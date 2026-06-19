@@ -1,6 +1,7 @@
 import numpy as np
+import pandas as pd
 
-from src.features import extract_basic_region_features, extract_cell_features
+from src.features import extract_basic_region_features, extract_cell_features, point_features_to_cell_features
 
 
 def test_extract_cell_features_returns_expected_columns_and_values():
@@ -53,3 +54,21 @@ def test_extract_basic_region_features_uses_cell_feature_schema():
     features = extract_basic_region_features(labels)
 
     assert list(features["cell_id"]) == [1, 2]
+
+
+def test_point_features_to_cell_features_fills_missing_shape_values_with_nan():
+    points = pd.DataFrame(
+        {
+            "point_id": [1, 2],
+            "centroid_x": [10.0, 20.0],
+            "centroid_y": [30.0, 40.0],
+            "source": ["stardist_npy", "stardist_npy"],
+        }
+    )
+
+    features = point_features_to_cell_features(points)
+
+    assert list(features.columns) == ["cell_id", "centroid_x", "centroid_y", "area", "eccentricity"]
+    assert list(features["cell_id"]) == [1, 2]
+    assert features["area"].isna().all()
+    assert features["eccentricity"].isna().all()

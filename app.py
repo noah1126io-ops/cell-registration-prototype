@@ -396,7 +396,11 @@ def main() -> None:
         max_pairs_to_display=max_pairs_to_display,
     )
 
-    # TODO: Add Cellpose execution for optional mask generation.
+    # TODO: Add segmentation source selection while preserving label-mask input.
+    # TODO: Add optional Cellpose adapter without making Cellpose the only source.
+    # TODO: Add StarDist nuclei centers .npy upload.
+    # TODO: Add GeoJSON nuclei upload.
+    # TODO: Add point-set registration mode.
     # TODO: Add GeoJSON nuclei input support for HE-to-GeoJSON alignment mode.
     # TODO: Add HE nuclei .npy input support for precomputed StarDist centers.
     # TODO: Add HE-to-GeoJSON alignment mode separate from mask-to-mask registration.

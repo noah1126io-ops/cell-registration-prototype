@@ -4,6 +4,8 @@ Serial tissue section images and their cell segmentation masks can be loaded int
 
 This application is a research prototype only. It is not intended for diagnosis, clinical decision-making, treatment planning, or any other medical use.
 
+The app should treat segmentation results as an abstract source. The current workflow keeps integer label-mask input, and future workflows should also accept point-set sources such as StarDist-derived `.npy` nucleus centers without requiring Cellpose.
+
 ## Setup
 
 ```bash
@@ -84,9 +86,18 @@ The reference pipeline aligns one HE image to one fluorescence nuclei GeoJSON wi
 - Visualize matched cell pairs on the fixed image
 - Export `matched_cells_overlay.png`
 
+## Planned Segmentation Sources
+
+- Integer label masks remain the supported input for the current mask-to-mask workflow.
+- Cellpose may be added later as an optional segmentation adapter.
+- StarDist-derived `.npy` nucleus center coordinates are planned as a point-set input source.
+- GeoJSON nuclei segmentations are planned for HE-to-GeoJSON alignment.
+- The internal feature/matching code should operate on normalized centroid tables rather than assuming one segmentation engine.
+
 ## Not Implemented Yet
 
-- Built-in Cellpose execution
+- Optional Cellpose segmentation adapter
+- StarDist `.npy` nuclei-center upload in the UI
 - Non-rigid registration
 - Batch processing
 - Moving-side unmatched cell reporting
