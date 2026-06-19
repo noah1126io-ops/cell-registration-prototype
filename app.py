@@ -397,6 +397,12 @@ def main() -> None:
     )
 
     # TODO: Add Cellpose execution for optional mask generation.
+    # TODO: Add GeoJSON nuclei input support for HE-to-GeoJSON alignment mode.
+    # TODO: Add HE nuclei .npy input support for precomputed StarDist centers.
+    # TODO: Add HE-to-GeoJSON alignment mode separate from mask-to-mask registration.
+    # TODO: Add world-um coordinate transform utilities for GeoJSON alignment.
+    # TODO: Add Y-flip handling for fluorescence GeoJSON world coordinates.
+    # TODO: Add Jacobian quality check for fine center-snap warp validation.
     # TODO: Add multi-scale density map presets for registration experiments.
     # TODO: Add non-rigid registration after affine registration is validated.
     # TODO: Add batch export of matched cells, transforms, and preview images.

@@ -11,6 +11,44 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Supported Workflows
+
+### Workflow A: mask-to-mask cell registration
+
+This is the currently implemented Streamlit workflow. It uses:
+
+- fixed image
+- moving image
+- fixed integer label mask
+- moving integer label mask
+
+The app extracts cell features from both masks, creates centroid-based density maps, estimates an affine transform from the density maps, transforms the moving image/mask/cell centroids, estimates cell correspondence candidates, and exports CSV/PNG/JSON quality-control artifacts.
+
+### Workflow B: HE-to-GeoJSON nuclei alignment
+
+This is a planned future workflow based on the existing HE-to-fluorescence nuclei GeoJSON research pipeline. It will use:
+
+- HE image
+- HE-side nucleus center `.npy` file, detected beforehand by StarDist or another nuclei detector
+- fluorescence-side nuclei segmentation GeoJSON
+
+The goal is to warp the HE image into the fluorescence nuclei GeoJSON world-µm coordinate system, then export aligned image and QC artifacts. This mode is not implemented in the Streamlit app yet.
+
+## Existing HE-to-GeoJSON Research Pipeline
+
+The reference pipeline aligns one HE image to one fluorescence nuclei GeoJSON without SpatialArc bundling.
+
+- The HE image is warped into the fluorescence nuclei GeoJSON world-µm coordinate system.
+- HE-side nucleus centers are assumed to be precomputed as `.npy`, for example from StarDist.
+- The fluorescence nuclei GeoJSON stores nuclei segmentation in world-µm coordinates and may require Y-flip handling.
+- The alignment performs an affine step followed by a fine center-snap warp.
+- Outputs include:
+  - overlay image of warped HE plus GeoJSON nuclei
+  - warp JSON containing image bounds, flip metadata, and quality metrics
+  - warped HE image on the GeoJSON world-µm grid
+- Deformation validity is checked with metrics such as minimum Jacobian value; positive Jacobian minimum is expected to avoid broken folds.
+- Future Streamlit integration should keep this as a separate mode from mask-to-mask cell registration.
+
 ## Implemented Features
 
 - Upload 4 files:
@@ -52,6 +90,11 @@ streamlit run app.py
 - Non-rigid registration
 - Batch processing
 - Moving-side unmatched cell reporting
+- HE-to-GeoJSON nuclei alignment mode
+- GeoJSON nuclei input
+- HE nuclei `.npy` input
+- World-um coordinate transforms and Y-flip handling
+- Jacobian-based warp quality checks
 - Production-grade quality control reports
 
 ## Notes
