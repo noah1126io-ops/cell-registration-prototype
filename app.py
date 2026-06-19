@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-import streamlit as st
+from io import BytesIO
 
+import numpy as np
+import streamlit as st
+from PIL import Image
+
+from src.density import create_density_map
 from src.features import extract_cell_features
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.visualization import colorize_label_image
@@ -35,12 +40,26 @@ def show_uploaded_image(title: str, uploaded_file, *, is_mask: bool = False):
         return None
 
 
-def show_feature_table(title: str, mask, image, filename: str) -> None:
+def density_map_to_png(density_map: np.ndarray) -> bytes:
+    density_map = np.asarray(density_map, dtype=np.float32)
+    max_value = float(density_map.max())
+    if max_value > 0:
+        preview = density_map / max_value
+    else:
+        preview = density_map
+
+    image = Image.fromarray((preview * 255).astype(np.uint8), mode="L")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def show_feature_table(title: str, mask, image, filename: str):
     st.subheader(title)
 
     if mask is None:
         st.info("Upload a mask to extract cell features.")
-        return
+        return None
 
     try:
         features = extract_cell_features(mask, image=image)
@@ -54,6 +73,29 @@ def show_feature_table(title: str, mask, image, filename: str) -> None:
         data=features.to_csv(index=False).encode("utf-8"),
         file_name=filename,
         mime="text/csv",
+        key=f"download-{filename}",
+    )
+    return features
+
+
+def show_density_map(title: str, features, image_shape, sigma: float, filename: str) -> None:
+    st.subheader(title)
+
+    if features is None or image_shape is None:
+        st.info("Upload a mask to create a density map.")
+        return
+
+    density_map = create_density_map(features, image_shape, sigma=sigma)
+    st.image(
+        density_map,
+        clamp=True,
+        caption=f"{filename} | shape={density_map.shape} | sigma={sigma}",
+    )
+    st.download_button(
+        "Download PNG",
+        data=density_map_to_png(density_map),
+        file_name=filename,
+        mime="image/png",
         key=f"download-{filename}",
     )
 
@@ -70,6 +112,14 @@ def main() -> None:
     fixed_mask = st.sidebar.file_uploader("Fixed mask", type=file_types)
     moving_mask = st.sidebar.file_uploader("Moving mask", type=file_types)
 
+    st.sidebar.divider()
+    density_sigma = st.sidebar.slider(
+        "Density map sigma",
+        min_value=1.0,
+        max_value=100.0,
+        value=10.0,
+        step=1.0,
+    )
     st.sidebar.divider()
     st.sidebar.info("Masks are interpreted as integer label images.")
 
@@ -88,21 +138,41 @@ def main() -> None:
     st.divider()
     feature_left, feature_right = st.columns(2)
     with feature_left:
-        show_feature_table(
+        fixed_features = show_feature_table(
             "Fixed cell features",
             fixed_mask_array,
             fixed_image_array,
             "fixed_cell_features.csv",
         )
     with feature_right:
-        show_feature_table(
+        moving_features = show_feature_table(
             "Moving cell features",
             moving_mask_array,
             moving_image_array,
             "moving_cell_features.csv",
         )
 
+    st.divider()
+    density_left, density_right = st.columns(2)
+    with density_left:
+        show_density_map(
+            "Fixed density map",
+            fixed_features,
+            None if fixed_mask_array is None else fixed_mask_array.shape,
+            density_sigma,
+            "fixed_density_map.png",
+        )
+    with density_right:
+        show_density_map(
+            "Moving density map",
+            moving_features,
+            None if moving_mask_array is None else moving_mask_array.shape,
+            density_sigma,
+            "moving_density_map.png",
+        )
+
     # TODO: Add Cellpose execution for optional mask generation.
+    # TODO: Add multi-scale density map presets for registration experiments.
     # TODO: Add cell correspondence estimation between fixed and moving masks.
     # TODO: Add image registration and transformed overlay visualization.
     # TODO: Add export of matched cells, transforms, and preview images.
