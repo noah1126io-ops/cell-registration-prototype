@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from io import BytesIO
 
 import numpy as np
@@ -10,6 +11,12 @@ from src.density import create_density_map
 from src.features import extract_cell_features
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.matching import match_cells
+from src.registration import (
+    estimate_affine_transform,
+    transform_cell_centroids,
+    warp_image,
+    warp_mask,
+)
 from src.visualization import colorize_label_image
 
 
@@ -55,6 +62,35 @@ def density_map_to_png(density_map: np.ndarray) -> bytes:
     return buffer.getvalue()
 
 
+def _to_grayscale_preview(image: np.ndarray) -> np.ndarray:
+    image = np.asarray(image)
+    if image.ndim == 3:
+        image = image[..., :3].mean(axis=2)
+
+    image = image.astype(np.float32)
+    min_value = float(np.min(image))
+    max_value = float(np.max(image))
+    if max_value == min_value:
+        return np.zeros_like(image, dtype=np.float32)
+    return (image - min_value) / (max_value - min_value)
+
+
+def create_overlay(fixed_image: np.ndarray, moving_image: np.ndarray) -> np.ndarray:
+    fixed = _to_grayscale_preview(fixed_image)
+    moving = _to_grayscale_preview(moving_image)
+
+    height = min(fixed.shape[0], moving.shape[0])
+    width = min(fixed.shape[1], moving.shape[1])
+    fixed = fixed[:height, :width]
+    moving = moving[:height, :width]
+
+    overlay = np.zeros((height, width, 3), dtype=np.float32)
+    overlay[..., 0] = moving
+    overlay[..., 1] = fixed
+    overlay[..., 2] = fixed
+    return np.clip(overlay, 0.0, 1.0)
+
+
 def show_feature_table(title: str, mask, image, filename: str):
     st.subheader(title)
 
@@ -79,12 +115,12 @@ def show_feature_table(title: str, mask, image, filename: str):
     return features
 
 
-def show_density_map(title: str, features, image_shape, sigma: float, filename: str) -> None:
+def show_density_map(title: str, features, image_shape, sigma: float, filename: str):
     st.subheader(title)
 
     if features is None or image_shape is None:
         st.info("Upload a mask to create a density map.")
-        return
+        return None
 
     density_map = create_density_map(features, image_shape, sigma=sigma)
     st.image(
@@ -99,6 +135,87 @@ def show_density_map(title: str, features, image_shape, sigma: float, filename: 
         mime="image/png",
         key=f"download-{filename}",
     )
+    return density_map
+
+
+def transformation_summary_to_json(registration_result) -> bytes:
+    summary = {
+        "registration_model": "affine",
+        "moving_to_fixed": True,
+        "success": registration_result.success,
+        "message": registration_result.message,
+        "ecc_score": registration_result.ecc_score,
+        "affine_transform": registration_result.affine_matrix.tolist(),
+        "fallback": not registration_result.success,
+        "notes": "Affine only. Non-rigid registration is not implemented in this prototype stage.",
+    }
+    return json.dumps(summary, indent=2).encode("utf-8")
+
+
+def show_registration_result(
+    fixed_image,
+    moving_image,
+    fixed_mask,
+    moving_mask,
+    fixed_density_map,
+    moving_density_map,
+    moving_features,
+):
+    st.subheader("Affine registration")
+
+    if fixed_density_map is None or moving_density_map is None:
+        st.info("Upload both masks to estimate affine registration from density maps.")
+        return moving_image, moving_mask, moving_features, None
+
+    result = estimate_affine_transform(fixed_density_map, moving_density_map)
+    if not result.success:
+        st.warning(result.message)
+
+    output_shape = fixed_density_map.shape
+    warped_moving_image = None if moving_image is None else warp_image(moving_image, result.affine_matrix, output_shape)
+    warped_moving_mask = None if moving_mask is None else warp_mask(moving_mask, result.affine_matrix, output_shape)
+    warped_moving_density = warp_image(moving_density_map, result.affine_matrix, output_shape)
+    transformed_moving_features = (
+        None if moving_features is None else transform_cell_centroids(moving_features, result.affine_matrix)
+    )
+
+    density_before, density_after = st.columns(2)
+    with density_before:
+        st.image(create_overlay(fixed_density_map, moving_density_map), caption="Before registration density overlay")
+    with density_after:
+        st.image(create_overlay(fixed_density_map, warped_moving_density), caption="After registration density overlay")
+
+    if fixed_image is not None and moving_image is not None and warped_moving_image is not None:
+        before_left, after_right = st.columns(2)
+        with before_left:
+            st.image(create_overlay(fixed_image, moving_image), caption="Before registration overlay")
+        with after_right:
+            st.image(create_overlay(fixed_image, warped_moving_image), caption="After registration overlay")
+
+    preview_left, preview_right = st.columns(2)
+    with preview_left:
+        if warped_moving_image is not None:
+            st.image(warped_moving_image, caption="Warped moving image")
+    with preview_right:
+        if warped_moving_mask is not None:
+            st.image(colorize_label_image(warped_moving_mask), caption="Warped moving mask")
+
+    if transformed_moving_features is not None:
+        st.subheader("Transformed moving cell centroids")
+        st.dataframe(
+            transformed_moving_features[["cell_id", "centroid_x", "centroid_y"]],
+            use_container_width=True,
+        )
+
+    st.download_button(
+        "Download transformation summary",
+        data=transformation_summary_to_json(result),
+        file_name="transformation_summary.json",
+        mime="application/json",
+        key="download-transformation-summary.json",
+    )
+
+    return warped_moving_image, warped_moving_mask, transformed_moving_features, result
 
 
 def show_cell_correspondence(
@@ -199,7 +316,7 @@ def main() -> None:
     st.divider()
     density_left, density_right = st.columns(2)
     with density_left:
-        show_density_map(
+        fixed_density_map = show_density_map(
             "Fixed density map",
             fixed_features,
             None if fixed_mask_array is None else fixed_mask_array.shape,
@@ -207,7 +324,7 @@ def main() -> None:
             "fixed_density_map.png",
         )
     with density_right:
-        show_density_map(
+        moving_density_map = show_density_map(
             "Moving density map",
             moving_features,
             None if moving_mask_array is None else moving_mask_array.shape,
@@ -216,9 +333,20 @@ def main() -> None:
         )
 
     st.divider()
+    _, _, transformed_moving_features, _ = show_registration_result(
+        fixed_image_array,
+        moving_image_array,
+        fixed_mask_array,
+        moving_mask_array,
+        fixed_density_map,
+        moving_density_map,
+        moving_features,
+    )
+
+    st.divider()
     show_cell_correspondence(
         fixed_features,
-        moving_features,
+        transformed_moving_features,
         max_distance=max_distance,
         min_area_ratio=min_area_ratio,
         max_area_ratio=max_area_ratio,
@@ -227,7 +355,7 @@ def main() -> None:
 
     # TODO: Add Cellpose execution for optional mask generation.
     # TODO: Add multi-scale density map presets for registration experiments.
-    # TODO: Add image registration and transformed overlay visualization.
+    # TODO: Add non-rigid registration after affine registration is validated.
     # TODO: Add export of matched cells, transforms, and preview images.
 
 
