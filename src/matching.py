@@ -40,7 +40,7 @@ def _unmatched_row(fixed_cell: pd.Series) -> dict:
         "area_ratio": np.nan,
         "score": np.nan,
         "confidence": 0.0,
-        "matched_status": "unmatched",
+        "matched_status": "unmatched_fixed",
     }
 
 
@@ -159,4 +159,5 @@ def initialize_empty_matches() -> pd.DataFrame:
     return _empty_matches()
 
 
+# TODO: Add unmatched_moving support for moving-side cells not assigned to any fixed cell.
 # TODO: Replace identity-transform matching with registration-aware candidate generation.

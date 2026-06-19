@@ -1,30 +1,61 @@
 # Cell Registration Prototype
 
-連続組織切片画像 2 枚と、それぞれの細胞セグメンテーションマスクを読み込み、後続の細胞対応推定と画像位置合わせの検討を行うための研究用ローカル Web アプリです。
+Serial tissue section images and their cell segmentation masks can be loaded into this local Streamlit app to prototype density-map registration and cell correspondence estimation.
 
-このアプリは研究用プロトタイプであり、診断用途・治療方針決定・臨床判断には使用しないでください。
+This application is a research prototype only. It is not intended for diagnosis, clinical decision-making, treatment planning, or any other medical use.
 
-## 起動方法
+## Setup
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## 現在できること
+## Implemented Features
 
-- fixed image のアップロードと表示
-- moving image のアップロードと表示
-- fixed mask のアップロードと表示
-- moving mask のアップロードと表示
-- mask を整数ラベル画像として読み込む
+- Upload 4 files:
+  - fixed image
+  - moving image
+  - fixed mask
+  - moving mask
+- Preview uploaded images and integer label masks
+- Extract per-cell features from fixed and moving masks
+  - centroid
+  - area
+  - perimeter
+  - eccentricity
+  - major/minor axis length
+  - bounding box
+  - mean intensity when an image is available
+- Export feature tables:
+  - `fixed_cell_features.csv`
+  - `moving_cell_features.csv`
+- Create fixed and moving cell density maps from cell centroids
+- Export density maps:
+  - `fixed_density_map.png`
+  - `moving_density_map.png`
+- Estimate affine registration from `fixed_density_map` and `moving_density_map`
+- Apply the affine transform to:
+  - moving image
+  - moving mask
+  - moving cell centroids
+- Display registration overlays before and after affine alignment
+- Export `transformation_summary.json`
+- Estimate cell correspondence candidates after affine registration
+- Export `cell_correspondence.csv`
+- Visualize matched cell pairs on the fixed image
+- Export `matched_cells_overlay.png`
 
-## 未実装の機能
+## Not Implemented Yet
 
-- Cellpose によるセグメンテーション実行
-- 細胞特徴量抽出の本実装
-- 密度画像生成の本実装
-- 細胞対応推定
-- 画像位置合わせ
-- 結果の可視化・エクスポート
+- Built-in Cellpose execution
+- Non-rigid registration
+- Batch processing
+- Moving-side unmatched cell reporting
+- Production-grade quality control reports
 
+## Notes
+
+- Masks are expected to be integer label images where `0` is background and positive values are cell IDs.
+- Affine registration uses OpenCV when `opencv-python` is installed. If registration fails, the app falls back to the identity transform and shows a warning.
+- The current cell matching step is intended as an MVP for exploratory research and should be reviewed carefully before downstream analysis.

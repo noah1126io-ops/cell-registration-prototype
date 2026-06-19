@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-from io import BytesIO
 
 import numpy as np
 import streamlit as st
-from PIL import Image
 
 from src.density import create_density_map
+from src.export import array_to_png_bytes, figure_to_png_bytes
 from src.features import extract_cell_features
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.matching import match_cells
@@ -17,7 +16,7 @@ from src.registration import (
     warp_image,
     warp_mask,
 )
-from src.visualization import colorize_label_image
+from src.visualization import colorize_label_image, visualize_cell_matches
 
 
 st.set_page_config(
@@ -49,17 +48,7 @@ def show_uploaded_image(title: str, uploaded_file, *, is_mask: bool = False):
 
 
 def density_map_to_png(density_map: np.ndarray) -> bytes:
-    density_map = np.asarray(density_map, dtype=np.float32)
-    max_value = float(density_map.max())
-    if max_value > 0:
-        preview = density_map / max_value
-    else:
-        preview = density_map
-
-    image = Image.fromarray((preview * 255).astype(np.uint8), mode="L")
-    buffer = BytesIO()
-    image.save(buffer, format="PNG")
-    return buffer.getvalue()
+    return array_to_png_bytes(np.asarray(density_map, dtype=np.float32))
 
 
 def _to_grayscale_preview(image: np.ndarray) -> np.ndarray:
@@ -231,7 +220,7 @@ def show_cell_correspondence(
 
     if fixed_features is None or moving_features is None:
         st.info("Upload both fixed and moving masks to estimate correspondence candidates.")
-        return
+        return None
 
     try:
         matches = match_cells(
@@ -244,7 +233,7 @@ def show_cell_correspondence(
         )
     except ValueError as exc:
         st.warning(str(exc))
-        return
+        return None
     st.dataframe(matches, use_container_width=True)
     st.download_button(
         "Download CSV",
@@ -252,6 +241,42 @@ def show_cell_correspondence(
         file_name="cell_correspondence.csv",
         mime="text/csv",
         key="download-cell-correspondence.csv",
+    )
+    return matches
+
+
+def show_match_visualization(
+    fixed_image,
+    fixed_features,
+    moving_features,
+    matches,
+    max_pairs_to_display: int,
+) -> None:
+    st.subheader("Matched pair visualization")
+
+    if fixed_image is None or fixed_features is None or moving_features is None or matches is None:
+        st.info("Upload fixed image and masks, then create correspondence results to visualize matches.")
+        return
+
+    try:
+        figure = visualize_cell_matches(
+            fixed_image,
+            fixed_features,
+            moving_features,
+            matches,
+            max_pairs=max_pairs_to_display,
+        )
+    except ValueError as exc:
+        st.warning(str(exc))
+        return
+
+    st.pyplot(figure, clear_figure=False)
+    st.download_button(
+        "Download matched overlay",
+        data=figure_to_png_bytes(figure),
+        file_name="matched_cells_overlay.png",
+        mime="image/png",
+        key="download-matched-cells-overlay.png",
     )
 
 
@@ -281,6 +306,15 @@ def main() -> None:
     min_area_ratio = st.sidebar.number_input("Min area ratio", min_value=0.01, value=0.5, step=0.05)
     max_area_ratio = st.sidebar.number_input("Max area ratio", min_value=0.01, value=2.0, step=0.05)
     max_score = st.sidebar.number_input("Max score", min_value=0.0, value=1.5, step=0.1)
+    st.sidebar.divider()
+    st.sidebar.header("Visualization")
+    max_pairs_to_display = st.sidebar.number_input(
+        "Max pairs to display",
+        min_value=1,
+        max_value=5000,
+        value=200,
+        step=50,
+    )
     st.sidebar.divider()
     st.sidebar.info("Masks are interpreted as integer label images.")
 
@@ -344,7 +378,7 @@ def main() -> None:
     )
 
     st.divider()
-    show_cell_correspondence(
+    matches = show_cell_correspondence(
         fixed_features,
         transformed_moving_features,
         max_distance=max_distance,
@@ -353,10 +387,19 @@ def main() -> None:
         max_score=max_score,
     )
 
+    st.divider()
+    show_match_visualization(
+        fixed_image_array,
+        fixed_features,
+        transformed_moving_features,
+        matches,
+        max_pairs_to_display=max_pairs_to_display,
+    )
+
     # TODO: Add Cellpose execution for optional mask generation.
     # TODO: Add multi-scale density map presets for registration experiments.
     # TODO: Add non-rigid registration after affine registration is validated.
-    # TODO: Add export of matched cells, transforms, and preview images.
+    # TODO: Add batch export of matched cells, transforms, and preview images.
 
 
 if __name__ == "__main__":

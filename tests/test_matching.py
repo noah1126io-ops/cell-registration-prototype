@@ -76,5 +76,40 @@ def test_match_cells_marks_threshold_exceeding_cell_unmatched():
 
     assert matches.loc[0, "fixed_cell_id"] == 1
     assert pd.isna(matches.loc[0, "moving_cell_id"])
-    assert matches.loc[0, "matched_status"] == "unmatched"
+    assert matches.loc[0, "matched_status"] == "unmatched_fixed"
     assert matches.loc[0, "confidence"] == 0.0
+
+
+def test_match_cells_marks_high_score_assignment_low_confidence():
+    fixed = pd.DataFrame(
+        {
+            "cell_id": [1],
+            "centroid_x": [10.0],
+            "centroid_y": [10.0],
+            "area": [50.0],
+            "eccentricity": [0.1],
+        }
+    )
+    moving = pd.DataFrame(
+        {
+            "cell_id": [11],
+            "centroid_x": [12.0],
+            "centroid_y": [10.0],
+            "area": [75.0],
+            "eccentricity": [0.8],
+        }
+    )
+
+    matches = match_cells(
+        fixed,
+        moving,
+        max_distance=10.0,
+        min_area_ratio=0.5,
+        max_area_ratio=2.0,
+        max_score=0.1,
+    )
+
+    assert matches.loc[0, "moving_cell_id"] == 11
+    assert matches.loc[0, "matched_status"] == "low_confidence"
+    assert matches.loc[0, "score"] > 0.1
+    assert 0.0 < matches.loc[0, "confidence"] < 1.0
