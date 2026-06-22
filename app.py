@@ -4,14 +4,17 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import streamlit as st
 
 from src.density import create_density_map
 from src.export import array_to_png_bytes, figure_to_png_bytes
 from src.features import extract_cell_features, point_features_to_cell_features
+from src.geojson_utils import load_geojson_centroids
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.matching import match_cells
 from src.point_io import load_csv_points, load_npy_centers
+from src.pointset_registration import estimate_affine_with_y_flip, fine_center_snap_warp
 from src.registration import (
     estimate_affine_transform,
     transform_cell_centroids,
@@ -579,9 +582,241 @@ def show_mask_to_mask_workflow(
     # TODO: Add batch export of matched cells, transforms, and preview images.
 
 
+def _points_from_table(points: pd.DataFrame) -> np.ndarray:
+    return points[["centroid_x", "centroid_y"]].to_numpy(dtype=float)
+
+
+def _cell_features_from_points(points: pd.DataFrame):
+    return point_features_to_cell_features(points)
+
+
+def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict) -> bytes:
+    summary = {
+        "workflow": "HE-to-GeoJSON alignment preparation",
+        "coordinate_system": "GeoJSON world-um",
+        "affine": {
+            "model": "y_flip_optional_affine_icp",
+            "flip_y": affine_result.flip_y,
+            "image_height_px": affine_result.image_height,
+            "affine_matrix": affine_result.affine_matrix.tolist(),
+            "translation": affine_result.translation.tolist(),
+            "mean_residual_um": affine_result.mean_residual,
+            "median_residual_um": affine_result.median_residual,
+            "n_pairs": affine_result.n_pairs,
+            "success": affine_result.success,
+            "message": affine_result.message,
+        },
+        "fine_center_snap": {
+            "model": "confidence_weighted_smooth_displacement_field",
+            "bounds_um": fine_result.bounds,
+            "grid_spacing_um": fine_result.grid_spacing,
+            "jacobian_min": fine_result.jacobian_min,
+            "jacobian_max": fine_result.jacobian_max,
+            "max_displacement_um": fine_result.max_displacement,
+            "n_pairs": fine_result.n_pairs,
+            "median_pair_distance_before_um": fine_result.median_pair_distance_before,
+            "median_pair_distance_after_um": fine_result.median_pair_distance_after,
+            "success": fine_result.success,
+            "message": fine_result.message,
+        },
+        "parameters": parameters,
+        "notes": "Research prototype only. Raster HE warp export and non-rigid production validation remain TODO.",
+    }
+    return json.dumps(summary, indent=2).encode("utf-8")
+
+
 def show_he_geojson_preparation() -> None:
     st.header("Workflow C: HE-to-GeoJSON alignment preparation")
-    st.info("This mode is planned. It will use HE image, HE nuclei .npy centers, and fluorescence nuclei GeoJSON inputs.")
+    st.caption("Experimental point-set alignment from HE nuclei centers to fluorescence GeoJSON world-um coordinates.")
+
+    input_left, input_right = st.columns(2)
+    with input_left:
+        he_centers_file = st.file_uploader("HE nuclei centers .npy", type=["npy"], key="he-nuclei-npy")
+        he_coordinate_order = st.selectbox("HE .npy coordinate order", ["xy", "yx"], key="he-nuclei-order")
+        he_image_file = st.file_uploader(
+            "Optional HE image for y-flip height / QC background",
+            type=["png", "jpg", "jpeg", "tif", "tiff"],
+            key="he-qc-image",
+        )
+    with input_right:
+        geojson_file = st.file_uploader(
+            "Fluorescence nuclei GeoJSON",
+            type=["geojson", "json"],
+            key="fluorescence-geojson",
+        )
+
+    st.subheader("Point-set registration parameters")
+    param_left, param_mid, param_right = st.columns(3)
+    with param_left:
+        similarity_trim = st.slider("Similarity ICP trim quantile", 0.1, 1.0, 0.8, 0.05)
+        affine_trim = st.slider("Affine ICP trim quantile", 0.1, 1.0, 0.7, 0.05)
+    with param_mid:
+        match_radius = st.number_input("Fine match radius (um)", min_value=0.1, value=10.0, step=1.0)
+        fine_bandwidth = st.number_input("Fine warp bandwidth (um)", min_value=0.1, value=12.0, step=1.0)
+    with param_right:
+        grid_spacing = st.number_input("Fine warp grid spacing (um)", min_value=0.1, value=6.0, step=1.0)
+        ridge = st.number_input("Fine warp ridge", min_value=0.0, value=0.3, step=0.1)
+
+    he_image = show_uploaded_image("Optional HE image", he_image_file) if he_image_file else None
+
+    try:
+        he_points = (
+            None
+            if he_centers_file is None
+            else load_npy_centers(
+                he_centers_file,
+                point_source="he_npy",
+                coordinate_order=he_coordinate_order,
+            )
+        )
+        geojson_points = (
+            None
+            if geojson_file is None
+            else load_geojson_centroids(geojson_file, point_source="fluorescence_geojson")
+        )
+    except ValueError as exc:
+        st.warning(str(exc))
+        return
+
+    table_left, table_right = st.columns(2)
+    with table_left:
+        st.subheader("HE nuclei centers")
+        if he_points is None:
+            st.info("Upload HE nuclei .npy centers.")
+        else:
+            st.dataframe(he_points.head(500), use_container_width=True)
+            st.download_button(
+                "Download normalized HE centers",
+                data=he_points.to_csv(index=False).encode("utf-8"),
+                file_name="he_nuclei_centers_normalized.csv",
+                mime="text/csv",
+            )
+    with table_right:
+        st.subheader("GeoJSON nuclei centroids")
+        if geojson_points is None:
+            st.info("Upload fluorescence nuclei GeoJSON.")
+        else:
+            st.dataframe(geojson_points.head(500), use_container_width=True)
+            st.download_button(
+                "Download GeoJSON centroids",
+                data=geojson_points.to_csv(index=False).encode("utf-8"),
+                file_name="geojson_nuclei_centroids.csv",
+                mime="text/csv",
+            )
+
+    if he_points is None or geojson_points is None:
+        st.info("Upload both HE .npy centers and GeoJSON centroids to run Workflow C.")
+        return
+
+    if he_image is not None:
+        image_height_px = float(he_image.shape[0])
+    else:
+        image_height_px = float(np.ceil(he_points["centroid_y"].max()))
+        st.warning(
+            "No HE image was uploaded. Y-flip candidates use the maximum HE y coordinate as image height estimate."
+        )
+
+    he_array = _points_from_table(he_points)
+    geojson_array = _points_from_table(geojson_points)
+
+    try:
+        affine_result = estimate_affine_with_y_flip(
+            he_array,
+            geojson_array,
+            image_height_px=image_height_px,
+            similarity_trim_quantile=similarity_trim,
+            affine_trim_quantile=affine_trim,
+        )
+        fine_result = fine_center_snap_warp(
+            affine_result.transformed_points,
+            geojson_array,
+            match_radius=match_radius,
+            grid_spacing=grid_spacing,
+            bandwidth=fine_bandwidth,
+            ridge=ridge,
+        )
+    except ValueError as exc:
+        st.warning(str(exc))
+        return
+
+    if not fine_result.success:
+        st.warning(fine_result.message)
+    if fine_result.jacobian_min <= 0:
+        st.warning("Jacobian minimum is <= 0. The fine warp may contain local fold-over.")
+
+    transformed_affine_points = he_points.copy()
+    transformed_affine_points["centroid_x"] = affine_result.transformed_points[:, 0]
+    transformed_affine_points["centroid_y"] = affine_result.transformed_points[:, 1]
+    transformed_affine_points["source"] = "he_affine_world_um"
+
+    transformed_fine_points = he_points.copy()
+    transformed_fine_points["centroid_x"] = fine_result.transformed_points[:, 0]
+    transformed_fine_points["centroid_y"] = fine_result.transformed_points[:, 1]
+    transformed_fine_points["source"] = "he_fine_world_um"
+
+    st.subheader("Registration QC")
+    metric_a, metric_b, metric_c, metric_d = st.columns(4)
+    metric_a.metric("Y-flip selected", str(affine_result.flip_y))
+    metric_b.metric("Affine median residual", f"{affine_result.median_residual:.2f} um")
+    metric_c.metric("Fine median residual", f"{fine_result.median_pair_distance_after:.2f} um")
+    metric_d.metric("Jacobian min", f"{fine_result.jacobian_min:.3f}")
+
+    plot_left, plot_right = st.columns(2)
+    geojson_features = _cell_features_from_points(geojson_points)
+    affine_features = _cell_features_from_points(transformed_affine_points)
+    fine_features = _cell_features_from_points(transformed_fine_points)
+    with plot_left:
+        affine_figure = visualize_point_sets(
+            geojson_features,
+            affine_features,
+            title="Affine HE centers vs GeoJSON centroids (world-um)",
+        )
+        st.pyplot(affine_figure, clear_figure=False)
+        st.download_button(
+            "Download affine scatter PNG",
+            data=figure_to_png_bytes(affine_figure),
+            file_name="he_geojson_affine_scatter.png",
+            mime="image/png",
+        )
+    with plot_right:
+        fine_figure = visualize_point_sets(
+            geojson_features,
+            fine_features,
+            title="Fine center-snap HE centers vs GeoJSON centroids (world-um)",
+        )
+        st.pyplot(fine_figure, clear_figure=False)
+        st.download_button(
+            "Download fine scatter PNG",
+            data=figure_to_png_bytes(fine_figure),
+            file_name="he_geojson_fine_scatter.png",
+            mime="image/png",
+        )
+
+    st.subheader("Exports")
+    st.download_button(
+        "Download transformed HE centers CSV",
+        data=transformed_fine_points.to_csv(index=False).encode("utf-8"),
+        file_name="he_centers_transformed_world_um.csv",
+        mime="text/csv",
+    )
+    parameters = {
+        "he_coordinate_order": he_coordinate_order,
+        "similarity_trim_quantile": similarity_trim,
+        "affine_trim_quantile": affine_trim,
+        "fine_match_radius_um": match_radius,
+        "fine_grid_spacing_um": grid_spacing,
+        "fine_bandwidth_um": fine_bandwidth,
+        "fine_ridge": ridge,
+    }
+    st.download_button(
+        "Download HE-GeoJSON transform summary",
+        data=_he_geojson_summary_to_json(affine_result, fine_result, parameters),
+        file_name="he_geojson_transform_summary.json",
+        mime="application/json",
+    )
+
+    # TODO: Export raster HE image warped onto the GeoJSON world-um grid.
+    # TODO: Add GeoJSON polygon overlay and warp-field vector QC panels.
 
 
 def main() -> None:
