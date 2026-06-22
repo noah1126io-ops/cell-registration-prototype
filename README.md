@@ -91,6 +91,7 @@ The reference pipeline aligns one HE image to one fluorescence nuclei GeoJSON wi
 - Integer label masks remain the supported input for the current mask-to-mask workflow.
 - Cellpose may be added later as an optional segmentation adapter.
 - StarDist-derived `.npy` nucleus center coordinates are planned as a point-set input source.
+- StarDist-derived `.npy` files may store centers as `xy` or `yx`; confirm the coordinate order before using them.
 - GeoJSON nuclei segmentations are planned for HE-to-GeoJSON alignment.
 - The internal feature/matching code should operate on normalized centroid tables rather than assuming one segmentation engine.
 
