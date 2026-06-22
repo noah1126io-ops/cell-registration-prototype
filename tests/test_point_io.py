@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.point_io import load_npy_centers
+from src.point_io import load_csv_points, load_npy_centers
 
 
 def test_load_npy_centers_returns_point_table_for_xy_order(tmp_path):
@@ -42,3 +42,26 @@ def test_load_npy_centers_rejects_invalid_arrays(tmp_path, centers):
 
     with pytest.raises(ValueError):
         load_npy_centers(path)
+
+
+def test_load_csv_points_accepts_xy_columns(tmp_path):
+    path = tmp_path / "points_xy.csv"
+    path.write_text("x,y\n10,20\n30.5,40.5\n", encoding="utf-8")
+
+    points = load_csv_points(path, point_source="csv_points")
+
+    assert list(points.columns) == ["point_id", "centroid_x", "centroid_y", "source"]
+    assert list(points["point_id"]) == [1, 2]
+    assert list(points["centroid_x"]) == [10.0, 30.5]
+    assert list(points["centroid_y"]) == [20.0, 40.5]
+
+
+def test_load_csv_points_accepts_centroid_columns_with_point_id(tmp_path):
+    path = tmp_path / "points_centroid.csv"
+    path.write_text("point_id,centroid_x,centroid_y\n101,10,20\n102,30.5,40.5\n", encoding="utf-8")
+
+    points = load_csv_points(path, point_source="csv_points")
+
+    assert list(points["point_id"]) == [101, 102]
+    assert list(points["centroid_x"]) == [10.0, 30.5]
+    assert list(points["centroid_y"]) == [20.0, 40.5]

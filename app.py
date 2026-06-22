@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import streamlit as st
 
 from src.density import create_density_map
 from src.export import array_to_png_bytes, figure_to_png_bytes
-from src.features import extract_cell_features
+from src.features import extract_cell_features, point_features_to_cell_features
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.matching import match_cells
+from src.point_io import load_csv_points, load_npy_centers
 from src.registration import (
     estimate_affine_transform,
     transform_cell_centroids,
     warp_image,
     warp_mask,
 )
-from src.visualization import colorize_label_image, visualize_cell_matches
+from src.visualization import colorize_label_image, visualize_cell_matches, visualize_point_sets
 
 
 st.set_page_config(
@@ -215,6 +217,7 @@ def show_cell_correspondence(
     min_area_ratio: float,
     max_area_ratio: float,
     max_score: float,
+    filename: str = "cell_correspondence.csv",
 ) -> None:
     st.subheader("Cell correspondence candidates")
 
@@ -238,9 +241,9 @@ def show_cell_correspondence(
     st.download_button(
         "Download CSV",
         data=matches.to_csv(index=False).encode("utf-8"),
-        file_name="cell_correspondence.csv",
+        file_name=filename,
         mime="text/csv",
-        key="download-cell-correspondence.csv",
+        key=f"download-{filename}",
     )
     return matches
 
@@ -254,8 +257,8 @@ def show_match_visualization(
 ) -> None:
     st.subheader("Matched pair visualization")
 
-    if fixed_image is None or fixed_features is None or moving_features is None or matches is None:
-        st.info("Upload fixed image and masks, then create correspondence results to visualize matches.")
+    if fixed_features is None or moving_features is None or matches is None:
+        st.info("Create correspondence results to visualize matches.")
         return
 
     try:
@@ -280,43 +283,207 @@ def show_match_visualization(
     )
 
 
-def main() -> None:
-    st.title("Cell Registration Prototype")
-    st.caption("Research prototype only. Not for diagnostic use.")
+def load_uploaded_points(uploaded_file, *, coordinate_order: str):
+    if uploaded_file is None:
+        return None
 
-    st.sidebar.header("Input files")
+    suffix = Path(uploaded_file.name).suffix.lower()
+    if suffix == ".npy":
+        return load_npy_centers(
+            uploaded_file,
+            point_source=suffix.lstrip("."),
+            coordinate_order=coordinate_order,
+        )
+    if suffix == ".csv":
+        return load_csv_points(uploaded_file, point_source=suffix.lstrip("."))
+    raise ValueError("Point files must be .npy or .csv.")
+
+
+def infer_canvas_shape(*feature_tables, background_image=None, margin: int = 50) -> tuple[int, int]:
+    if background_image is not None:
+        return tuple(background_image.shape[:2])
+
+    max_x = 0.0
+    max_y = 0.0
+    for features in feature_tables:
+        if features is None or features.empty:
+            continue
+        max_x = max(max_x, float(features["centroid_x"].max()))
+        max_y = max(max_y, float(features["centroid_y"].max()))
+
+    width = max(64, int(np.ceil(max_x)) + margin)
+    height = max(64, int(np.ceil(max_y)) + margin)
+    return height, width
+
+
+def show_point_table(title: str, points, filename: str):
+    st.subheader(title)
+    if points is None:
+        st.info("Upload a point file to preview it.")
+        return None
+    st.dataframe(points, use_container_width=True)
+    st.download_button(
+        "Download normalized points",
+        data=points.to_csv(index=False).encode("utf-8"),
+        file_name=filename,
+        mime="text/csv",
+        key=f"download-{filename}",
+    )
+    return point_features_to_cell_features(points)
+
+
+def show_point_registration_workflow(
+    *,
+    density_sigma: float,
+    max_distance: float,
+    min_area_ratio: float,
+    max_area_ratio: float,
+    max_score: float,
+    max_pairs_to_display: int,
+) -> None:
+    st.header("Workflow A: Data-only point registration")
+
+    point_left, point_right = st.columns(2)
+    with point_left:
+        fixed_points_file = st.file_uploader("Fixed points file", type=["npy", "csv"])
+        fixed_coordinate_order = st.selectbox("Fixed .npy coordinate order", ["xy", "yx"], key="fixed-point-order")
+    with point_right:
+        moving_points_file = st.file_uploader("Moving points file", type=["npy", "csv"])
+        moving_coordinate_order = st.selectbox("Moving .npy coordinate order", ["xy", "yx"], key="moving-point-order")
+
+    bg_left, bg_right = st.columns(2)
+    with bg_left:
+        fixed_background_file = st.file_uploader("Optional fixed background image", type=["png", "jpg", "jpeg", "tif", "tiff"])
+        fixed_background = show_uploaded_image("Fixed background", fixed_background_file) if fixed_background_file else None
+    with bg_right:
+        moving_background_file = st.file_uploader("Optional moving background image", type=["png", "jpg", "jpeg", "tif", "tiff"])
+        moving_background = show_uploaded_image("Moving background", moving_background_file) if moving_background_file else None
+
+    try:
+        fixed_points = load_uploaded_points(fixed_points_file, coordinate_order=fixed_coordinate_order)
+        moving_points = load_uploaded_points(moving_points_file, coordinate_order=moving_coordinate_order)
+    except ValueError as exc:
+        st.warning(str(exc))
+        return
+
+    table_left, table_right = st.columns(2)
+    with table_left:
+        fixed_features = show_point_table("Fixed point table", fixed_points, "fixed_points_normalized.csv")
+    with table_right:
+        moving_features = show_point_table("Moving point table", moving_points, "moving_points_normalized.csv")
+
+    if fixed_features is None or moving_features is None:
+        st.info("Upload both fixed and moving point files to run registration.")
+        return
+
+    canvas_shape = infer_canvas_shape(fixed_features, moving_features, background_image=fixed_background)
+    fixed_density_map = create_density_map(fixed_features, canvas_shape, sigma=density_sigma)
+    moving_density_map = create_density_map(moving_features, canvas_shape, sigma=density_sigma)
+
+    st.divider()
+    density_left, density_right = st.columns(2)
+    with density_left:
+        st.image(fixed_density_map, clamp=True, caption=f"Fixed density map | shape={fixed_density_map.shape}")
+        st.download_button(
+            "Download fixed density PNG",
+            data=density_map_to_png(fixed_density_map),
+            file_name="fixed_density_map.png",
+            mime="image/png",
+            key="download-fixed-density-point.png",
+        )
+    with density_right:
+        st.image(moving_density_map, clamp=True, caption=f"Moving density map | shape={moving_density_map.shape}")
+        st.download_button(
+            "Download moving density PNG",
+            data=density_map_to_png(moving_density_map),
+            file_name="moving_density_map.png",
+            mime="image/png",
+            key="download-moving-density-point.png",
+        )
+
+    result = estimate_affine_transform(fixed_density_map, moving_density_map)
+    if not result.success:
+        st.warning(result.message)
+
+    transformed_moving_features = transform_cell_centroids(moving_features, result.affine_matrix)
+    warped_moving_background = None
+    if moving_background is not None:
+        warped_moving_background = warp_image(moving_background, result.affine_matrix, canvas_shape)
+
+    st.divider()
+    before_after_left, before_after_right = st.columns(2)
+    with before_after_left:
+        before_figure = visualize_point_sets(
+            fixed_features,
+            moving_features,
+            title="Before registration",
+            background_image=fixed_background,
+        )
+        st.pyplot(before_figure, clear_figure=False)
+    with before_after_right:
+        after_figure = visualize_point_sets(
+            fixed_features,
+            transformed_moving_features,
+            title="After registration",
+            background_image=fixed_background,
+        )
+        st.pyplot(after_figure, clear_figure=False)
+
+    matches = show_cell_correspondence(
+        fixed_features,
+        transformed_moving_features,
+        max_distance=max_distance,
+        min_area_ratio=min_area_ratio,
+        max_area_ratio=max_area_ratio,
+        max_score=max_score,
+        filename="matched_points.csv",
+    )
+
+    show_match_visualization(
+        fixed_background,
+        fixed_features,
+        transformed_moving_features,
+        matches,
+        max_pairs_to_display=max_pairs_to_display,
+    )
+
+    st.download_button(
+        "Download transform summary",
+        data=transformation_summary_to_json(result),
+        file_name="transform_summary.json",
+        mime="application/json",
+        key="download-point-transform-summary.json",
+    )
+    if warped_moving_background is not None:
+        st.image(warped_moving_background, caption="Warped moving background")
+        st.download_button(
+            "Download warped moving image",
+            data=array_to_png_bytes(warped_moving_background),
+            file_name="warped_moving_background.png",
+            mime="image/png",
+            key="download-warped-moving-background.png",
+        )
+
+
+def show_mask_to_mask_workflow(
+    *,
+    density_sigma: float,
+    max_distance: float,
+    min_area_ratio: float,
+    max_area_ratio: float,
+    max_score: float,
+    max_pairs_to_display: int,
+) -> None:
+    st.header("Workflow B: Mask-to-mask registration")
+    st.caption("Secondary workflow for existing integer label-mask inputs.")
+
+    st.subheader("Input files")
     file_types = ["png", "jpg", "jpeg", "tif", "tiff"]
 
-    fixed_image = st.sidebar.file_uploader("Fixed image", type=file_types)
-    moving_image = st.sidebar.file_uploader("Moving image", type=file_types)
-    fixed_mask = st.sidebar.file_uploader("Fixed mask", type=file_types)
-    moving_mask = st.sidebar.file_uploader("Moving mask", type=file_types)
-
-    st.sidebar.divider()
-    density_sigma = st.sidebar.slider(
-        "Density map sigma",
-        min_value=1.0,
-        max_value=100.0,
-        value=10.0,
-        step=1.0,
-    )
-    st.sidebar.divider()
-    st.sidebar.header("Matching thresholds")
-    max_distance = st.sidebar.number_input("Max distance", min_value=0.1, value=50.0, step=1.0)
-    min_area_ratio = st.sidebar.number_input("Min area ratio", min_value=0.01, value=0.5, step=0.05)
-    max_area_ratio = st.sidebar.number_input("Max area ratio", min_value=0.01, value=2.0, step=0.05)
-    max_score = st.sidebar.number_input("Max score", min_value=0.0, value=1.5, step=0.1)
-    st.sidebar.divider()
-    st.sidebar.header("Visualization")
-    max_pairs_to_display = st.sidebar.number_input(
-        "Max pairs to display",
-        min_value=1,
-        max_value=5000,
-        value=200,
-        step=50,
-    )
-    st.sidebar.divider()
-    st.sidebar.info("Masks are interpreted as integer label images.")
+    fixed_image = st.file_uploader("Fixed image (optional QC background)", type=file_types, key="mask-fixed-image")
+    moving_image = st.file_uploader("Moving image (optional QC background)", type=file_types, key="mask-moving-image")
+    fixed_mask = st.file_uploader("Fixed mask", type=file_types, key="mask-fixed-mask")
+    moving_mask = st.file_uploader("Moving mask", type=file_types, key="mask-moving-mask")
 
     image_left, image_right = st.columns(2)
     with image_left:
@@ -410,6 +577,57 @@ def main() -> None:
     # TODO: Add multi-scale density map presets for registration experiments.
     # TODO: Add non-rigid registration after affine registration is validated.
     # TODO: Add batch export of matched cells, transforms, and preview images.
+
+
+def show_he_geojson_preparation() -> None:
+    st.header("Workflow C: HE-to-GeoJSON alignment preparation")
+    st.info("This mode is planned. It will use HE image, HE nuclei .npy centers, and fluorescence nuclei GeoJSON inputs.")
+
+
+def main() -> None:
+    st.title("Cell Registration Prototype")
+    st.caption("Research prototype only. Not for diagnostic use.")
+
+    workflow = st.sidebar.selectbox(
+        "Workflow",
+        [
+            "Workflow A: Data-only point registration",
+            "Workflow B: Mask-to-mask registration",
+            "Workflow C: HE-to-GeoJSON alignment preparation",
+        ],
+    )
+    st.sidebar.divider()
+    density_sigma = st.sidebar.slider("Density map sigma", min_value=1.0, max_value=100.0, value=10.0, step=1.0)
+    st.sidebar.divider()
+    st.sidebar.header("Matching thresholds")
+    max_distance = st.sidebar.number_input("Max distance", min_value=0.1, value=50.0, step=1.0)
+    min_area_ratio = st.sidebar.number_input("Min area ratio", min_value=0.01, value=0.5, step=0.05)
+    max_area_ratio = st.sidebar.number_input("Max area ratio", min_value=0.01, value=2.0, step=0.05)
+    max_score = st.sidebar.number_input("Max score", min_value=0.0, value=1.5, step=0.1)
+    st.sidebar.divider()
+    st.sidebar.header("Visualization")
+    max_pairs_to_display = st.sidebar.number_input(
+        "Max pairs to display",
+        min_value=1,
+        max_value=5000,
+        value=200,
+        step=50,
+    )
+
+    workflow_kwargs = {
+        "density_sigma": density_sigma,
+        "max_distance": max_distance,
+        "min_area_ratio": min_area_ratio,
+        "max_area_ratio": max_area_ratio,
+        "max_score": max_score,
+        "max_pairs_to_display": max_pairs_to_display,
+    }
+    if workflow.startswith("Workflow A"):
+        show_point_registration_workflow(**workflow_kwargs)
+    elif workflow.startswith("Workflow B"):
+        show_mask_to_mask_workflow(**workflow_kwargs)
+    else:
+        show_he_geojson_preparation()
 
 
 if __name__ == "__main__":

@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 
 
+POINT_COLUMNS = ["point_id", "centroid_x", "centroid_y", "source"]
+
+
 def load_npy_centers(
     source: str | PathLike | BinaryIO,
     *,
@@ -49,6 +52,44 @@ def load_npy_centers(
             "source": point_source,
         }
     )
+
+
+def load_csv_points(source: str | PathLike | BinaryIO, *, point_source: str = "csv") -> pd.DataFrame:
+    """Load point coordinates from a CSV file."""
+    if hasattr(source, "seek"):
+        source.seek(0)
+
+    points = pd.read_csv(source)
+    return normalize_point_table(points, point_source=point_source)
+
+
+def normalize_point_table(points: pd.DataFrame, *, point_source: str = "table") -> pd.DataFrame:
+    """Normalize supported point-table variants to the app point schema."""
+    if points.empty:
+        raise ValueError("Point tables must contain at least one point.")
+
+    if {"centroid_x", "centroid_y"}.issubset(points.columns):
+        centroid_x = points["centroid_x"]
+        centroid_y = points["centroid_y"]
+    elif {"x", "y"}.issubset(points.columns):
+        centroid_x = points["x"]
+        centroid_y = points["y"]
+    else:
+        raise ValueError('CSV point tables must contain either "x,y" or "centroid_x,centroid_y" columns.')
+
+    normalized = pd.DataFrame(
+        {
+            "point_id": points["point_id"] if "point_id" in points.columns else np.arange(1, len(points) + 1),
+            "centroid_x": pd.to_numeric(centroid_x, errors="raise").astype(float),
+            "centroid_y": pd.to_numeric(centroid_y, errors="raise").astype(float),
+            "source": points["source"] if "source" in points.columns else point_source,
+        }
+    )
+
+    if not np.isfinite(normalized[["centroid_x", "centroid_y"]].to_numpy(dtype=float)).all():
+        raise ValueError("Point tables must not contain NaN or infinite coordinates.")
+
+    return normalized[POINT_COLUMNS]
 
 
 # TODO: Add coordinate-convention metadata for StarDist outputs and HE image coordinate frames.

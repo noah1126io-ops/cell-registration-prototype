@@ -113,3 +113,33 @@ def test_match_cells_marks_high_score_assignment_low_confidence():
     assert matches.loc[0, "matched_status"] == "low_confidence"
     assert matches.loc[0, "score"] > 0.1
     assert 0.0 < matches.loc[0, "confidence"] < 1.0
+
+
+def test_match_cells_uses_position_only_when_area_and_shape_are_missing():
+    fixed = pd.DataFrame(
+        {
+            "cell_id": [1],
+            "centroid_x": [10.0],
+            "centroid_y": [10.0],
+        }
+    )
+    moving = pd.DataFrame(
+        {
+            "cell_id": [11],
+            "centroid_x": [12.0],
+            "centroid_y": [10.0],
+        }
+    )
+
+    matches = match_cells(
+        fixed,
+        moving,
+        max_distance=10.0,
+        min_area_ratio=0.5,
+        max_area_ratio=2.0,
+        max_score=1.0,
+    )
+
+    assert matches.loc[0, "moving_cell_id"] == 11
+    assert matches.loc[0, "matched_status"] == "matched"
+    assert pd.isna(matches.loc[0, "area_ratio"])

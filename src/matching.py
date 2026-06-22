@@ -35,7 +35,7 @@ def _unmatched_row(fixed_cell: pd.Series) -> dict:
         "moving_centroid_x": np.nan,
         "moving_centroid_y": np.nan,
         "distance": np.nan,
-        "fixed_area": fixed_cell["area"],
+        "fixed_area": fixed_cell.get("area", np.nan),
         "moving_area": np.nan,
         "area_ratio": np.nan,
         "score": np.nan,
@@ -45,7 +45,13 @@ def _unmatched_row(fixed_cell: pd.Series) -> dict:
 
 
 def _match_row(fixed_cell: pd.Series, moving_cell: pd.Series, distance: float, score: float, status: str) -> dict:
-    area_ratio = moving_cell["area"] / fixed_cell["area"]
+    fixed_area = fixed_cell.get("area", np.nan)
+    moving_area = moving_cell.get("area", np.nan)
+    if np.isfinite(fixed_area) and np.isfinite(moving_area) and fixed_area > 0:
+        area_ratio = moving_area / fixed_area
+    else:
+        area_ratio = np.nan
+
     return {
         "fixed_cell_id": fixed_cell["cell_id"],
         "moving_cell_id": moving_cell["cell_id"],
@@ -54,8 +60,8 @@ def _match_row(fixed_cell: pd.Series, moving_cell: pd.Series, distance: float, s
         "moving_centroid_x": moving_cell["centroid_x"],
         "moving_centroid_y": moving_cell["centroid_y"],
         "distance": distance,
-        "fixed_area": fixed_cell["area"],
-        "moving_area": moving_cell["area"],
+        "fixed_area": fixed_area,
+        "moving_area": moving_area,
         "area_ratio": area_ratio,
         "score": score,
         "confidence": float(np.exp(-score)),
@@ -82,7 +88,7 @@ def match_cells(
     if moving_features.empty:
         return pd.DataFrame([_unmatched_row(row) for _, row in fixed_features.iterrows()], columns=MATCH_COLUMNS)
 
-    required_columns = {"cell_id", "centroid_x", "centroid_y", "area", "eccentricity"}
+    required_columns = {"cell_id", "centroid_x", "centroid_y"}
     for name, features in (("fixed_features", fixed_features), ("moving_features", moving_features)):
         missing_columns = required_columns - set(features.columns)
         if missing_columns:
@@ -109,23 +115,31 @@ def match_cells(
                     fixed_cell["centroid_y"] - moving_cell["centroid_y"],
                 )
             )
-            if fixed_cell["area"] <= 0 or moving_cell["area"] <= 0:
-                continue
-
-            area_ratio = float(moving_cell["area"] / fixed_cell["area"])
-            hard_threshold_passed = (
-                distance <= max_distance
-                and min_area_ratio <= area_ratio <= max_area_ratio
-            )
-            if not hard_threshold_passed:
+            if distance > max_distance:
                 continue
 
             normalized_distance = distance / max_distance
-            score = float(
-                w_pos * normalized_distance
-                + w_area * abs(np.log(area_ratio))
-                + w_shape * abs(fixed_cell["eccentricity"] - moving_cell["eccentricity"])
+            score = float(w_pos * normalized_distance)
+
+            fixed_area = fixed_cell.get("area", np.nan)
+            moving_area = moving_cell.get("area", np.nan)
+            has_area = (
+                np.isfinite(fixed_area)
+                and np.isfinite(moving_area)
+                and fixed_area > 0
+                and moving_area > 0
             )
+            if has_area:
+                area_ratio = float(moving_area / fixed_area)
+                if not (min_area_ratio <= area_ratio <= max_area_ratio):
+                    continue
+                score += float(w_area * abs(np.log(area_ratio)))
+
+            fixed_ecc = fixed_cell.get("eccentricity", np.nan)
+            moving_ecc = moving_cell.get("eccentricity", np.nan)
+            if np.isfinite(fixed_ecc) and np.isfinite(moving_ecc):
+                score += float(w_shape * abs(fixed_ecc - moving_ecc))
+
             cost[fixed_idx, moving_idx] = score
             pair_metrics[(fixed_idx, moving_idx)] = (distance, score)
 

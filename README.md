@@ -1,10 +1,10 @@
 # Cell Registration Prototype
 
-Serial tissue section images and their cell segmentation masks can be loaded into this local Streamlit app to prototype density-map registration and cell correspondence estimation.
+Precomputed point, mask, GeoJSON, and tabular segmentation outputs can be loaded into this local Streamlit app to prototype registration, matching, and QC visualization.
 
 This application is a research prototype only. It is not intended for diagnosis, clinical decision-making, treatment planning, or any other medical use.
 
-The app should treat segmentation results as an abstract source. The current workflow keeps integer label-mask input, and future workflows should also accept point-set sources such as StarDist-derived `.npy` nucleus centers without requiring Cellpose.
+This app is not intended to process raw pre-segmentation images. It expects numerical data created by external tools such as Cellpose, StarDist, QuPath, or related analysis pipelines. Raw images are optional QC backgrounds, not required primary inputs.
 
 ## Setup
 
@@ -15,9 +15,22 @@ streamlit run app.py
 
 ## Supported Workflows
 
-### Workflow A: mask-to-mask cell registration
+### Workflow A: Data-only point registration
 
-This is the currently implemented Streamlit workflow. It uses:
+This is the primary workflow. It uses fixed and moving point files without requiring raw images.
+
+Supported point inputs:
+
+- `.npy` arrays with shape `(n, 2)`
+- `.csv` files with `x,y`, `centroid_x,centroid_y`, or `point_id,centroid_x,centroid_y`
+
+The app previews normalized point tables, creates density maps, estimates affine registration, transforms moving points, performs matching, displays before/after scatter plots, and exports `matched_points.csv` plus `transform_summary.json`.
+
+Raw fixed/moving images can optionally be uploaded as QC backgrounds for overlays and warped-image export.
+
+### Workflow B: mask-to-mask registration
+
+This is a secondary workflow for existing integer label-mask inputs. It uses:
 
 - fixed image
 - moving image
@@ -26,7 +39,7 @@ This is the currently implemented Streamlit workflow. It uses:
 
 The app extracts cell features from both masks, creates centroid-based density maps, estimates an affine transform from the density maps, transforms the moving image/mask/cell centroids, estimates cell correspondence candidates, and exports CSV/PNG/JSON quality-control artifacts.
 
-### Workflow B: HE-to-GeoJSON nuclei alignment
+### Workflow C: HE-to-GeoJSON nuclei alignment preparation
 
 This is a planned future workflow based on the existing HE-to-fluorescence nuclei GeoJSON research pipeline. It will use:
 
@@ -53,6 +66,17 @@ The reference pipeline aligns one HE image to one fluorescence nuclei GeoJSON wi
 
 ## Implemented Features
 
+- Workflow selector:
+  - data-only point registration
+  - mask-to-mask registration
+  - HE-to-GeoJSON alignment preparation
+- Data-only point registration from `.npy` or `.csv`
+- Point table preview and normalization
+- Density-map generation from point centroids without raw images
+- Affine registration and point transformation
+- Position-only matching when area/eccentricity are unavailable
+- Scatter and match-line QC plots on a blank coordinate canvas
+- Optional raw image upload as QC background only
 - Upload 4 files:
   - fixed image
   - moving image

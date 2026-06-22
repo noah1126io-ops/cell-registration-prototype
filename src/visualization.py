@@ -44,17 +44,17 @@ def visualize_cell_matches(
     max_pairs: int,
 ):
     """Visualize fixed/transformed moving centroids and matched pair links."""
-    if fixed_image is None:
-        raise ValueError("fixed_image is required for match visualization.")
     if fixed_features is None or moving_features is None or matches is None:
         raise ValueError("fixed_features, moving_features, and matches are required.")
 
-    background = _to_grayscale_preview(fixed_image)
     max_pairs = max(0, int(max_pairs))
     display_matches = matches.head(max_pairs)
 
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.imshow(background, cmap="gray")
+    has_background = fixed_image is not None
+    if has_background:
+        background = _to_grayscale_preview(fixed_image)
+        ax.imshow(background, cmap="gray")
 
     fixed_points = display_matches[
         ["fixed_centroid_x", "fixed_centroid_y", "matched_status"]
@@ -124,7 +124,59 @@ def visualize_cell_matches(
         )
 
     ax.set_axis_off()
+    ax.set_aspect("equal", adjustable="box")
+    if not has_background:
+        ax.invert_yaxis()
     ax.set_title(f"Cell match overlay ({len(display_matches)} displayed rows)")
+    ax.legend(loc="lower right", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_point_sets(
+    fixed_features: pd.DataFrame,
+    moving_features: pd.DataFrame,
+    *,
+    title: str,
+    background_image=None,
+):
+    """Visualize fixed and moving point sets on an optional image background."""
+    if fixed_features is None or moving_features is None:
+        raise ValueError("fixed_features and moving_features are required.")
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    has_background = background_image is not None
+    if has_background:
+        ax.imshow(_to_grayscale_preview(background_image), cmap="gray")
+
+    if not fixed_features.empty:
+        ax.scatter(
+            fixed_features["centroid_x"],
+            fixed_features["centroid_y"],
+            s=14,
+            c="#00d1ff",
+            marker="o",
+            linewidths=0,
+            alpha=0.85,
+            label="fixed",
+        )
+
+    if not moving_features.empty:
+        ax.scatter(
+            moving_features["centroid_x"],
+            moving_features["centroid_y"],
+            s=14,
+            c="#ffb000",
+            marker="x",
+            linewidths=0.8,
+            alpha=0.85,
+            label="moving",
+        )
+
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    if not has_background:
+        ax.invert_yaxis()
     ax.legend(loc="lower right", fontsize=8, frameon=True)
     fig.tight_layout()
     return fig
