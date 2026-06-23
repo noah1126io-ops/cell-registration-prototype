@@ -14,14 +14,31 @@ from src.geojson_utils import load_geojson_centroids
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.matching import match_cells
 from src.point_io import load_csv_points, load_npy_centers
-from src.pointset_registration import estimate_affine_with_y_flip, fine_center_snap_warp, warp_he_image_to_world
+from src.pointset_registration import (
+    estimate_affine_with_y_flip,
+    FineWarpResult,
+    fine_center_snap_warp,
+    local_translation_fine_warp,
+    point_nearest_distances,
+    warp_he_image_to_world,
+    world_points_to_warped_image_pixels,
+)
 from src.registration import (
     estimate_affine_transform,
     transform_cell_centroids,
     warp_image,
     warp_mask,
 )
-from src.visualization import colorize_label_image, visualize_cell_matches, visualize_point_sets
+from src.visualization import (
+    colorize_label_image,
+    visualize_cell_matches,
+    visualize_anchor_correlation_heatmap,
+    visualize_displacement_field,
+    visualize_distance_histogram,
+    visualize_point_sets,
+    visualize_translation_anchors,
+    visualize_warped_he_point_overlay,
+)
 
 
 st.set_page_config(
@@ -616,9 +633,12 @@ def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict, wa
             "jacobian_min": fine_result.jacobian_min,
             "jacobian_max": fine_result.jacobian_max,
             "max_displacement_um": fine_result.max_displacement,
+            "n_candidate_pairs": fine_result.n_candidate_pairs,
             "n_pairs": fine_result.n_pairs,
+            "n_filtered_pairs": fine_result.n_filtered_pairs,
             "median_pair_distance_before_um": fine_result.median_pair_distance_before,
             "median_pair_distance_after_um": fine_result.median_pair_distance_after,
+            "distance_metrics": fine_result.metrics,
             "success": fine_result.success,
             "message": fine_result.message,
         },
@@ -650,6 +670,12 @@ def show_he_geojson_preparation() -> None:
         )
 
     st.subheader("Point-set registration parameters")
+    fine_alignment_method = st.selectbox(
+        "Fine alignment method",
+        ["local translation field", "center-snap", "off"],
+        index=0,
+        help="Local translation field estimates patch-wise shifts from density maps; center-snap uses matched nuclei pairs.",
+    )
     param_left, param_mid, param_right = st.columns(3)
     with param_left:
         similarity_trim = st.slider("Similarity ICP trim quantile", 0.1, 1.0, 0.8, 0.05)
@@ -660,17 +686,52 @@ def show_he_geojson_preparation() -> None:
     with param_right:
         grid_spacing = st.number_input("Fine warp grid spacing (um)", min_value=0.1, value=6.0, step=1.0)
         ridge = st.number_input("Fine warp ridge", min_value=0.0, value=0.3, step=0.1)
-    display_origin = st.selectbox(
-        "World-coordinate display origin",
-        ["upper-right", "upper-left", "lower-left"],
+    st.subheader("Robust fine-snap filtering")
+    robust_left, robust_mid, robust_right = st.columns(3)
+    with robust_left:
+        min_pair_confidence = st.slider("Min pair confidence", 0.0, 1.0, 0.05, 0.01)
+        coherence_radius = st.number_input("Local coherence radius (um)", min_value=0.1, value=30.0, step=5.0)
+    with robust_mid:
+        max_local_deviation = st.number_input("Max local deviation (um)", min_value=0.1, value=8.0, step=1.0)
+        snap_strength = st.slider("Fine snap strength", 0.1, 2.5, 1.25, 0.05)
+    with robust_right:
+        max_snap_displacement = st.number_input("Max snap displacement (um)", min_value=0.1, value=25.0, step=5.0)
+    st.subheader("Local translation field")
+    local_left, local_mid, local_right = st.columns(3)
+    with local_left:
+        local_density_sigma = st.number_input("Density sigma (um)", min_value=0.1, value=3.0, step=0.5)
+        local_density_pixel_size = st.number_input("Density pixel size (um)", min_value=0.1, value=1.0, step=0.5)
+        local_point_weight = st.number_input("Point weight", min_value=0.1, value=1.0, step=0.5)
+    with local_mid:
+        local_grid_spacing = st.number_input("Local grid spacing (um)", min_value=1.0, value=60.0, step=5.0)
+        local_patch_radius = st.number_input("Patch radius (um)", min_value=1.0, value=25.0, step=5.0)
+        local_search_radius = st.number_input("Search radius (um)", min_value=1.0, value=12.0, step=2.0)
+    with local_right:
+        local_min_correlation = st.slider("Min local correlation", 0.0, 1.0, 0.25, 0.05)
+        local_max_shift = st.number_input("Max local shift (um)", min_value=1.0, value=20.0, step=5.0)
+        local_min_anchors = st.number_input("Min accepted anchors", min_value=1, value=8, step=1)
+    local_outlier_percentile = st.slider("Anchor outlier percentile", 50.0, 100.0, 95.0, 1.0)
+    local_neighbor_radius = st.number_input("Neighbor consistency radius (um)", min_value=1.0, value=120.0, step=10.0)
+    local_smoothing = st.number_input("RBF smoothing", min_value=0.0, value=10.0, step=1.0)
+    local_kernel = st.selectbox("RBF kernel", ["thin_plate_spline", "linear", "cubic", "quintic"], index=0)
+    local_neighbors = st.number_input("RBF neighbors", min_value=0, value=50, step=5)
+    registration_display_origin = st.selectbox(
+        "Registration QC display origin",
+        ["lower-left", "upper-left", "upper-right"],
         index=0,
-        help="Use upper-right when the registered scatter appears flipped relative to the HE image.",
+        help="Controls only the scatter/QC registration plots. Use lower-left if the registration plot appears upside-down relative to the uploaded HE image.",
+    )
+    warped_he_output_origin = st.selectbox(
+        "Warped HE output origin",
+        ["lower-left", "upper-left", "upper-right"],
+        index=0,
+        help="Controls only the exported warped HE image orientation. Use lower-left if the warped HE output appears upside-down.",
     )
     flip_mode = st.selectbox(
         "HE coordinate flip candidates",
         ["auto", "none", "x", "y", "x+y"],
         index=0,
-        help="Use x+y when the HE image behaves like an upper-right-origin coordinate frame.",
+        help="Use y when HE image coordinates are top-left-origin and the GeoJSON world coordinates are bottom-left-origin.",
     )
     warped_he_pixel_size = st.number_input(
         "Warped HE output pixel size (um)",
@@ -678,6 +739,13 @@ def show_he_geojson_preparation() -> None:
         value=1.0,
         step=0.5,
         help="Smaller values create larger PNG files.",
+    )
+    max_warped_overlay_points = st.number_input(
+        "Max warped HE overlay points",
+        min_value=100,
+        max_value=20000,
+        value=3000,
+        step=500,
     )
 
     he_image = show_uploaded_image("Optional HE image", he_image_file) if he_image_file else None
@@ -761,14 +829,68 @@ def show_he_geojson_preparation() -> None:
             similarity_trim_quantile=similarity_trim,
             affine_trim_quantile=affine_trim,
         )
-        fine_result = fine_center_snap_warp(
-            affine_result.transformed_points,
-            geojson_array,
-            match_radius=match_radius,
-            grid_spacing=grid_spacing,
-            bandwidth=fine_bandwidth,
-            ridge=ridge,
-        )
+        if fine_alignment_method == "local translation field":
+            fine_result = local_translation_fine_warp(
+                geojson_array,
+                affine_result.transformed_points,
+                density_sigma=local_density_sigma,
+                density_pixel_size=local_density_pixel_size,
+                point_weight=local_point_weight,
+                grid_spacing=local_grid_spacing,
+                patch_radius=local_patch_radius,
+                search_radius=local_search_radius,
+                min_correlation=local_min_correlation,
+                max_shift=local_max_shift,
+                outlier_percentile=local_outlier_percentile,
+                neighbor_consistency_radius=local_neighbor_radius,
+                smoothing=local_smoothing,
+                kernel=local_kernel,
+                neighbors=int(local_neighbors) if local_neighbors > 0 else 0,
+                min_accepted_anchors=int(local_min_anchors),
+            )
+        elif fine_alignment_method == "center-snap":
+            fine_result = fine_center_snap_warp(
+                affine_result.transformed_points,
+                geojson_array,
+                match_radius=match_radius,
+                grid_spacing=grid_spacing,
+                bandwidth=fine_bandwidth,
+                ridge=ridge,
+                coherence_radius=coherence_radius,
+                max_local_deviation=max_local_deviation,
+                min_pair_confidence=min_pair_confidence,
+                snap_strength=snap_strength,
+                max_snap_displacement=max_snap_displacement,
+            )
+        else:
+            min_x, min_y = np.min(np.vstack([geojson_array, affine_result.transformed_points]), axis=0) - 30.0
+            max_x, max_y = np.max(np.vstack([geojson_array, affine_result.transformed_points]), axis=0) + 30.0
+            xs = np.arange(min_x, max_x + grid_spacing, grid_spacing)
+            ys = np.arange(min_y, max_y + grid_spacing, grid_spacing)
+            grid_x, grid_y = np.meshgrid(xs, ys)
+            zeros = np.zeros_like(grid_x, dtype=float)
+            affine_metrics = {"before": {}, "after": {}}
+            fine_result = FineWarpResult(
+                transformed_points=affine_result.transformed_points.copy(),
+                grid_x=grid_x,
+                grid_y=grid_y,
+                displacement_x=zeros,
+                displacement_y=zeros,
+                bounds=(float(min_x), float(min_y), float(max_x), float(max_y)),
+                grid_spacing=float(grid_spacing),
+                jacobian_min=1.0,
+                jacobian_max=1.0,
+                max_displacement=0.0,
+                n_candidate_pairs=0,
+                n_pairs=0,
+                n_filtered_pairs=0,
+                median_pair_distance_before=affine_result.median_residual,
+                median_pair_distance_after=affine_result.median_residual,
+                success=True,
+                message="Fine alignment disabled.",
+                anchors=None,
+                metrics=affine_metrics,
+            )
     except ValueError as exc:
         st.warning(str(exc))
         return
@@ -795,13 +917,17 @@ def show_he_geojson_preparation() -> None:
     metric_c.metric("Affine median", f"{affine_result.median_residual:.2f} um")
     metric_d.metric("Fine median", f"{fine_result.median_pair_distance_after:.2f} um")
     metric_e.metric("Jacobian min", f"{fine_result.jacobian_min:.3f}")
+    st.caption(
+        f"Fine snap pairs: {fine_result.n_pairs} used / {fine_result.n_candidate_pairs} candidates "
+        f"({fine_result.n_filtered_pairs} filtered out)"
+    )
 
     plot_left, plot_right = st.columns(2)
     geojson_features = _cell_features_from_points(geojson_points)
     affine_features = _cell_features_from_points(transformed_affine_points)
     fine_features = _cell_features_from_points(transformed_fine_points)
-    invert_x_axis = display_origin == "upper-right"
-    invert_y_axis = display_origin in {"upper-right", "upper-left"}
+    invert_x_axis = registration_display_origin == "upper-right"
+    invert_y_axis = registration_display_origin in {"upper-right", "upper-left"}
     with plot_left:
         affine_figure = visualize_point_sets(
             geojson_features,
@@ -821,7 +947,7 @@ def show_he_geojson_preparation() -> None:
         fine_figure = visualize_point_sets(
             geojson_features,
             fine_features,
-            title="Fine center-snap HE centers vs GeoJSON centroids (world-um)",
+            title=f"Fine aligned HE centers vs GeoJSON centroids ({fine_alignment_method})",
             invert_x_axis=invert_x_axis,
             invert_y_axis=invert_y_axis,
         )
@@ -833,6 +959,72 @@ def show_he_geojson_preparation() -> None:
             mime="image/png",
         )
 
+    before_distances = point_nearest_distances(geojson_array, affine_result.transformed_points)
+    after_distances = point_nearest_distances(geojson_array, fine_result.transformed_points)
+    hist_figure = visualize_distance_histogram(
+        before_distances,
+        after_distances,
+        title="Nearest-neighbor distance before/after fine alignment",
+    )
+    st.pyplot(hist_figure, clear_figure=False)
+    st.download_button(
+        "Download distance histogram PNG",
+        data=figure_to_png_bytes(hist_figure),
+        file_name="fine_alignment_distance_histogram.png",
+        mime="image/png",
+    )
+
+    if fine_result.anchors is not None:
+        st.subheader("Local translation anchors")
+        st.dataframe(fine_result.anchors, use_container_width=True)
+        st.download_button(
+            "Download local translation anchors CSV",
+            data=fine_result.anchors.to_csv(index=False).encode("utf-8"),
+            file_name="local_translation_anchors.csv",
+            mime="text/csv",
+        )
+
+        anchor_left, anchor_right = st.columns(2)
+        with anchor_left:
+            anchor_figure = visualize_translation_anchors(
+                fine_result.anchors,
+                title="Accepted and rejected local translation anchors",
+            )
+            st.pyplot(anchor_figure, clear_figure=False)
+            st.download_button(
+                "Download anchor vectors PNG",
+                data=figure_to_png_bytes(anchor_figure),
+                file_name="local_translation_anchor_vectors.png",
+                mime="image/png",
+            )
+        with anchor_right:
+            corr_figure = visualize_anchor_correlation_heatmap(
+                fine_result.anchors,
+                title="Local translation anchor correlation",
+            )
+            st.pyplot(corr_figure, clear_figure=False)
+            st.download_button(
+                "Download correlation heatmap PNG",
+                data=figure_to_png_bytes(corr_figure),
+                file_name="local_translation_correlation_heatmap.png",
+                mime="image/png",
+            )
+
+    field_figure = visualize_displacement_field(
+        fine_result.grid_x,
+        fine_result.grid_y,
+        fine_result.displacement_x,
+        fine_result.displacement_y,
+        title="Fine displacement vector field",
+    )
+    st.pyplot(field_figure, clear_figure=False)
+    st.download_button(
+        "Download displacement field PNG",
+        data=figure_to_png_bytes(field_figure),
+        file_name="fine_displacement_vector_field.png",
+        mime="image/png",
+    )
+
     warped_he_image = None
     warped_he_metadata = None
     if he_image is not None:
@@ -842,6 +1034,7 @@ def show_he_geojson_preparation() -> None:
                 affine_result,
                 fine_result,
                 output_pixel_size_um=warped_he_pixel_size,
+                output_origin=warped_he_output_origin,
             )
         except ValueError as exc:
             st.warning(f"Could not warp HE image: {exc}")
@@ -862,6 +1055,23 @@ def show_he_geojson_preparation() -> None:
             mime="image/png",
         )
 
+        geojson_pixels = world_points_to_warped_image_pixels(geojson_array, warped_he_metadata)
+        he_pixels = world_points_to_warped_image_pixels(fine_result.transformed_points, warped_he_metadata)
+        warped_overlay_figure = visualize_warped_he_point_overlay(
+            warped_he_image,
+            geojson_pixels,
+            he_pixels,
+            title="Warped HE image with registered nuclei overlay",
+            max_points=max_warped_overlay_points,
+        )
+        st.pyplot(warped_overlay_figure, clear_figure=False)
+        st.download_button(
+            "Download warped HE overlay PNG",
+            data=figure_to_png_bytes(warped_overlay_figure),
+            file_name="warped_he_registered_points_overlay.png",
+            mime="image/png",
+        )
+
     st.subheader("Exports")
     st.download_button(
         "Download transformed HE centers CSV",
@@ -870,6 +1080,7 @@ def show_he_geojson_preparation() -> None:
         mime="text/csv",
     )
     parameters = {
+        "fine_alignment_method": fine_alignment_method,
         "he_coordinate_order": he_coordinate_order,
         "similarity_trim_quantile": similarity_trim,
         "affine_trim_quantile": affine_trim,
@@ -877,9 +1088,30 @@ def show_he_geojson_preparation() -> None:
         "fine_grid_spacing_um": grid_spacing,
         "fine_bandwidth_um": fine_bandwidth,
         "fine_ridge": ridge,
-        "display_origin": display_origin,
+        "fine_min_pair_confidence": min_pair_confidence,
+        "fine_coherence_radius_um": coherence_radius,
+        "fine_max_local_deviation_um": max_local_deviation,
+        "fine_snap_strength": snap_strength,
+        "fine_max_snap_displacement_um": max_snap_displacement,
+        "local_density_sigma_um": local_density_sigma,
+        "local_density_pixel_size_um": local_density_pixel_size,
+        "local_point_weight": local_point_weight,
+        "local_grid_spacing_um": local_grid_spacing,
+        "local_patch_radius_um": local_patch_radius,
+        "local_search_radius_um": local_search_radius,
+        "local_min_correlation": local_min_correlation,
+        "local_max_shift_um": local_max_shift,
+        "local_outlier_percentile": local_outlier_percentile,
+        "local_neighbor_consistency_radius_um": local_neighbor_radius,
+        "local_smoothing": local_smoothing,
+        "local_kernel": local_kernel,
+        "local_neighbors": local_neighbors,
+        "local_min_accepted_anchors": local_min_anchors,
+        "registration_display_origin": registration_display_origin,
+        "warped_he_output_origin": warped_he_output_origin,
         "flip_mode": flip_mode,
         "warped_he_output_pixel_size_um": warped_he_pixel_size,
+        "max_warped_overlay_points": max_warped_overlay_points,
     }
     st.download_button(
         "Download HE-GeoJSON transform summary",

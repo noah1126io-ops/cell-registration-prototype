@@ -5,7 +5,9 @@ from src.pointset_registration import (
     apply_affine,
     estimate_affine_with_y_flip,
     fine_center_snap_warp,
+    local_translation_fine_warp,
     warp_he_image_to_world,
+    world_points_to_warped_image_pixels,
 )
 
 
@@ -115,6 +117,36 @@ def test_fine_center_snap_warp_moves_points_toward_targets():
     assert np.isfinite(result.jacobian_min)
 
 
+def test_fine_center_snap_warp_filters_locally_inconsistent_pairs():
+    source = np.array(
+        [
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [0.0, 10.0],
+            [10.0, 10.0],
+            [5.0, 5.0],
+        ]
+    )
+    target = source + np.array([1.0, 1.0])
+    target[-1] = source[-1] + np.array([10.0, 0.0])
+
+    result = fine_center_snap_warp(
+        source,
+        target,
+        match_radius=15.0,
+        grid_spacing=2.0,
+        bandwidth=4.0,
+        ridge=0.01,
+        padding=5.0,
+        coherence_radius=20.0,
+        max_local_deviation=3.0,
+        min_pair_confidence=0.0,
+    )
+
+    assert result.n_candidate_pairs < len(source) or result.n_filtered_pairs > 0
+    assert result.n_pairs <= result.n_candidate_pairs
+
+
 def test_warp_he_image_to_world_returns_corrected_image_grid():
     he_image = np.arange(25, dtype=np.uint8).reshape(5, 5)
     src = np.array(
@@ -152,6 +184,77 @@ def test_warp_he_image_to_world_returns_corrected_image_grid():
     )
 
     assert warped.shape == (5, 5)
-    assert metadata["row0_world_y"] == 5.0
-    assert metadata["col0_world_x"] == 0.0
+    assert metadata["output_origin"] == "upper-left"
+    assert metadata["row0_world_y"] == 0.5
+    assert metadata["col0_world_x"] == 0.5
     assert warped.dtype == he_image.dtype
+
+
+def test_warp_he_image_to_world_can_export_lower_left_origin():
+    he_image = np.arange(25, dtype=np.uint8).reshape(5, 5)
+    src = np.array([[0.0, 0.0], [4.0, 0.0], [0.0, 4.0], [4.0, 4.0], [2.0, 2.0]])
+    affine = AffineICPResult(
+        affine_matrix=np.eye(2),
+        translation=np.zeros(2),
+        transformed_points=src,
+        flip_x=False,
+        flip_y=False,
+        image_width=5.0,
+        image_height=5.0,
+        mean_residual=0.0,
+        median_residual=0.0,
+        n_pairs=len(src),
+        success=True,
+        message="identity",
+    )
+
+    _, metadata = warp_he_image_to_world(
+        he_image,
+        affine,
+        None,
+        output_pixel_size_um=1.0,
+        bounds=(0.0, 0.0, 5.0, 5.0),
+        output_origin="lower-left",
+    )
+
+    assert metadata["output_origin"] == "lower-left"
+    assert metadata["row0_world_y"] == 4.5
+
+
+def test_world_points_to_warped_image_pixels_respects_upper_left_origin():
+    metadata = {
+        "output_pixel_size_um": 1.0,
+        "output_origin": "upper-left",
+        "col0_world_x": 0.5,
+        "row0_world_y": 0.5,
+    }
+    pixels = world_points_to_warped_image_pixels(np.array([[0.5, 0.5], [2.5, 3.5]]), metadata)
+
+    assert np.allclose(pixels, [[0.0, 0.0], [2.0, 3.0]])
+
+
+def test_local_translation_fine_warp_improves_shifted_point_cloud():
+    xs, ys = np.meshgrid(np.arange(20.0, 100.0, 20.0), np.arange(20.0, 100.0, 20.0))
+    fixed = np.column_stack([xs.ravel(), ys.ravel()])
+    moving = fixed + np.array([4.0, -3.0])
+
+    result = local_translation_fine_warp(
+        fixed,
+        moving,
+        bounds=(0.0, 0.0, 120.0, 120.0),
+        density_sigma=2.0,
+        density_pixel_size=1.0,
+        grid_spacing=30.0,
+        patch_radius=18.0,
+        search_radius=8.0,
+        min_correlation=0.1,
+        max_shift=10.0,
+        min_accepted_anchors=3,
+        smoothing=0.1,
+        neighbors=0,
+    )
+
+    assert result.success is True
+    assert result.n_pairs >= 3
+    assert result.median_pair_distance_after < result.median_pair_distance_before
+    assert result.anchors is not None

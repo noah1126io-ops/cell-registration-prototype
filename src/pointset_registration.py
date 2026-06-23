@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import Iterable
 
 import numpy as np
+import pandas as pd
 from scipy.ndimage import gaussian_filter, map_coordinates
+from scipy.interpolate import RBFInterpolator
 from scipy.spatial import cKDTree
 
 
@@ -63,11 +65,15 @@ class FineWarpResult:
     jacobian_min: float
     jacobian_max: float
     max_displacement: float
+    n_candidate_pairs: int
     n_pairs: int
+    n_filtered_pairs: int
     median_pair_distance_before: float
     median_pair_distance_after: float
     success: bool
     message: str
+    anchors: pd.DataFrame | None = None
+    metrics: dict | None = None
 
 
 def _as_points(points: np.ndarray, *, name: str) -> np.ndarray:
@@ -453,6 +459,11 @@ def fine_center_snap_warp(
     ridge: float = 0.3,
     padding: float = 30.0,
     closeness_sigma: float = 8.0,
+    coherence_radius: float = 30.0,
+    max_local_deviation: float = 8.0,
+    min_pair_confidence: float = 0.05,
+    snap_strength: float = 1.0,
+    max_snap_displacement: float | None = 25.0,
 ) -> FineWarpResult:
     """Create a confidence-weighted smooth center-snap displacement field."""
     source_world_points = _as_points(source_world_points, name="source_world_points")
@@ -470,6 +481,7 @@ def fine_center_snap_warp(
         target_world_points,
         max_distance=match_radius,
     )
+    n_candidate_pairs = int(len(source_indices))
 
     if len(source_indices) == 0:
         zeros = np.zeros(field_shape, dtype=float)
@@ -484,7 +496,9 @@ def fine_center_snap_warp(
             jacobian_min=1.0,
             jacobian_max=1.0,
             max_displacement=0.0,
+            n_candidate_pairs=0,
             n_pairs=0,
+            n_filtered_pairs=0,
             median_pair_distance_before=float("inf"),
             median_pair_distance_after=float("inf"),
             success=False,
@@ -495,6 +509,51 @@ def fine_center_snap_warp(
     target_pair_points = target_world_points[target_indices]
     displacement = target_pair_points - source_pair_points
     confidence = np.exp(-(distances**2) / (2.0 * closeness_sigma**2))
+
+    if len(source_pair_points) >= 3 and coherence_radius > 0 and max_local_deviation > 0:
+        pair_tree = cKDTree(source_pair_points)
+        local_deviation = np.zeros(len(source_pair_points), dtype=float)
+        for pair_index, neighbor_indices in enumerate(pair_tree.query_ball_point(source_pair_points, coherence_radius)):
+            if len(neighbor_indices) < 3:
+                continue
+            local_median = np.median(displacement[neighbor_indices], axis=0)
+            local_deviation[pair_index] = np.linalg.norm(displacement[pair_index] - local_median)
+        coherence = np.exp(-(local_deviation**2) / (2.0 * max_local_deviation**2))
+        confidence *= coherence
+        keep = (confidence >= min_pair_confidence) & (local_deviation <= max_local_deviation)
+    else:
+        keep = confidence >= min_pair_confidence
+
+    source_pair_points = source_pair_points[keep]
+    target_pair_points = target_pair_points[keep]
+    displacement = displacement[keep]
+    distances = distances[keep]
+    confidence = confidence[keep]
+    n_filtered_pairs = int(n_candidate_pairs - len(source_pair_points))
+
+    if len(source_pair_points) == 0:
+        zeros = np.zeros(field_shape, dtype=float)
+        return FineWarpResult(
+            transformed_points=source_world_points.copy(),
+            grid_x=grid_x,
+            grid_y=grid_y,
+            displacement_x=zeros,
+            displacement_y=zeros,
+            bounds=bounds,
+            grid_spacing=float(grid_spacing),
+            jacobian_min=1.0,
+            jacobian_max=1.0,
+            max_displacement=0.0,
+            n_candidate_pairs=n_candidate_pairs,
+            n_pairs=0,
+            n_filtered_pairs=n_filtered_pairs,
+            median_pair_distance_before=float("inf"),
+            median_pair_distance_after=float("inf"),
+            success=False,
+            message="All fine-warp candidate pairs were filtered out; fine warp is identity.",
+        )
+
+    displacement = displacement * float(snap_strength)
 
     numerator_x = np.zeros(field_shape, dtype=float)
     numerator_y = np.zeros(field_shape, dtype=float)
@@ -520,6 +579,15 @@ def fine_center_snap_warp(
 
     displacement_x = numerator_x / (denominator + ridge_value)
     displacement_y = numerator_y / (denominator + ridge_value)
+    if max_snap_displacement is not None and max_snap_displacement > 0:
+        field_magnitude = np.sqrt(displacement_x**2 + displacement_y**2)
+        too_large = field_magnitude > max_snap_displacement
+        if np.any(too_large):
+            scale = np.ones_like(field_magnitude)
+            scale[too_large] = max_snap_displacement / field_magnitude[too_large]
+            displacement_x *= scale
+            displacement_y *= scale
+
     sampled_displacement = _sample_field(source_world_points, displacement_x, displacement_y, bounds, grid_spacing)
     transformed_points = source_world_points + sampled_displacement
 
@@ -542,11 +610,354 @@ def fine_center_snap_warp(
         jacobian_min=float(np.min(jacobian)),
         jacobian_max=float(np.max(jacobian)),
         max_displacement=max_displacement,
-        n_pairs=int(len(source_indices)),
+        n_candidate_pairs=n_candidate_pairs,
+        n_pairs=int(len(source_pair_points)),
+        n_filtered_pairs=n_filtered_pairs,
         median_pair_distance_before=float(np.median(distances)),
         median_pair_distance_after=median_after,
         success=True,
-        message="Fine center-snap warp completed.",
+        message="Robust fine center-snap warp completed.",
+    )
+
+
+def point_distance_metrics(
+    fixed_points: np.ndarray,
+    moving_points: np.ndarray,
+    *,
+    thresholds: tuple[float, ...] = (3.0, 5.0, 10.0),
+) -> dict:
+    """Nearest-neighbor distance summary from moving points to fixed points."""
+    fixed_points = _as_points(fixed_points, name="fixed_points")
+    moving_points = _as_points(moving_points, name="moving_points")
+    distances, _ = cKDTree(fixed_points).query(moving_points, k=1)
+    metrics = {
+        "mean_distance": float(np.mean(distances)),
+        "median_distance": float(np.median(distances)),
+    }
+    for threshold in thresholds:
+        metrics[f"within_{threshold:g}"] = float(np.mean(distances <= threshold))
+    return metrics
+
+
+def point_nearest_distances(fixed_points: np.ndarray, moving_points: np.ndarray) -> np.ndarray:
+    """Nearest-neighbor distances from moving points to fixed points."""
+    fixed_points = _as_points(fixed_points, name="fixed_points")
+    moving_points = _as_points(moving_points, name="moving_points")
+    distances, _ = cKDTree(fixed_points).query(moving_points, k=1)
+    return np.asarray(distances, dtype=float)
+
+
+def _density_from_points(
+    points: np.ndarray,
+    bounds: tuple[float, float, float, float],
+    *,
+    pixel_size: float,
+    sigma: float,
+    point_weight: float,
+) -> np.ndarray:
+    min_x, min_y, max_x, max_y = bounds
+    width = max(1, int(np.ceil((max_x - min_x) / pixel_size)) + 1)
+    height = max(1, int(np.ceil((max_y - min_y) / pixel_size)) + 1)
+    density = np.zeros((height, width), dtype=float)
+    cols = np.rint((points[:, 0] - min_x) / pixel_size).astype(int)
+    rows = np.rint((points[:, 1] - min_y) / pixel_size).astype(int)
+    valid = (rows >= 0) & (rows < height) & (cols >= 0) & (cols < width)
+    np.add.at(density, (rows[valid], cols[valid]), float(point_weight))
+    return gaussian_filter(density, sigma=max(float(sigma) / pixel_size, 0.01))
+
+
+def _extract_patch(image: np.ndarray, row: int, col: int, radius: int) -> np.ndarray | None:
+    row0 = row - radius
+    row1 = row + radius + 1
+    col0 = col - radius
+    col1 = col + radius + 1
+    if row0 < 0 or col0 < 0 or row1 > image.shape[0] or col1 > image.shape[1]:
+        return None
+    return image[row0:row1, col0:col1]
+
+
+def _normalized_correlation(a: np.ndarray, b: np.ndarray) -> float:
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+    a = a - np.mean(a)
+    b = b - np.mean(b)
+    denom = float(np.sqrt(np.sum(a * a) * np.sum(b * b)))
+    if denom <= 0:
+        return float("-inf")
+    return float(np.sum(a * b) / denom)
+
+
+def _local_translation_anchors(
+    fixed_density: np.ndarray,
+    moving_density: np.ndarray,
+    bounds: tuple[float, float, float, float],
+    *,
+    pixel_size: float,
+    grid_spacing: float,
+    patch_radius: float,
+    search_radius: float,
+    min_correlation: float,
+    max_shift: float,
+    min_patch_signal: float,
+) -> pd.DataFrame:
+    min_x, min_y, max_x, max_y = bounds
+    patch_radius_px = max(1, int(round(patch_radius / pixel_size)))
+    search_radius_px = max(0, int(round(search_radius / pixel_size)))
+    max_shift_px = max_shift / pixel_size
+    rows = []
+
+    xs = np.arange(min_x + patch_radius, max_x - patch_radius + 1e-6, grid_spacing)
+    ys = np.arange(min_y + patch_radius, max_y - patch_radius + 1e-6, grid_spacing)
+    for anchor_y in ys:
+        for anchor_x in xs:
+            center_col = int(round((anchor_x - min_x) / pixel_size))
+            center_row = int(round((anchor_y - min_y) / pixel_size))
+            fixed_patch = _extract_patch(fixed_density, center_row, center_col, patch_radius_px)
+            if fixed_patch is None or float(np.max(fixed_patch)) < min_patch_signal:
+                rows.append(
+                    {
+                        "anchor_x": anchor_x,
+                        "anchor_y": anchor_y,
+                        "dx": 0.0,
+                        "dy": 0.0,
+                        "correlation": np.nan,
+                        "accepted": False,
+                        "rejection_reason": "edge_or_background",
+                    }
+                )
+                continue
+
+            best_corr = float("-inf")
+            best_dx_px = 0
+            best_dy_px = 0
+            for dy_px in range(-search_radius_px, search_radius_px + 1):
+                for dx_px in range(-search_radius_px, search_radius_px + 1):
+                    if np.hypot(dx_px, dy_px) > max_shift_px:
+                        continue
+                    moving_patch = _extract_patch(
+                        moving_density,
+                        center_row - dy_px,
+                        center_col - dx_px,
+                        patch_radius_px,
+                    )
+                    if moving_patch is None or float(np.max(moving_patch)) < min_patch_signal:
+                        continue
+                    correlation = _normalized_correlation(fixed_patch, moving_patch)
+                    if correlation > best_corr:
+                        best_corr = correlation
+                        best_dx_px = dx_px
+                        best_dy_px = dy_px
+
+            accepted = bool(best_corr >= min_correlation and np.hypot(best_dx_px, best_dy_px) <= max_shift_px)
+            rows.append(
+                {
+                    "anchor_x": anchor_x,
+                    "anchor_y": anchor_y,
+                    "dx": float(best_dx_px * pixel_size),
+                    "dy": float(best_dy_px * pixel_size),
+                    "correlation": best_corr,
+                    "accepted": accepted,
+                    "rejection_reason": "" if accepted else "low_correlation_or_large_shift",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _filter_translation_anchor_outliers(
+    anchors: pd.DataFrame,
+    *,
+    outlier_percentile: float,
+    neighbor_consistency_radius: float,
+    min_correlation: float,
+) -> pd.DataFrame:
+    anchors = anchors.copy()
+    accepted = anchors["accepted"].to_numpy(dtype=bool)
+    accepted &= anchors["correlation"].to_numpy(dtype=float) >= min_correlation
+    vectors = anchors[["dx", "dy"]].to_numpy(dtype=float)
+    magnitudes = np.linalg.norm(vectors, axis=1)
+    if np.any(accepted):
+        threshold = np.percentile(magnitudes[accepted], outlier_percentile)
+        too_large = magnitudes > threshold
+        accepted &= ~too_large
+        anchors.loc[too_large & anchors["accepted"], "rejection_reason"] = "magnitude_outlier"
+
+    accepted_indices = np.flatnonzero(accepted)
+    if len(accepted_indices) >= 3 and neighbor_consistency_radius > 0:
+        points = anchors[["anchor_x", "anchor_y"]].to_numpy(dtype=float)
+        tree = cKDTree(points[accepted_indices])
+        for row_index in accepted_indices:
+            neighbors = accepted_indices[tree.query_ball_point(points[row_index], neighbor_consistency_radius)]
+            if len(neighbors) < 3:
+                continue
+            local_median = np.median(vectors[neighbors], axis=0)
+            deviation = np.linalg.norm(vectors[row_index] - local_median)
+            local_norm = max(float(np.linalg.norm(local_median)), 1.0)
+            if deviation > max(local_norm, neighbor_consistency_radius * 0.25):
+                accepted[row_index] = False
+                anchors.loc[row_index, "rejection_reason"] = "neighbor_inconsistent"
+
+    anchors["accepted"] = accepted
+    anchors.loc[~anchors["accepted"] & (anchors["rejection_reason"] == ""), "rejection_reason"] = "filtered"
+    return anchors
+
+
+def local_translation_fine_warp(
+    fixed_points: np.ndarray,
+    moving_points: np.ndarray,
+    *,
+    bounds: tuple[float, float, float, float] | None = None,
+    density_sigma: float = 3.0,
+    density_pixel_size: float = 1.0,
+    point_weight: float = 1.0,
+    grid_spacing: float = 60.0,
+    patch_radius: float = 25.0,
+    search_radius: float = 12.0,
+    min_correlation: float = 0.25,
+    max_shift: float = 20.0,
+    min_patch_signal: float = 1e-4,
+    outlier_percentile: float = 95.0,
+    neighbor_consistency_radius: float = 120.0,
+    smoothing: float = 10.0,
+    kernel: str = "thin_plate_spline",
+    neighbors: int = 50,
+    min_accepted_anchors: int = 8,
+    jacobian_min_threshold: float = 0.05,
+) -> FineWarpResult:
+    """Estimate a smooth local translation field from density-map patch matching."""
+    fixed_points = _as_points(fixed_points, name="fixed_points")
+    moving_points = _as_points(moving_points, name="moving_points")
+    if bounds is None:
+        all_points = np.vstack([fixed_points, moving_points])
+        min_x, min_y = np.min(all_points, axis=0) - patch_radius
+        max_x, max_y = np.max(all_points, axis=0) + patch_radius
+        bounds = (float(min_x), float(min_y), float(max_x), float(max_y))
+
+    fixed_density = _density_from_points(
+        fixed_points,
+        bounds,
+        pixel_size=density_pixel_size,
+        sigma=density_sigma,
+        point_weight=point_weight,
+    )
+    moving_density = _density_from_points(
+        moving_points,
+        bounds,
+        pixel_size=density_pixel_size,
+        sigma=density_sigma,
+        point_weight=point_weight,
+    )
+    anchors = _local_translation_anchors(
+        fixed_density,
+        moving_density,
+        bounds,
+        pixel_size=density_pixel_size,
+        grid_spacing=grid_spacing,
+        patch_radius=patch_radius,
+        search_radius=search_radius,
+        min_correlation=min_correlation,
+        max_shift=max_shift,
+        min_patch_signal=min_patch_signal,
+    )
+    anchors = _filter_translation_anchor_outliers(
+        anchors,
+        outlier_percentile=outlier_percentile,
+        neighbor_consistency_radius=neighbor_consistency_radius,
+        min_correlation=min_correlation,
+    )
+    accepted = anchors[anchors["accepted"]]
+    before_metrics = point_distance_metrics(fixed_points, moving_points)
+
+    min_x, min_y, max_x, max_y = bounds
+    xs = np.arange(min_x, max_x + grid_spacing, grid_spacing, dtype=float)
+    ys = np.arange(min_y, max_y + grid_spacing, grid_spacing, dtype=float)
+    grid_x, grid_y = np.meshgrid(xs, ys)
+    zeros = np.zeros_like(grid_x, dtype=float)
+
+    if len(accepted) < min_accepted_anchors:
+        return FineWarpResult(
+            transformed_points=moving_points.copy(),
+            grid_x=grid_x,
+            grid_y=grid_y,
+            displacement_x=zeros,
+            displacement_y=zeros,
+            bounds=bounds,
+            grid_spacing=float(grid_spacing),
+            jacobian_min=1.0,
+            jacobian_max=1.0,
+            max_displacement=0.0,
+            n_candidate_pairs=int(len(anchors)),
+            n_pairs=int(len(accepted)),
+            n_filtered_pairs=int(len(anchors) - len(accepted)),
+            median_pair_distance_before=before_metrics["median_distance"],
+            median_pair_distance_after=before_metrics["median_distance"],
+            success=False,
+            message="Too few accepted local-translation anchors; fine warp was not applied.",
+            anchors=anchors,
+            metrics={"before": before_metrics, "after": before_metrics},
+        )
+
+    anchor_points = accepted[["anchor_x", "anchor_y"]].to_numpy(dtype=float)
+    anchor_vectors = accepted[["dx", "dy"]].to_numpy(dtype=float)
+    query_grid = np.column_stack([grid_x.ravel(), grid_y.ravel()])
+    rbf_neighbors = min(int(neighbors), len(anchor_points)) if neighbors else None
+    interpolator = RBFInterpolator(
+        anchor_points,
+        anchor_vectors,
+        kernel=kernel,
+        smoothing=float(smoothing),
+        neighbors=rbf_neighbors,
+    )
+    field = interpolator(query_grid).reshape(*grid_x.shape, 2)
+    displacement_x = field[..., 0]
+    displacement_y = field[..., 1]
+    magnitude = np.sqrt(displacement_x**2 + displacement_y**2)
+    max_displacement = float(np.max(magnitude))
+
+    sampled = _sample_field(moving_points, displacement_x, displacement_y, bounds, grid_spacing)
+    transformed_points = moving_points + sampled
+    after_metrics = point_distance_metrics(fixed_points, transformed_points)
+
+    dfx_dy, dfx_dx = np.gradient(displacement_x, grid_spacing, grid_spacing)
+    dfy_dy, dfy_dx = np.gradient(displacement_y, grid_spacing, grid_spacing)
+    jacobian = (1.0 + dfx_dx) * (1.0 + dfy_dy) - dfx_dy * dfy_dx
+    jacobian_min = float(np.min(jacobian))
+    jacobian_max = float(np.max(jacobian))
+
+    success = True
+    message = "Local translation fine warp completed."
+    if after_metrics["median_distance"] > before_metrics["median_distance"]:
+        success = False
+        message = "Local translation warp rejected because median distance worsened."
+    elif max_displacement > max_shift * 1.5:
+        success = False
+        message = "Local translation warp rejected because max displacement was too large."
+    elif jacobian_min < jacobian_min_threshold:
+        success = False
+        message = "Local translation warp rejected because Jacobian/fold check failed."
+
+    if not success:
+        transformed_points = moving_points.copy()
+
+    return FineWarpResult(
+        transformed_points=transformed_points,
+        grid_x=grid_x,
+        grid_y=grid_y,
+        displacement_x=displacement_x if success else zeros,
+        displacement_y=displacement_y if success else zeros,
+        bounds=bounds,
+        grid_spacing=float(grid_spacing),
+        jacobian_min=jacobian_min,
+        jacobian_max=jacobian_max,
+        max_displacement=max_displacement,
+        n_candidate_pairs=int(len(anchors)),
+        n_pairs=int(len(accepted)),
+        n_filtered_pairs=int(len(anchors) - len(accepted)),
+        median_pair_distance_before=before_metrics["median_distance"],
+        median_pair_distance_after=after_metrics["median_distance"],
+        success=success,
+        message=message,
+        anchors=anchors,
+        metrics={"before": before_metrics, "after": after_metrics},
     )
 
 
@@ -602,15 +1013,18 @@ def warp_he_image_to_world(
     *,
     output_pixel_size_um: float = 1.0,
     bounds: tuple[float, float, float, float] | None = None,
+    output_origin: str = "upper-left",
     inverse_fine_iterations: int = 8,
 ) -> tuple[np.ndarray, dict]:
     """Warp an HE image into the GeoJSON world-um coordinate frame.
 
-    The output array is arranged for normal image display: row 0 corresponds to
-    max world-y and column 0 corresponds to min world-x.
+    output_origin controls which world-coordinate corner is placed at row 0,
+    column 0 of the exported image.
     """
     if output_pixel_size_um <= 0 or not np.isfinite(output_pixel_size_um):
         raise ValueError("output_pixel_size_um must be a positive finite value.")
+    if output_origin not in {"upper-left", "upper-right", "lower-left"}:
+        raise ValueError('output_origin must be "upper-left", "upper-right", or "lower-left".')
     he_image = np.asarray(he_image)
     if he_image.ndim not in {2, 3}:
         raise ValueError("he_image must be a 2D or 3D array.")
@@ -629,8 +1043,15 @@ def warp_he_image_to_world(
     width = max(1, int(np.ceil((max_x - min_x) / output_pixel_size_um)))
     height = max(1, int(np.ceil((max_y - min_y) / output_pixel_size_um)))
 
-    x_coords = min_x + (np.arange(width, dtype=float) + 0.5) * output_pixel_size_um
-    y_coords = max_y - (np.arange(height, dtype=float) + 0.5) * output_pixel_size_um
+    if output_origin == "upper-right":
+        x_coords = max_x - (np.arange(width, dtype=float) + 0.5) * output_pixel_size_um
+    else:
+        x_coords = min_x + (np.arange(width, dtype=float) + 0.5) * output_pixel_size_um
+
+    if output_origin in {"upper-left", "upper-right"}:
+        y_coords = min_y + (np.arange(height, dtype=float) + 0.5) * output_pixel_size_um
+    else:
+        y_coords = max_y - (np.arange(height, dtype=float) + 0.5) * output_pixel_size_um
     grid_x, grid_y = np.meshgrid(x_coords, y_coords)
     world_points = np.column_stack([grid_x.ravel(), grid_y.ravel()])
 
@@ -662,11 +1083,36 @@ def warp_he_image_to_world(
     metadata = {
         "bounds_um": [float(min_x), float(min_y), float(max_x), float(max_y)],
         "output_pixel_size_um": float(output_pixel_size_um),
+        "output_origin": output_origin,
         "width": int(width),
         "height": int(height),
-        "row0_world_y": float(max_y),
-        "col0_world_x": float(min_x),
+        "row0_world_y": float(y_coords[0]),
+        "col0_world_x": float(x_coords[0]),
         "flip_x": bool(affine_result.flip_x),
         "flip_y": bool(affine_result.flip_y),
     }
     return warped, metadata
+
+
+def world_points_to_warped_image_pixels(points: np.ndarray, warp_metadata: dict) -> np.ndarray:
+    """Convert world-um points to pixel coordinates in a warped HE image."""
+    points = _as_points(points, name="points")
+    pixel_size = float(warp_metadata["output_pixel_size_um"])
+    if pixel_size <= 0:
+        raise ValueError("warp_metadata output_pixel_size_um must be positive.")
+
+    output_origin = warp_metadata.get("output_origin", "upper-left")
+    col0_world_x = float(warp_metadata["col0_world_x"])
+    row0_world_y = float(warp_metadata["row0_world_y"])
+
+    if output_origin == "upper-right":
+        cols = (col0_world_x - points[:, 0]) / pixel_size
+    else:
+        cols = (points[:, 0] - col0_world_x) / pixel_size
+
+    if output_origin in {"upper-left", "upper-right"}:
+        rows = (points[:, 1] - row0_world_y) / pixel_size
+    else:
+        rows = (row0_world_y - points[:, 1]) / pixel_size
+
+    return np.column_stack([cols, rows])

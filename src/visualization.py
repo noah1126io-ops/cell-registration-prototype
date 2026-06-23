@@ -188,4 +188,159 @@ def visualize_point_sets(
     return fig
 
 
+def visualize_warped_he_point_overlay(
+    warped_he_image,
+    geojson_pixels: np.ndarray,
+    he_pixels: np.ndarray,
+    *,
+    title: str,
+    max_points: int = 3000,
+):
+    """Overlay GeoJSON and transformed HE points on a warped HE image."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.imshow(_to_grayscale_preview(warped_he_image), cmap="gray")
+
+    max_points = max(1, int(max_points))
+    if len(geojson_pixels):
+        geojson_pixels = np.asarray(geojson_pixels, dtype=float)[:max_points]
+        ax.scatter(
+            geojson_pixels[:, 0],
+            geojson_pixels[:, 1],
+            s=12,
+            c="#00d1ff",
+            marker="o",
+            linewidths=0,
+            alpha=0.65,
+            label="GeoJSON nuclei",
+        )
+
+    if len(he_pixels):
+        he_pixels = np.asarray(he_pixels, dtype=float)[:max_points]
+        ax.scatter(
+            he_pixels[:, 0],
+            he_pixels[:, 1],
+            s=14,
+            c="#ffb000",
+            marker="x",
+            linewidths=0.8,
+            alpha=0.8,
+            label="warped HE nuclei",
+        )
+
+    ax.set_title(title)
+    ax.set_xlim(0, warped_he_image.shape[1])
+    ax.set_ylim(warped_he_image.shape[0], 0)
+    ax.set_aspect("equal", adjustable="box")
+    ax.legend(loc="lower right", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_translation_anchors(anchors: pd.DataFrame, *, title: str):
+    """Show accepted and rejected local-translation anchors."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    accepted = anchors[anchors["accepted"]]
+    rejected = anchors[~anchors["accepted"]]
+
+    if not rejected.empty:
+        ax.scatter(rejected["anchor_x"], rejected["anchor_y"], s=12, c="#999999", alpha=0.45, label="rejected")
+        ax.quiver(
+            rejected["anchor_x"],
+            rejected["anchor_y"],
+            rejected["dx"],
+            rejected["dy"],
+            angles="xy",
+            scale_units="xy",
+            scale=1,
+            color="#999999",
+            alpha=0.35,
+            width=0.002,
+        )
+    if not accepted.empty:
+        ax.scatter(accepted["anchor_x"], accepted["anchor_y"], s=18, c="#00d1ff", alpha=0.8, label="accepted")
+        ax.quiver(
+            accepted["anchor_x"],
+            accepted["anchor_y"],
+            accepted["dx"],
+            accepted["dy"],
+            angles="xy",
+            scale_units="xy",
+            scale=1,
+            color="#ffb000",
+            alpha=0.9,
+            width=0.003,
+        )
+
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    ax.invert_yaxis()
+    ax.legend(loc="lower right", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_displacement_field(grid_x, grid_y, displacement_x, displacement_y, *, title: str, stride: int = 2):
+    """Show a sampled displacement vector field."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    stride = max(1, int(stride))
+    magnitude = np.sqrt(displacement_x**2 + displacement_y**2)
+    image = ax.imshow(
+        magnitude,
+        cmap="magma",
+        extent=[float(np.min(grid_x)), float(np.max(grid_x)), float(np.max(grid_y)), float(np.min(grid_y))],
+    )
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="displacement")
+    ax.quiver(
+        grid_x[::stride, ::stride],
+        grid_y[::stride, ::stride],
+        displacement_x[::stride, ::stride],
+        displacement_y[::stride, ::stride],
+        angles="xy",
+        scale_units="xy",
+        scale=1,
+        color="white",
+        alpha=0.8,
+        width=0.003,
+    )
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    ax.invert_yaxis()
+    fig.tight_layout()
+    return fig
+
+
+def visualize_distance_histogram(before_distances, after_distances, *, title: str):
+    """Plot before/after nearest-neighbor distance histograms."""
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.hist(before_distances, bins=40, alpha=0.55, label="before", color="#999999")
+    ax.hist(after_distances, bins=40, alpha=0.55, label="after", color="#00d1ff")
+    ax.set_title(title)
+    ax.set_xlabel("nearest distance")
+    ax.set_ylabel("count")
+    ax.legend(frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_anchor_correlation_heatmap(anchors: pd.DataFrame, *, title: str):
+    """Scatter heatmap of local translation anchor correlations."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    values = anchors["correlation"].to_numpy(dtype=float)
+    scatter = ax.scatter(
+        anchors["anchor_x"],
+        anchors["anchor_y"],
+        c=values,
+        s=22,
+        cmap="viridis",
+        vmin=0,
+        vmax=1,
+    )
+    fig.colorbar(scatter, ax=ax, fraction=0.046, pad=0.04, label="correlation")
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    ax.invert_yaxis()
+    fig.tight_layout()
+    return fig
+
+
 # TODO: Add checkerboards and registration quality summary plots.
