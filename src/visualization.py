@@ -139,6 +139,8 @@ def visualize_point_sets(
     *,
     title: str,
     background_image=None,
+    invert_x_axis: bool = False,
+    invert_y_axis: bool | None = None,
 ):
     """Visualize fixed and moving point sets on an optional image background."""
     if fixed_features is None or moving_features is None:
@@ -175,7 +177,11 @@ def visualize_point_sets(
 
     ax.set_title(title)
     ax.set_aspect("equal", adjustable="box")
-    if not has_background:
+    if invert_x_axis:
+        ax.invert_xaxis()
+    if invert_y_axis is None:
+        invert_y_axis = not has_background
+    if invert_y_axis:
         ax.invert_yaxis()
     ax.legend(loc="lower right", fontsize=8, frameon=True)
     fig.tight_layout()

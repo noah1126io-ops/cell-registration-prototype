@@ -40,7 +40,9 @@ class AffineICPResult:
     affine_matrix: np.ndarray
     translation: np.ndarray
     transformed_points: np.ndarray
+    flip_x: bool
     flip_y: bool
+    image_width: float
     image_height: float
     mean_residual: float
     median_residual: float
@@ -85,6 +87,27 @@ def apply_y_flip(points: np.ndarray, image_height: float) -> np.ndarray:
         raise ValueError("image_height must be a positive finite value.")
     flipped = _as_points(points, name="points").copy()
     flipped[:, 1] = float(image_height) - flipped[:, 1]
+    return flipped
+
+
+def apply_axis_flips(
+    points: np.ndarray,
+    *,
+    image_width: float,
+    image_height: float,
+    flip_x: bool = False,
+    flip_y: bool = False,
+) -> np.ndarray:
+    """Flip image-space coordinates around image width/height before world alignment."""
+    flipped = _as_points(points, name="points").copy()
+    if flip_x:
+        if not np.isfinite(image_width) or image_width <= 0:
+            raise ValueError("image_width must be a positive finite value when flip_x is enabled.")
+        flipped[:, 0] = float(image_width) - flipped[:, 0]
+    if flip_y:
+        if not np.isfinite(image_height) or image_height <= 0:
+            raise ValueError("image_height must be a positive finite value when flip_y is enabled.")
+        flipped[:, 1] = float(image_height) - flipped[:, 1]
     return flipped
 
 
@@ -297,19 +320,34 @@ def estimate_affine_with_y_flip(
     geojson_points_um: np.ndarray,
     *,
     image_height_px: float,
+    image_width_px: float | None = None,
+    flip_candidates: Iterable[tuple[bool, bool]] | None = None,
     rotations_deg: Iterable[float] = range(0, 360, 30),
     similarity_trim_quantile: float = 0.8,
     affine_trim_quantile: float = 0.7,
     max_iter: int = 80,
 ) -> AffineICPResult:
-    """Estimate HE-pixel to GeoJSON-world affine alignment, trying both y orientations."""
+    """Estimate HE-pixel to GeoJSON-world affine alignment, trying x/y orientation flips."""
     he_points_px = _as_points(he_points_px, name="he_points_px")
     geojson_points_um = _as_points(geojson_points_um, name="geojson_points_um")
+    if image_width_px is None:
+        image_width_px = float(np.ceil(np.max(he_points_px[:, 0])))
+    if flip_candidates is None:
+        flip_candidates = ((False, False), (False, True), (True, False), (True, True))
 
     best_result = None
-    best_orientation_error = np.inf
-    for flip_y in (False, True):
-        source = apply_y_flip(he_points_px, image_height_px) if flip_y else he_points_px
+    best_selection_score = np.inf
+    target_span = np.ptp(geojson_points_um, axis=0)
+    reflection_penalty = float(np.linalg.norm(target_span))
+    best_flip_count = 99
+    for flip_x, flip_y in flip_candidates:
+        source = apply_axis_flips(
+            he_points_px,
+            image_width=image_width_px,
+            image_height=image_height_px,
+            flip_x=flip_x,
+            flip_y=flip_y,
+        )
         similarity, orientation_error, _ = best_of_initial_rotations(
             source,
             geojson_points_um,
@@ -333,7 +371,9 @@ def estimate_affine_with_y_flip(
             affine_matrix=affine_matrix,
             translation=translation,
             transformed_points=transformed,
+            flip_x=flip_x,
             flip_y=flip_y,
+            image_width=float(image_width_px),
             image_height=float(image_height_px),
             mean_residual=float(mean_residual if np.isfinite(mean_residual) else np.mean(distances)),
             median_residual=median_residual,
@@ -344,16 +384,25 @@ def estimate_affine_with_y_flip(
         orientation_error = float(orientation_error)
         if not np.isfinite(orientation_error):
             orientation_error = result.median_residual
+        determinant = float(np.linalg.det(affine_matrix))
+        flip_count = int(flip_x) + int(flip_y)
+        selection_score = orientation_error + (reflection_penalty if determinant < 0 else 0.0) + flip_count * 1e-3
         if (
             best_result is None
-            or orientation_error < best_orientation_error
+            or selection_score < best_selection_score
             or (
-                np.isclose(orientation_error, best_orientation_error)
+                np.isclose(selection_score, best_selection_score)
+                and flip_count < best_flip_count
+            )
+            or (
+                np.isclose(selection_score, best_selection_score)
+                and flip_count == best_flip_count
                 and result.median_residual < best_result.median_residual
             )
         ):
             best_result = result
-            best_orientation_error = orientation_error
+            best_selection_score = selection_score
+            best_flip_count = flip_count
 
     if best_result is None:
         identity = np.eye(2, dtype=float)
@@ -362,7 +411,9 @@ def estimate_affine_with_y_flip(
             affine_matrix=identity,
             translation=np.zeros(2, dtype=float),
             transformed_points=transformed,
+            flip_x=False,
             flip_y=False,
+            image_width=float(image_width_px),
             image_height=float(image_height_px),
             mean_residual=float("inf"),
             median_residual=float("inf"),
@@ -497,3 +548,125 @@ def fine_center_snap_warp(
         success=True,
         message="Fine center-snap warp completed.",
     )
+
+
+def _inverse_affine(points: np.ndarray, affine_matrix: np.ndarray, translation: np.ndarray) -> np.ndarray:
+    affine_matrix = np.asarray(affine_matrix, dtype=float)
+    translation = np.asarray(translation, dtype=float)
+    inverse_transpose = np.linalg.inv(affine_matrix).T
+    return (points - translation) @ inverse_transpose
+
+
+def _inverse_fine_warp(points: np.ndarray, fine_result: FineWarpResult, *, iterations: int = 8) -> np.ndarray:
+    """Invert p -> p + displacement(p) by fixed-point iteration."""
+    estimate = np.asarray(points, dtype=float).copy()
+    for _ in range(iterations):
+        displacement = _sample_field(
+            estimate,
+            fine_result.displacement_x,
+            fine_result.displacement_y,
+            fine_result.bounds,
+            fine_result.grid_spacing,
+        )
+        estimate = points - displacement
+    return estimate
+
+
+def _sample_image_linear(image: np.ndarray, xy: np.ndarray) -> np.ndarray:
+    image = np.asarray(image)
+    rows = xy[:, 1]
+    cols = xy[:, 0]
+
+    if image.ndim == 2:
+        sampled = map_coordinates(image.astype(float), np.vstack([rows, cols]), order=1, mode="constant", cval=0.0)
+        return sampled
+
+    channels = []
+    for channel in range(image.shape[2]):
+        channels.append(
+            map_coordinates(
+                image[..., channel].astype(float),
+                np.vstack([rows, cols]),
+                order=1,
+                mode="constant",
+                cval=0.0,
+            )
+        )
+    return np.stack(channels, axis=1)
+
+
+def warp_he_image_to_world(
+    he_image: np.ndarray,
+    affine_result: AffineICPResult,
+    fine_result: FineWarpResult | None = None,
+    *,
+    output_pixel_size_um: float = 1.0,
+    bounds: tuple[float, float, float, float] | None = None,
+    inverse_fine_iterations: int = 8,
+) -> tuple[np.ndarray, dict]:
+    """Warp an HE image into the GeoJSON world-um coordinate frame.
+
+    The output array is arranged for normal image display: row 0 corresponds to
+    max world-y and column 0 corresponds to min world-x.
+    """
+    if output_pixel_size_um <= 0 or not np.isfinite(output_pixel_size_um):
+        raise ValueError("output_pixel_size_um must be a positive finite value.")
+    he_image = np.asarray(he_image)
+    if he_image.ndim not in {2, 3}:
+        raise ValueError("he_image must be a 2D or 3D array.")
+
+    if bounds is None:
+        if fine_result is not None:
+            bounds = fine_result.bounds
+        else:
+            transformed = affine_result.transformed_points
+            min_x, min_y = transformed.min(axis=0)
+            max_x, max_y = transformed.max(axis=0)
+            padding = 30.0
+            bounds = (float(min_x - padding), float(min_y - padding), float(max_x + padding), float(max_y + padding))
+
+    min_x, min_y, max_x, max_y = bounds
+    width = max(1, int(np.ceil((max_x - min_x) / output_pixel_size_um)))
+    height = max(1, int(np.ceil((max_y - min_y) / output_pixel_size_um)))
+
+    x_coords = min_x + (np.arange(width, dtype=float) + 0.5) * output_pixel_size_um
+    y_coords = max_y - (np.arange(height, dtype=float) + 0.5) * output_pixel_size_um
+    grid_x, grid_y = np.meshgrid(x_coords, y_coords)
+    world_points = np.column_stack([grid_x.ravel(), grid_y.ravel()])
+
+    affine_world_points = (
+        _inverse_fine_warp(world_points, fine_result, iterations=inverse_fine_iterations)
+        if fine_result is not None
+        else world_points
+    )
+    oriented_he_points = _inverse_affine(affine_world_points, affine_result.affine_matrix, affine_result.translation)
+
+    he_points = oriented_he_points.copy()
+    if affine_result.flip_x:
+        he_points[:, 0] = affine_result.image_width - he_points[:, 0]
+    if affine_result.flip_y:
+        he_points[:, 1] = affine_result.image_height - he_points[:, 1]
+
+    sampled = _sample_image_linear(he_image, he_points)
+    if he_image.ndim == 2:
+        warped = sampled.reshape(height, width)
+    else:
+        warped = sampled.reshape(height, width, he_image.shape[2])
+
+    if np.issubdtype(he_image.dtype, np.integer):
+        info = np.iinfo(he_image.dtype)
+        warped = np.clip(warped, info.min, info.max).astype(he_image.dtype)
+    else:
+        warped = warped.astype(he_image.dtype, copy=False)
+
+    metadata = {
+        "bounds_um": [float(min_x), float(min_y), float(max_x), float(max_y)],
+        "output_pixel_size_um": float(output_pixel_size_um),
+        "width": int(width),
+        "height": int(height),
+        "row0_world_y": float(max_y),
+        "col0_world_x": float(min_x),
+        "flip_x": bool(affine_result.flip_x),
+        "flip_y": bool(affine_result.flip_y),
+    }
+    return warped, metadata

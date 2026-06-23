@@ -14,7 +14,7 @@ from src.geojson_utils import load_geojson_centroids
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.matching import match_cells
 from src.point_io import load_csv_points, load_npy_centers
-from src.pointset_registration import estimate_affine_with_y_flip, fine_center_snap_warp
+from src.pointset_registration import estimate_affine_with_y_flip, fine_center_snap_warp, warp_he_image_to_world
 from src.registration import (
     estimate_affine_transform,
     transform_cell_centroids,
@@ -344,7 +344,8 @@ def show_point_registration_workflow(
     max_score: float,
     max_pairs_to_display: int,
 ) -> None:
-    st.header("Workflow A: Data-only point registration")
+    st.header("Workflow A: Point registration")
+    st.caption("Register and match precomputed point tables. Images are optional QC backgrounds.")
 
     point_left, point_right = st.columns(2)
     with point_left:
@@ -477,8 +478,8 @@ def show_mask_to_mask_workflow(
     max_score: float,
     max_pairs_to_display: int,
 ) -> None:
-    st.header("Workflow B: Mask-to-mask registration")
-    st.caption("Secondary workflow for existing integer label-mask inputs.")
+    st.header("Workflow B: Mask-derived point registration")
+    st.caption("Extract points/features from existing label masks, then run the shared registration and matching flow.")
 
     st.subheader("Input files")
     file_types = ["png", "jpg", "jpeg", "tif", "tiff"]
@@ -571,9 +572,9 @@ def show_mask_to_mask_workflow(
     # TODO: Add StarDist nuclei centers .npy upload.
     # TODO: Add GeoJSON nuclei upload.
     # TODO: Add point-set registration mode.
-    # TODO: Add GeoJSON nuclei input support for HE-to-GeoJSON alignment mode.
+    # TODO: Add GeoJSON nuclei polygon QC support for HE-GeoJSON alignment mode.
     # TODO: Add HE nuclei .npy input support for precomputed StarDist centers.
-    # TODO: Add HE-to-GeoJSON alignment mode separate from mask-to-mask registration.
+    # TODO: Keep HE-GeoJSON alignment as a special-coordinate workflow separate from mask-derived point registration.
     # TODO: Add world-um coordinate transform utilities for GeoJSON alignment.
     # TODO: Add Y-flip handling for fluorescence GeoJSON world coordinates.
     # TODO: Add Jacobian quality check for fine center-snap warp validation.
@@ -590,13 +591,15 @@ def _cell_features_from_points(points: pd.DataFrame):
     return point_features_to_cell_features(points)
 
 
-def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict) -> bytes:
+def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict, warp_metadata: dict | None = None) -> bytes:
     summary = {
-        "workflow": "HE-to-GeoJSON alignment preparation",
+        "workflow": "HE-GeoJSON alignment",
         "coordinate_system": "GeoJSON world-um",
         "affine": {
-            "model": "y_flip_optional_affine_icp",
+            "model": "xy_flip_optional_affine_icp",
+            "flip_x": affine_result.flip_x,
             "flip_y": affine_result.flip_y,
+            "image_width_px": affine_result.image_width,
             "image_height_px": affine_result.image_height,
             "affine_matrix": affine_result.affine_matrix.tolist(),
             "translation": affine_result.translation.tolist(),
@@ -619,15 +622,16 @@ def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict) ->
             "success": fine_result.success,
             "message": fine_result.message,
         },
+        "warped_he_image": warp_metadata,
         "parameters": parameters,
-        "notes": "Research prototype only. Raster HE warp export and non-rigid production validation remain TODO.",
+        "notes": "Research prototype only. Raster HE warp export is an MVP for QC and should be visually checked.",
     }
     return json.dumps(summary, indent=2).encode("utf-8")
 
 
 def show_he_geojson_preparation() -> None:
-    st.header("Workflow C: HE-to-GeoJSON alignment preparation")
-    st.caption("Experimental point-set alignment from HE nuclei centers to fluorescence GeoJSON world-um coordinates.")
+    st.header("Workflow C: HE-GeoJSON alignment")
+    st.caption("Special-coordinate workflow for HE nuclei points and fluorescence GeoJSON in world-um space.")
 
     input_left, input_right = st.columns(2)
     with input_left:
@@ -656,6 +660,25 @@ def show_he_geojson_preparation() -> None:
     with param_right:
         grid_spacing = st.number_input("Fine warp grid spacing (um)", min_value=0.1, value=6.0, step=1.0)
         ridge = st.number_input("Fine warp ridge", min_value=0.0, value=0.3, step=0.1)
+    display_origin = st.selectbox(
+        "World-coordinate display origin",
+        ["upper-right", "upper-left", "lower-left"],
+        index=0,
+        help="Use upper-right when the registered scatter appears flipped relative to the HE image.",
+    )
+    flip_mode = st.selectbox(
+        "HE coordinate flip candidates",
+        ["auto", "none", "x", "y", "x+y"],
+        index=0,
+        help="Use x+y when the HE image behaves like an upper-right-origin coordinate frame.",
+    )
+    warped_he_pixel_size = st.number_input(
+        "Warped HE output pixel size (um)",
+        min_value=0.1,
+        value=1.0,
+        step=0.5,
+        help="Smaller values create larger PNG files.",
+    )
 
     he_image = show_uploaded_image("Optional HE image", he_image_file) if he_image_file else None
 
@@ -710,20 +733,31 @@ def show_he_geojson_preparation() -> None:
 
     if he_image is not None:
         image_height_px = float(he_image.shape[0])
+        image_width_px = float(he_image.shape[1])
     else:
         image_height_px = float(np.ceil(he_points["centroid_y"].max()))
+        image_width_px = float(np.ceil(he_points["centroid_x"].max()))
         st.warning(
-            "No HE image was uploaded. Y-flip candidates use the maximum HE y coordinate as image height estimate."
+            "No HE image was uploaded. Flip candidates use the maximum HE x/y coordinates as image size estimates."
         )
 
     he_array = _points_from_table(he_points)
     geojson_array = _points_from_table(geojson_points)
 
     try:
+        flip_candidates = {
+            "auto": None,
+            "none": ((False, False),),
+            "x": ((True, False),),
+            "y": ((False, True),),
+            "x+y": ((True, True),),
+        }[flip_mode]
         affine_result = estimate_affine_with_y_flip(
             he_array,
             geojson_array,
             image_height_px=image_height_px,
+            image_width_px=image_width_px,
+            flip_candidates=flip_candidates,
             similarity_trim_quantile=similarity_trim,
             affine_trim_quantile=affine_trim,
         )
@@ -755,21 +789,26 @@ def show_he_geojson_preparation() -> None:
     transformed_fine_points["source"] = "he_fine_world_um"
 
     st.subheader("Registration QC")
-    metric_a, metric_b, metric_c, metric_d = st.columns(4)
-    metric_a.metric("Y-flip selected", str(affine_result.flip_y))
-    metric_b.metric("Affine median residual", f"{affine_result.median_residual:.2f} um")
-    metric_c.metric("Fine median residual", f"{fine_result.median_pair_distance_after:.2f} um")
-    metric_d.metric("Jacobian min", f"{fine_result.jacobian_min:.3f}")
+    metric_a, metric_b, metric_c, metric_d, metric_e = st.columns(5)
+    metric_a.metric("X-flip", str(affine_result.flip_x))
+    metric_b.metric("Y-flip", str(affine_result.flip_y))
+    metric_c.metric("Affine median", f"{affine_result.median_residual:.2f} um")
+    metric_d.metric("Fine median", f"{fine_result.median_pair_distance_after:.2f} um")
+    metric_e.metric("Jacobian min", f"{fine_result.jacobian_min:.3f}")
 
     plot_left, plot_right = st.columns(2)
     geojson_features = _cell_features_from_points(geojson_points)
     affine_features = _cell_features_from_points(transformed_affine_points)
     fine_features = _cell_features_from_points(transformed_fine_points)
+    invert_x_axis = display_origin == "upper-right"
+    invert_y_axis = display_origin in {"upper-right", "upper-left"}
     with plot_left:
         affine_figure = visualize_point_sets(
             geojson_features,
             affine_features,
             title="Affine HE centers vs GeoJSON centroids (world-um)",
+            invert_x_axis=invert_x_axis,
+            invert_y_axis=invert_y_axis,
         )
         st.pyplot(affine_figure, clear_figure=False)
         st.download_button(
@@ -783,12 +822,43 @@ def show_he_geojson_preparation() -> None:
             geojson_features,
             fine_features,
             title="Fine center-snap HE centers vs GeoJSON centroids (world-um)",
+            invert_x_axis=invert_x_axis,
+            invert_y_axis=invert_y_axis,
         )
         st.pyplot(fine_figure, clear_figure=False)
         st.download_button(
             "Download fine scatter PNG",
             data=figure_to_png_bytes(fine_figure),
             file_name="he_geojson_fine_scatter.png",
+            mime="image/png",
+        )
+
+    warped_he_image = None
+    warped_he_metadata = None
+    if he_image is not None:
+        try:
+            warped_he_image, warped_he_metadata = warp_he_image_to_world(
+                he_image,
+                affine_result,
+                fine_result,
+                output_pixel_size_um=warped_he_pixel_size,
+            )
+        except ValueError as exc:
+            st.warning(f"Could not warp HE image: {exc}")
+
+    if warped_he_image is not None:
+        st.subheader("Warped HE image")
+        st.image(
+            warped_he_image,
+            caption=(
+                "HE image warped into GeoJSON world-um coordinates "
+                f"| pixel_size={warped_he_metadata['output_pixel_size_um']} um"
+            ),
+        )
+        st.download_button(
+            "Download warped HE image PNG",
+            data=array_to_png_bytes(warped_he_image),
+            file_name="warped_he_world_um.png",
             mime="image/png",
         )
 
@@ -807,28 +877,31 @@ def show_he_geojson_preparation() -> None:
         "fine_grid_spacing_um": grid_spacing,
         "fine_bandwidth_um": fine_bandwidth,
         "fine_ridge": ridge,
+        "display_origin": display_origin,
+        "flip_mode": flip_mode,
+        "warped_he_output_pixel_size_um": warped_he_pixel_size,
     }
     st.download_button(
         "Download HE-GeoJSON transform summary",
-        data=_he_geojson_summary_to_json(affine_result, fine_result, parameters),
+        data=_he_geojson_summary_to_json(affine_result, fine_result, parameters, warped_he_metadata),
         file_name="he_geojson_transform_summary.json",
         mime="application/json",
     )
 
-    # TODO: Export raster HE image warped onto the GeoJSON world-um grid.
+    # TODO: Add inverse-warp refinement controls and larger tiled exports for full-resolution HE images.
     # TODO: Add GeoJSON polygon overlay and warp-field vector QC panels.
 
 
 def main() -> None:
     st.title("Cell Registration Prototype")
-    st.caption("Research prototype only. Not for diagnostic use.")
+    st.caption("Research prototype for point-based registration, matching, and QC. Not for diagnostic use.")
 
     workflow = st.sidebar.selectbox(
         "Workflow",
         [
-            "Workflow A: Data-only point registration",
-            "Workflow B: Mask-to-mask registration",
-            "Workflow C: HE-to-GeoJSON alignment preparation",
+            "Workflow A: Point registration",
+            "Workflow B: Mask-derived point registration",
+            "Workflow C: HE-GeoJSON alignment",
         ],
     )
     st.sidebar.divider()
