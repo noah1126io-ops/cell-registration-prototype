@@ -72,6 +72,13 @@ class FineWarpResult:
     median_pair_distance_after: float
     success: bool
     message: str
+    attempted_transformed_points: np.ndarray | None = None
+    attempted_displacement_x: np.ndarray | None = None
+    attempted_displacement_y: np.ndarray | None = None
+    attempted_metrics: dict | None = None
+    applied_metrics: dict | None = None
+    rejection_reason: str | None = None
+    applied: bool | None = None
     anchors: pd.DataFrame | None = None
     metrics: dict | None = None
 
@@ -491,6 +498,9 @@ def fine_center_snap_warp(
             grid_y=grid_y,
             displacement_x=zeros,
             displacement_y=zeros,
+            attempted_transformed_points=source_world_points.copy(),
+            attempted_displacement_x=zeros,
+            attempted_displacement_y=zeros,
             bounds=bounds,
             grid_spacing=float(grid_spacing),
             jacobian_min=1.0,
@@ -503,6 +513,10 @@ def fine_center_snap_warp(
             median_pair_distance_after=float("inf"),
             success=False,
             message="No mutual nearest-neighbor pairs within match_radius; fine warp is identity.",
+            attempted_metrics=None,
+            applied_metrics=None,
+            rejection_reason="No mutual nearest-neighbor pairs within match_radius; fine warp is identity.",
+            applied=False,
         )
 
     source_pair_points = source_world_points[source_indices]
@@ -539,6 +553,9 @@ def fine_center_snap_warp(
             grid_y=grid_y,
             displacement_x=zeros,
             displacement_y=zeros,
+            attempted_transformed_points=source_world_points.copy(),
+            attempted_displacement_x=zeros,
+            attempted_displacement_y=zeros,
             bounds=bounds,
             grid_spacing=float(grid_spacing),
             jacobian_min=1.0,
@@ -551,6 +568,10 @@ def fine_center_snap_warp(
             median_pair_distance_after=float("inf"),
             success=False,
             message="All fine-warp candidate pairs were filtered out; fine warp is identity.",
+            attempted_metrics=None,
+            applied_metrics=None,
+            rejection_reason="All fine-warp candidate pairs were filtered out; fine warp is identity.",
+            applied=False,
         )
 
     displacement = displacement * float(snap_strength)
@@ -605,6 +626,9 @@ def fine_center_snap_warp(
         grid_y=grid_y,
         displacement_x=displacement_x,
         displacement_y=displacement_y,
+        attempted_transformed_points=transformed_points,
+        attempted_displacement_x=displacement_x,
+        attempted_displacement_y=displacement_y,
         bounds=bounds,
         grid_spacing=float(grid_spacing),
         jacobian_min=float(np.min(jacobian)),
@@ -617,6 +641,10 @@ def fine_center_snap_warp(
         median_pair_distance_after=median_after,
         success=True,
         message="Robust fine center-snap warp completed.",
+        attempted_metrics=None,
+        applied_metrics=None,
+        rejection_reason=None,
+        applied=True,
     )
 
 
@@ -720,6 +748,14 @@ def _local_translation_anchors(
                         "anchor_y": anchor_y,
                         "dx": 0.0,
                         "dy": 0.0,
+                        "shift_magnitude": 0.0,
+                        "dx_px": 0,
+                        "dy_px": 0,
+                        "best_correlation": np.nan,
+                        "zero_shift_correlation": np.nan,
+                        "correlation_gain": np.nan,
+                        "patch_signal": 0.0 if fixed_patch is None else float(np.max(fixed_patch)),
+                        "accepted_before_filter": False,
                         "correlation": np.nan,
                         "accepted": False,
                         "rejection_reason": "edge_or_background",
@@ -730,6 +766,7 @@ def _local_translation_anchors(
             best_corr = float("-inf")
             best_dx_px = 0
             best_dy_px = 0
+            zero_shift_correlation = float("-inf")
             for dy_px in range(-search_radius_px, search_radius_px + 1):
                 for dx_px in range(-search_radius_px, search_radius_px + 1):
                     if np.hypot(dx_px, dy_px) > max_shift_px:
@@ -743,21 +780,34 @@ def _local_translation_anchors(
                     if moving_patch is None or float(np.max(moving_patch)) < min_patch_signal:
                         continue
                     correlation = _normalized_correlation(fixed_patch, moving_patch)
+                    if dx_px == 0 and dy_px == 0:
+                        zero_shift_correlation = correlation
                     if correlation > best_corr:
                         best_corr = correlation
                         best_dx_px = dx_px
                         best_dy_px = dy_px
 
-            accepted = bool(best_corr >= min_correlation and np.hypot(best_dx_px, best_dy_px) <= max_shift_px)
+            shift_magnitude_px = float(np.hypot(best_dx_px, best_dy_px))
+            accepted_before_filter = bool(best_corr >= min_correlation and shift_magnitude_px <= max_shift_px)
+            dx = float(best_dx_px * pixel_size)
+            dy = float(best_dy_px * pixel_size)
             rows.append(
                 {
                     "anchor_x": anchor_x,
                     "anchor_y": anchor_y,
-                    "dx": float(best_dx_px * pixel_size),
-                    "dy": float(best_dy_px * pixel_size),
+                    "dx": dx,
+                    "dy": dy,
+                    "shift_magnitude": float(np.hypot(dx, dy)),
+                    "dx_px": int(best_dx_px),
+                    "dy_px": int(best_dy_px),
+                    "best_correlation": best_corr,
+                    "zero_shift_correlation": zero_shift_correlation,
+                    "correlation_gain": best_corr - zero_shift_correlation,
+                    "patch_signal": float(np.max(fixed_patch)),
+                    "accepted_before_filter": accepted_before_filter,
                     "correlation": best_corr,
-                    "accepted": accepted,
-                    "rejection_reason": "" if accepted else "low_correlation_or_large_shift",
+                    "accepted": accepted_before_filter,
+                    "rejection_reason": "" if accepted_before_filter else "low_correlation_or_large_shift",
                 }
             )
     return pd.DataFrame(rows)
@@ -880,6 +930,9 @@ def local_translation_fine_warp(
             grid_y=grid_y,
             displacement_x=zeros,
             displacement_y=zeros,
+            attempted_transformed_points=moving_points.copy(),
+            attempted_displacement_x=zeros,
+            attempted_displacement_y=zeros,
             bounds=bounds,
             grid_spacing=float(grid_spacing),
             jacobian_min=1.0,
@@ -892,6 +945,10 @@ def local_translation_fine_warp(
             median_pair_distance_after=before_metrics["median_distance"],
             success=False,
             message="Too few accepted local-translation anchors; fine warp was not applied.",
+            attempted_metrics=before_metrics,
+            applied_metrics=before_metrics,
+            rejection_reason="too_few_accepted_anchors",
+            applied=False,
             anchors=anchors,
             metrics={"before": before_metrics, "after": before_metrics},
         )
@@ -914,8 +971,8 @@ def local_translation_fine_warp(
     max_displacement = float(np.max(magnitude))
 
     sampled = _sample_field(moving_points, displacement_x, displacement_y, bounds, grid_spacing)
-    transformed_points = moving_points + sampled
-    after_metrics = point_distance_metrics(fixed_points, transformed_points)
+    attempted_transformed_points = moving_points + sampled
+    attempted_metrics = point_distance_metrics(fixed_points, attempted_transformed_points)
 
     dfx_dy, dfx_dx = np.gradient(displacement_x, grid_spacing, grid_spacing)
     dfy_dy, dfy_dx = np.gradient(displacement_y, grid_spacing, grid_spacing)
@@ -925,18 +982,22 @@ def local_translation_fine_warp(
 
     success = True
     message = "Local translation fine warp completed."
-    if after_metrics["median_distance"] > before_metrics["median_distance"]:
+    rejection_reason = ""
+    if attempted_metrics["median_distance"] > before_metrics["median_distance"]:
         success = False
         message = "Local translation warp rejected because median distance worsened."
+        rejection_reason = "median_distance_worsened"
     elif max_displacement > max_shift * 1.5:
         success = False
         message = "Local translation warp rejected because max displacement was too large."
+        rejection_reason = "max_displacement_too_large"
     elif jacobian_min < jacobian_min_threshold:
         success = False
         message = "Local translation warp rejected because Jacobian/fold check failed."
+        rejection_reason = "jacobian_or_fold_check_failed"
 
-    if not success:
-        transformed_points = moving_points.copy()
+    transformed_points = attempted_transformed_points if success else moving_points.copy()
+    applied_metrics = attempted_metrics if success else before_metrics
 
     return FineWarpResult(
         transformed_points=transformed_points,
@@ -944,6 +1005,9 @@ def local_translation_fine_warp(
         grid_y=grid_y,
         displacement_x=displacement_x if success else zeros,
         displacement_y=displacement_y if success else zeros,
+        attempted_transformed_points=attempted_transformed_points,
+        attempted_displacement_x=displacement_x,
+        attempted_displacement_y=displacement_y,
         bounds=bounds,
         grid_spacing=float(grid_spacing),
         jacobian_min=jacobian_min,
@@ -953,11 +1017,15 @@ def local_translation_fine_warp(
         n_pairs=int(len(accepted)),
         n_filtered_pairs=int(len(anchors) - len(accepted)),
         median_pair_distance_before=before_metrics["median_distance"],
-        median_pair_distance_after=after_metrics["median_distance"],
+        median_pair_distance_after=applied_metrics["median_distance"],
         success=success,
         message=message,
+        attempted_metrics=attempted_metrics,
+        applied_metrics=applied_metrics,
+        rejection_reason=rejection_reason,
+        applied=success,
         anchors=anchors,
-        metrics={"before": before_metrics, "after": after_metrics},
+        metrics={"before": before_metrics, "attempted": attempted_metrics, "applied": applied_metrics},
     )
 
 

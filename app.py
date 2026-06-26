@@ -19,6 +19,7 @@ from src.pointset_registration import (
     FineWarpResult,
     fine_center_snap_warp,
     local_translation_fine_warp,
+    point_distance_metrics,
     point_nearest_distances,
     warp_he_image_to_world,
     world_points_to_warped_image_pixels,
@@ -609,6 +610,11 @@ def _cell_features_from_points(points: pd.DataFrame):
 
 
 def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict, warp_metadata: dict | None = None) -> bytes:
+    fine_applied_value = getattr(fine_result, "applied", None)
+    fine_applied = fine_result.success if fine_applied_value is None else bool(fine_applied_value)
+    rejection_reason = getattr(fine_result, "rejection_reason", None) or ""
+    attempted_metrics = getattr(fine_result, "attempted_metrics", None)
+    applied_metrics = getattr(fine_result, "applied_metrics", None)
     summary = {
         "workflow": "HE-GeoJSON alignment",
         "coordinate_system": "GeoJSON world-um",
@@ -638,6 +644,10 @@ def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict, wa
             "n_filtered_pairs": fine_result.n_filtered_pairs,
             "median_pair_distance_before_um": fine_result.median_pair_distance_before,
             "median_pair_distance_after_um": fine_result.median_pair_distance_after,
+            "applied": fine_applied,
+            "rejection_reason": rejection_reason,
+            "attempted_metrics": attempted_metrics,
+            "applied_metrics": applied_metrics,
             "distance_metrics": fine_result.metrics,
             "success": fine_result.success,
             "message": fine_result.message,
@@ -676,6 +686,55 @@ def show_he_geojson_preparation() -> None:
         index=0,
         help="Local translation field estimates patch-wise shifts from density maps; center-snap uses matched nuclei pairs.",
     )
+    local_preset = st.selectbox(
+        "Local translation preset",
+        ["conservative", "balanced", "aggressive", "debug"],
+        index=1,
+        help="Preset defaults for local translation field. Debug is permissive and useful for diagnosis.",
+    )
+    local_presets = {
+        "conservative": {
+            "density_sigma": 3.0,
+            "grid_spacing": 60.0,
+            "patch_radius": 25.0,
+            "search_radius": 12.0,
+            "min_correlation": 0.25,
+            "max_shift": 20.0,
+            "smoothing": 10.0,
+            "min_accepted_anchors": 8,
+        },
+        "balanced": {
+            "density_sigma": 2.0,
+            "grid_spacing": 35.0,
+            "patch_radius": 18.0,
+            "search_radius": 25.0,
+            "min_correlation": 0.15,
+            "max_shift": 35.0,
+            "smoothing": 3.0,
+            "min_accepted_anchors": 5,
+        },
+        "aggressive": {
+            "density_sigma": 1.5,
+            "grid_spacing": 25.0,
+            "patch_radius": 12.0,
+            "search_radius": 35.0,
+            "min_correlation": 0.10,
+            "max_shift": 45.0,
+            "smoothing": 0.0,
+            "min_accepted_anchors": 3,
+        },
+        "debug": {
+            "density_sigma": 2.0,
+            "grid_spacing": 30.0,
+            "patch_radius": 15.0,
+            "search_radius": 35.0,
+            "min_correlation": 0.05,
+            "max_shift": 50.0,
+            "smoothing": 0.0,
+            "min_accepted_anchors": 1,
+        },
+    }
+    local_default = local_presets[local_preset]
     param_left, param_mid, param_right = st.columns(3)
     with param_left:
         similarity_trim = st.slider("Similarity ICP trim quantile", 0.1, 1.0, 0.8, 0.05)
@@ -699,20 +758,34 @@ def show_he_geojson_preparation() -> None:
     st.subheader("Local translation field")
     local_left, local_mid, local_right = st.columns(3)
     with local_left:
-        local_density_sigma = st.number_input("Density sigma (um)", min_value=0.1, value=3.0, step=0.5)
+        local_density_sigma = st.number_input(
+            "Density sigma (um)", min_value=0.1, value=local_default["density_sigma"], step=0.5
+        )
         local_density_pixel_size = st.number_input("Density pixel size (um)", min_value=0.1, value=1.0, step=0.5)
         local_point_weight = st.number_input("Point weight", min_value=0.1, value=1.0, step=0.5)
     with local_mid:
-        local_grid_spacing = st.number_input("Local grid spacing (um)", min_value=1.0, value=60.0, step=5.0)
-        local_patch_radius = st.number_input("Patch radius (um)", min_value=1.0, value=25.0, step=5.0)
-        local_search_radius = st.number_input("Search radius (um)", min_value=1.0, value=12.0, step=2.0)
+        local_grid_spacing = st.number_input(
+            "Local grid spacing (um)", min_value=1.0, value=local_default["grid_spacing"], step=5.0
+        )
+        local_patch_radius = st.number_input(
+            "Patch radius (um)", min_value=1.0, value=local_default["patch_radius"], step=5.0
+        )
+        local_search_radius = st.number_input(
+            "Search radius (um)", min_value=1.0, value=local_default["search_radius"], step=2.0
+        )
     with local_right:
-        local_min_correlation = st.slider("Min local correlation", 0.0, 1.0, 0.25, 0.05)
-        local_max_shift = st.number_input("Max local shift (um)", min_value=1.0, value=20.0, step=5.0)
-        local_min_anchors = st.number_input("Min accepted anchors", min_value=1, value=8, step=1)
+        local_min_correlation = st.slider(
+            "Min local correlation", 0.0, 1.0, local_default["min_correlation"], 0.05
+        )
+        local_max_shift = st.number_input(
+            "Max local shift (um)", min_value=1.0, value=local_default["max_shift"], step=5.0
+        )
+        local_min_anchors = st.number_input(
+            "Min accepted anchors", min_value=1, value=local_default["min_accepted_anchors"], step=1
+        )
     local_outlier_percentile = st.slider("Anchor outlier percentile", 50.0, 100.0, 95.0, 1.0)
     local_neighbor_radius = st.number_input("Neighbor consistency radius (um)", min_value=1.0, value=120.0, step=10.0)
-    local_smoothing = st.number_input("RBF smoothing", min_value=0.0, value=10.0, step=1.0)
+    local_smoothing = st.number_input("RBF smoothing", min_value=0.0, value=local_default["smoothing"], step=1.0)
     local_kernel = st.selectbox("RBF kernel", ["thin_plate_spline", "linear", "cubic", "quintic"], index=0)
     local_neighbors = st.number_input("RBF neighbors", min_value=0, value=50, step=5)
     registration_display_origin = st.selectbox(
@@ -876,6 +949,9 @@ def show_he_geojson_preparation() -> None:
                 grid_y=grid_y,
                 displacement_x=zeros,
                 displacement_y=zeros,
+                attempted_transformed_points=affine_result.transformed_points.copy(),
+                attempted_displacement_x=zeros,
+                attempted_displacement_y=zeros,
                 bounds=(float(min_x), float(min_y), float(max_x), float(max_y)),
                 grid_spacing=float(grid_spacing),
                 jacobian_min=1.0,
@@ -888,6 +964,10 @@ def show_he_geojson_preparation() -> None:
                 median_pair_distance_after=affine_result.median_residual,
                 success=True,
                 message="Fine alignment disabled.",
+                attempted_metrics=None,
+                applied_metrics=None,
+                rejection_reason="Fine alignment disabled.",
+                applied=False,
                 anchors=None,
                 metrics=affine_metrics,
             )
@@ -910,6 +990,32 @@ def show_he_geojson_preparation() -> None:
     transformed_fine_points["centroid_y"] = fine_result.transformed_points[:, 1]
     transformed_fine_points["source"] = "he_fine_world_um"
 
+    attempted_points = (
+        fine_result.attempted_transformed_points
+        if getattr(fine_result, "attempted_transformed_points", None) is not None
+        else fine_result.transformed_points
+    )
+    attempted_displacement_x = (
+        fine_result.attempted_displacement_x
+        if getattr(fine_result, "attempted_displacement_x", None) is not None
+        else fine_result.displacement_x
+    )
+    attempted_displacement_y = (
+        fine_result.attempted_displacement_y
+        if getattr(fine_result, "attempted_displacement_y", None) is not None
+        else fine_result.displacement_y
+    )
+    attempted_metrics_result = getattr(fine_result, "attempted_metrics", None)
+    applied_metrics_result = getattr(fine_result, "applied_metrics", None)
+    rejection_reason = getattr(fine_result, "rejection_reason", None) or ""
+    fine_applied_value = getattr(fine_result, "applied", None)
+    fine_applied = fine_result.success if fine_applied_value is None else bool(fine_applied_value)
+
+    transformed_attempted_points = he_points.copy()
+    transformed_attempted_points["centroid_x"] = attempted_points[:, 0]
+    transformed_attempted_points["centroid_y"] = attempted_points[:, 1]
+    transformed_attempted_points["source"] = "he_attempted_fine_world_um"
+
     st.subheader("Registration QC")
     metric_a, metric_b, metric_c, metric_d, metric_e = st.columns(5)
     metric_a.metric("X-flip", str(affine_result.flip_x))
@@ -922,9 +1028,71 @@ def show_he_geojson_preparation() -> None:
         f"({fine_result.n_filtered_pairs} filtered out)"
     )
 
-    plot_left, plot_right = st.columns(2)
+    before_metrics = point_distance_metrics(geojson_array, affine_result.transformed_points)
+    attempted_metrics = attempted_metrics_result or point_distance_metrics(
+        geojson_array,
+        attempted_points,
+    )
+    applied_metrics = applied_metrics_result or point_distance_metrics(geojson_array, fine_result.transformed_points)
+    status = "applied" if fine_applied else ("disabled" if fine_alignment_method == "off" else "rejected")
+    accepted_anchor_count = fine_result.n_pairs
+    total_anchor_count = fine_result.n_candidate_pairs
+    rejected_anchor_count = fine_result.n_filtered_pairs
+    if fine_result.anchors is not None and "shift_magnitude" in fine_result.anchors:
+        accepted_anchor_magnitudes = fine_result.anchors.loc[fine_result.anchors["accepted"], "shift_magnitude"]
+        median_shift = float(accepted_anchor_magnitudes.median()) if not accepted_anchor_magnitudes.empty else 0.0
+        p95_shift = float(accepted_anchor_magnitudes.quantile(0.95)) if not accepted_anchor_magnitudes.empty else 0.0
+    else:
+        attempted_magnitude = np.sqrt(attempted_displacement_x**2 + attempted_displacement_y**2)
+        median_shift = float(np.median(attempted_magnitude))
+        p95_shift = float(np.percentile(attempted_magnitude, 95))
+
+    st.subheader("Fine alignment diagnostics")
+    diag_a, diag_b, diag_c, diag_d = st.columns(4)
+    diag_a.metric("Fine method", fine_alignment_method)
+    diag_b.metric("Fine status", status)
+    diag_c.metric("Accepted anchors", f"{accepted_anchor_count}/{total_anchor_count}")
+    diag_d.metric("Rejected anchors", rejected_anchor_count)
+    if rejection_reason:
+        st.warning(f"Rejection reason: {rejection_reason}")
+    diag2_a, diag2_b, diag2_c, diag2_d = st.columns(4)
+    diag2_a.metric("Median shift", f"{median_shift:.2f} um")
+    diag2_b.metric("Shift p95", f"{p95_shift:.2f} um")
+    diag2_c.metric("Max displacement", f"{fine_result.max_displacement:.2f} um")
+    diag2_d.metric("Jacobian min", f"{fine_result.jacobian_min:.3f}")
+
+    metric_rows = [
+        {
+            "stage": "affine",
+            "median": before_metrics["median_distance"],
+            "mean": before_metrics["mean_distance"],
+            "within_3": before_metrics["within_3"],
+            "within_5": before_metrics["within_5"],
+            "within_10": before_metrics["within_10"],
+        },
+        {
+            "stage": "attempted_fine",
+            "median": attempted_metrics["median_distance"],
+            "mean": attempted_metrics["mean_distance"],
+            "within_3": attempted_metrics["within_3"],
+            "within_5": attempted_metrics["within_5"],
+            "within_10": attempted_metrics["within_10"],
+        },
+        {
+            "stage": "applied_fine",
+            "median": applied_metrics["median_distance"],
+            "mean": applied_metrics["mean_distance"],
+            "within_3": applied_metrics["within_3"],
+            "within_5": applied_metrics["within_5"],
+            "within_10": applied_metrics["within_10"],
+        },
+    ]
+    st.dataframe(pd.DataFrame(metric_rows), use_container_width=True)
+
+    plot_left, plot_mid, plot_right = st.columns(3)
     geojson_features = _cell_features_from_points(geojson_points)
     affine_features = _cell_features_from_points(transformed_affine_points)
+    attempted_features = _cell_features_from_points(transformed_attempted_points)
     fine_features = _cell_features_from_points(transformed_fine_points)
     invert_x_axis = registration_display_origin == "upper-right"
     invert_y_axis = registration_display_origin in {"upper-right", "upper-left"}
@@ -943,11 +1111,26 @@ def show_he_geojson_preparation() -> None:
             file_name="he_geojson_affine_scatter.png",
             mime="image/png",
         )
+    with plot_mid:
+        attempted_figure = visualize_point_sets(
+            geojson_features,
+            attempted_features,
+            title=f"Attempted fine HE centers ({fine_alignment_method})",
+            invert_x_axis=invert_x_axis,
+            invert_y_axis=invert_y_axis,
+        )
+        st.pyplot(attempted_figure, clear_figure=False)
+        st.download_button(
+            "Download attempted fine scatter PNG",
+            data=figure_to_png_bytes(attempted_figure),
+            file_name="he_geojson_attempted_fine_scatter.png",
+            mime="image/png",
+        )
     with plot_right:
         fine_figure = visualize_point_sets(
             geojson_features,
             fine_features,
-            title=f"Fine aligned HE centers vs GeoJSON centroids ({fine_alignment_method})",
+            title=f"Applied fine HE centers ({fine_alignment_method})",
             invert_x_axis=invert_x_axis,
             invert_y_axis=invert_y_axis,
         )
@@ -960,11 +1143,13 @@ def show_he_geojson_preparation() -> None:
         )
 
     before_distances = point_nearest_distances(geojson_array, affine_result.transformed_points)
+    attempted_distances = point_nearest_distances(geojson_array, attempted_points)
     after_distances = point_nearest_distances(geojson_array, fine_result.transformed_points)
     hist_figure = visualize_distance_histogram(
         before_distances,
         after_distances,
         title="Nearest-neighbor distance before/after fine alignment",
+        attempted_distances=attempted_distances,
     )
     st.pyplot(hist_figure, clear_figure=False)
     st.download_button(
@@ -1010,20 +1195,37 @@ def show_he_geojson_preparation() -> None:
                 mime="image/png",
             )
 
-    field_figure = visualize_displacement_field(
-        fine_result.grid_x,
-        fine_result.grid_y,
-        fine_result.displacement_x,
-        fine_result.displacement_y,
-        title="Fine displacement vector field",
-    )
-    st.pyplot(field_figure, clear_figure=False)
-    st.download_button(
-        "Download displacement field PNG",
-        data=figure_to_png_bytes(field_figure),
-        file_name="fine_displacement_vector_field.png",
-        mime="image/png",
-    )
+    field_left, field_right = st.columns(2)
+    with field_left:
+        attempted_field_figure = visualize_displacement_field(
+            fine_result.grid_x,
+            fine_result.grid_y,
+            attempted_displacement_x,
+            attempted_displacement_y,
+            title="Attempted fine displacement field",
+        )
+        st.pyplot(attempted_field_figure, clear_figure=False)
+        st.download_button(
+            "Download attempted displacement field PNG",
+            data=figure_to_png_bytes(attempted_field_figure),
+            file_name="attempted_fine_displacement_vector_field.png",
+            mime="image/png",
+        )
+    with field_right:
+        applied_field_figure = visualize_displacement_field(
+            fine_result.grid_x,
+            fine_result.grid_y,
+            fine_result.displacement_x,
+            fine_result.displacement_y,
+            title="Applied fine displacement field",
+        )
+        st.pyplot(applied_field_figure, clear_figure=False)
+        st.download_button(
+            "Download applied displacement field PNG",
+            data=figure_to_png_bytes(applied_field_figure),
+            file_name="applied_fine_displacement_vector_field.png",
+            mime="image/png",
+        )
 
     warped_he_image = None
     warped_he_metadata = None
@@ -1041,6 +1243,10 @@ def show_he_geojson_preparation() -> None:
 
     if warped_he_image is not None:
         st.subheader("Warped HE image")
+        if fine_applied:
+            st.success("Warped HE image uses: affine + applied fine warp")
+        else:
+            st.warning("Fine warp was rejected or disabled; warped HE image is affine-only.")
         st.image(
             warped_he_image,
             caption=(
@@ -1081,6 +1287,7 @@ def show_he_geojson_preparation() -> None:
     )
     parameters = {
         "fine_alignment_method": fine_alignment_method,
+        "local_translation_preset": local_preset,
         "he_coordinate_order": he_coordinate_order,
         "similarity_trim_quantile": similarity_trim,
         "affine_trim_quantile": affine_trim,

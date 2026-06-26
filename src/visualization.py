@@ -239,6 +239,25 @@ def visualize_warped_he_point_overlay(
 def visualize_translation_anchors(anchors: pd.DataFrame, *, title: str):
     """Show accepted and rejected local-translation anchors."""
     fig, ax = plt.subplots(figsize=(8, 8))
+    if anchors is None or anchors.empty or not {"anchor_x", "anchor_y"}.issubset(anchors.columns):
+        ax.set_title(title)
+        ax.set_aspect("equal", adjustable="box")
+        fig.tight_layout()
+        return fig
+
+    anchors = anchors.copy()
+    if "accepted" not in anchors:
+        anchors["accepted"] = True
+    if "dx" not in anchors:
+        anchors["dx"] = 0.0
+    if "dy" not in anchors:
+        anchors["dy"] = 0.0
+    if "shift_magnitude" not in anchors:
+        anchors["shift_magnitude"] = np.sqrt(
+            anchors["dx"].to_numpy(dtype=float) ** 2 + anchors["dy"].to_numpy(dtype=float) ** 2
+        )
+
+    anchors["accepted"] = anchors["accepted"].fillna(False).astype(bool)
     accepted = anchors[anchors["accepted"]]
     rejected = anchors[~anchors["accepted"]]
 
@@ -309,11 +328,13 @@ def visualize_displacement_field(grid_x, grid_y, displacement_x, displacement_y,
     return fig
 
 
-def visualize_distance_histogram(before_distances, after_distances, *, title: str):
+def visualize_distance_histogram(before_distances, after_distances, *, title: str, attempted_distances=None):
     """Plot before/after nearest-neighbor distance histograms."""
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.hist(before_distances, bins=40, alpha=0.55, label="before", color="#999999")
-    ax.hist(after_distances, bins=40, alpha=0.55, label="after", color="#00d1ff")
+    ax.hist(before_distances, bins=40, alpha=0.45, label="affine", color="#999999")
+    if attempted_distances is not None:
+        ax.hist(attempted_distances, bins=40, alpha=0.45, label="attempted fine", color="#ffb000")
+    ax.hist(after_distances, bins=40, alpha=0.45, label="applied fine", color="#00d1ff")
     ax.set_title(title)
     ax.set_xlabel("nearest distance")
     ax.set_ylabel("count")
@@ -325,7 +346,22 @@ def visualize_distance_histogram(before_distances, after_distances, *, title: st
 def visualize_anchor_correlation_heatmap(anchors: pd.DataFrame, *, title: str):
     """Scatter heatmap of local translation anchor correlations."""
     fig, ax = plt.subplots(figsize=(8, 8))
-    values = anchors["correlation"].to_numpy(dtype=float)
+    if anchors is None or anchors.empty or not {"anchor_x", "anchor_y"}.issubset(anchors.columns):
+        ax.set_title(title)
+        ax.set_aspect("equal", adjustable="box")
+        fig.tight_layout()
+        return fig
+
+    anchors = anchors.copy()
+    if "correlation" in anchors:
+        values = anchors["correlation"].to_numpy(dtype=float)
+    elif "best_correlation" in anchors:
+        values = anchors["best_correlation"].to_numpy(dtype=float)
+    else:
+        values = np.full(len(anchors), np.nan, dtype=float)
+    finite_values = values[np.isfinite(values)]
+    if finite_values.size == 0:
+        values = np.zeros(len(anchors), dtype=float)
     scatter = ax.scatter(
         anchors["anchor_x"],
         anchors["anchor_y"],

@@ -2,6 +2,7 @@ import numpy as np
 
 from src.pointset_registration import (
     AffineICPResult,
+    FineWarpResult,
     apply_affine,
     estimate_affine_with_y_flip,
     fine_center_snap_warp,
@@ -9,6 +10,35 @@ from src.pointset_registration import (
     warp_he_image_to_world,
     world_points_to_warped_image_pixels,
 )
+
+
+def test_fine_warp_result_legacy_constructor_has_diagnostic_defaults():
+    grid_x, grid_y = np.meshgrid(np.array([0.0, 1.0]), np.array([0.0, 1.0]))
+    zeros = np.zeros_like(grid_x)
+
+    result = FineWarpResult(
+        transformed_points=np.array([[0.0, 0.0]]),
+        grid_x=grid_x,
+        grid_y=grid_y,
+        displacement_x=zeros,
+        displacement_y=zeros,
+        bounds=(0.0, 0.0, 1.0, 1.0),
+        grid_spacing=1.0,
+        jacobian_min=1.0,
+        jacobian_max=1.0,
+        max_displacement=0.0,
+        n_candidate_pairs=0,
+        n_pairs=0,
+        n_filtered_pairs=0,
+        median_pair_distance_before=0.0,
+        median_pair_distance_after=0.0,
+        success=True,
+        message="legacy",
+    )
+
+    assert result.attempted_transformed_points is None
+    assert result.attempted_displacement_x is None
+    assert result.applied is None
 
 
 def test_estimate_affine_with_y_flip_recovers_known_transform_without_flip():
@@ -115,6 +145,11 @@ def test_fine_center_snap_warp_moves_points_toward_targets():
     assert result.n_pairs == len(source)
     assert after < before
     assert np.isfinite(result.jacobian_min)
+    assert np.allclose(result.attempted_transformed_points, result.transformed_points)
+    assert np.allclose(result.attempted_displacement_x, result.displacement_x)
+    assert np.allclose(result.attempted_displacement_y, result.displacement_y)
+    assert result.applied is True
+    assert result.rejection_reason is None
 
 
 def test_fine_center_snap_warp_filters_locally_inconsistent_pairs():
@@ -258,3 +293,36 @@ def test_local_translation_fine_warp_improves_shifted_point_cloud():
     assert result.n_pairs >= 3
     assert result.median_pair_distance_after < result.median_pair_distance_before
     assert result.anchors is not None
+    assert result.applied is True
+    assert result.attempted_metrics is not None
+    assert result.applied_metrics is not None
+
+
+def test_local_translation_rejection_preserves_attempted_candidate():
+    xs, ys = np.meshgrid(np.arange(20.0, 100.0, 20.0), np.arange(20.0, 100.0, 20.0))
+    fixed = np.column_stack([xs.ravel(), ys.ravel()])
+    moving = fixed + np.array([4.0, -3.0])
+
+    result = local_translation_fine_warp(
+        fixed,
+        moving,
+        bounds=(0.0, 0.0, 120.0, 120.0),
+        density_sigma=2.0,
+        density_pixel_size=1.0,
+        grid_spacing=30.0,
+        patch_radius=18.0,
+        search_radius=8.0,
+        min_correlation=0.1,
+        max_shift=1.0,
+        min_accepted_anchors=3,
+        jacobian_min_threshold=2.0,
+        smoothing=0.1,
+        neighbors=0,
+    )
+
+    assert result.success is False
+    assert result.applied is False
+    assert result.rejection_reason
+    assert result.attempted_transformed_points is not None
+    assert result.attempted_displacement_x is not None
+    assert result.applied_metrics is not None
