@@ -4,9 +4,11 @@ from src.pointset_registration import (
     AffineICPResult,
     FineWarpResult,
     apply_affine,
+    cluster_anchor_fine_warp,
     estimate_affine_with_y_flip,
     fine_center_snap_warp,
     local_translation_fine_warp,
+    matched_nuclei_rbf_fine_warp,
     warp_he_image_to_world,
     world_points_to_warped_image_pixels,
 )
@@ -326,3 +328,134 @@ def test_local_translation_rejection_preserves_attempted_candidate():
     assert result.attempted_transformed_points is not None
     assert result.attempted_displacement_x is not None
     assert result.applied_metrics is not None
+
+
+def test_matched_nuclei_rbf_fine_warp_improves_paired_shift():
+    xs, ys = np.meshgrid(np.arange(10.0, 60.0, 10.0), np.arange(10.0, 60.0, 10.0))
+    fixed = np.column_stack([xs.ravel(), ys.ravel()])
+    moving = fixed + np.array([2.0, -3.0])
+
+    result = matched_nuclei_rbf_fine_warp(
+        moving,
+        fixed,
+        match_radius=6.0,
+        grid_spacing=5.0,
+        smoothing=0.1,
+        neighbors=0,
+        min_pairs=4,
+        max_displacement=10.0,
+    )
+
+    before = np.mean(np.linalg.norm(moving - fixed, axis=1))
+    after = np.mean(np.linalg.norm(result.transformed_points - fixed, axis=1))
+    assert result.success is True
+    assert result.applied is True
+    assert result.n_pairs >= 4
+    assert result.anchors is not None
+    assert after < before
+    assert np.max(np.abs(result.displacement_x)) > 0
+
+
+def test_matched_nuclei_rbf_rejection_preserves_attempted_candidate():
+    xs, ys = np.meshgrid(np.arange(10.0, 60.0, 10.0), np.arange(10.0, 60.0, 10.0))
+    fixed = np.column_stack([xs.ravel(), ys.ravel()])
+    moving = fixed + np.array([2.0, -3.0])
+
+    result = matched_nuclei_rbf_fine_warp(
+        moving,
+        fixed,
+        match_radius=6.0,
+        grid_spacing=5.0,
+        smoothing=0.1,
+        neighbors=0,
+        min_pairs=4,
+        max_displacement=10.0,
+        jacobian_min_threshold=2.0,
+    )
+
+    assert result.success is False
+    assert result.applied is False
+    assert result.rejection_reason
+    assert np.allclose(result.transformed_points, moving)
+    assert result.attempted_transformed_points is not None
+    assert not np.allclose(result.attempted_transformed_points, moving)
+    assert result.attempted_displacement_x is not None
+
+
+def test_cluster_anchor_fine_warp_improves_local_cluster_shift():
+    xs, ys = np.meshgrid(np.arange(10.0, 70.0, 10.0), np.arange(10.0, 70.0, 10.0))
+    fixed = np.column_stack([xs.ravel(), ys.ravel()])
+    moving = fixed + np.array([4.0, -2.0])
+
+    result = cluster_anchor_fine_warp(
+        fixed,
+        moving,
+        bounds=(0.0, 0.0, 80.0, 80.0),
+        grid_spacing=20.0,
+        patch_radius=18.0,
+        search_radius=8.0,
+        search_step=2.0,
+        min_points_per_cluster=3,
+        match_threshold=4.0,
+        min_improvement=0.5,
+        max_shift=10.0,
+        min_accepted_anchors=3,
+        smoothing=0.1,
+        neighbors=0,
+    )
+
+    before = np.mean(np.linalg.norm(moving - fixed, axis=1))
+    after = np.mean(np.linalg.norm(result.transformed_points - fixed, axis=1))
+    assert result.success is True
+    assert result.applied is True
+    assert result.n_pairs >= 3
+    assert result.anchors is not None
+    assert after < before
+    expected_columns = {
+        "anchor_x",
+        "anchor_y",
+        "dx",
+        "dy",
+        "shift_magnitude",
+        "n_fixed_points",
+        "n_moving_points",
+        "median_distance_zero_shift",
+        "median_distance_best_shift",
+        "improvement",
+        "fraction_within_threshold_zero_shift",
+        "fraction_within_threshold_best_shift",
+        "accepted",
+        "rejection_reason",
+    }
+    assert expected_columns.issubset(result.anchors.columns)
+
+
+def test_cluster_anchor_rejection_preserves_attempted_candidate():
+    xs, ys = np.meshgrid(np.arange(10.0, 70.0, 10.0), np.arange(10.0, 70.0, 10.0))
+    fixed = np.column_stack([xs.ravel(), ys.ravel()])
+    moving = fixed + np.array([4.0, -2.0])
+
+    result = cluster_anchor_fine_warp(
+        fixed,
+        moving,
+        bounds=(0.0, 0.0, 80.0, 80.0),
+        grid_spacing=20.0,
+        patch_radius=18.0,
+        search_radius=8.0,
+        search_step=2.0,
+        min_points_per_cluster=3,
+        match_threshold=4.0,
+        min_improvement=0.5,
+        max_shift=10.0,
+        min_accepted_anchors=3,
+        smoothing=0.1,
+        neighbors=0,
+        jacobian_min_threshold=2.0,
+    )
+
+    assert result.success is False
+    assert result.applied is False
+    assert result.rejection_reason
+    assert np.allclose(result.transformed_points, moving)
+    assert result.attempted_transformed_points is not None
+    assert not np.allclose(result.attempted_transformed_points, moving)

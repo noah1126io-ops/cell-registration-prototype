@@ -236,6 +236,95 @@ def visualize_warped_he_point_overlay(
     return fig
 
 
+def visualize_warped_pixel_point_scatter(
+    geojson_pixels: np.ndarray,
+    he_pixels: np.ndarray,
+    *,
+    image_width: int,
+    image_height: int,
+    title: str,
+    max_points: int = 3000,
+):
+    """Show GeoJSON and registered HE points in warped-image pixel coordinates."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    max_points = max(1, int(max_points))
+    geojson_pixels = np.asarray(geojson_pixels, dtype=float)[:max_points]
+    he_pixels = np.asarray(he_pixels, dtype=float)[:max_points]
+
+    if len(geojson_pixels):
+        ax.scatter(
+            geojson_pixels[:, 0],
+            geojson_pixels[:, 1],
+            s=12,
+            c="#00d1ff",
+            marker="o",
+            linewidths=0,
+            alpha=0.65,
+            label="GeoJSON pixels",
+        )
+    if len(he_pixels):
+        ax.scatter(
+            he_pixels[:, 0],
+            he_pixels[:, 1],
+            s=14,
+            c="#ffb000",
+            marker="x",
+            linewidths=0.8,
+            alpha=0.8,
+            label="registered HE pixels",
+        )
+
+    ax.set_title(title)
+    ax.set_xlim(0, image_width)
+    ax.set_ylim(image_height, 0)
+    ax.set_xlabel("col")
+    ax.set_ylabel("row")
+    ax.set_aspect("equal", adjustable="box")
+    ax.legend(loc="lower right", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_geojson_classification_overlay(
+    warped_he_image,
+    geojson_pixels: np.ndarray,
+    classifications,
+    *,
+    title: str,
+    max_points: int = 5000,
+):
+    """Overlay GeoJSON classification states on the warped HE image."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.imshow(_to_grayscale_preview(warped_he_image), cmap="gray")
+    geojson_pixels = np.asarray(geojson_pixels, dtype=float)[:max_points]
+    classifications = np.asarray(classifications, dtype=object)[:max_points]
+    styles = {
+        "valid": ("#00d1ff", "valid", 16, 0.8),
+        "edge_candidate": ("#ffe45e", "edge_candidate", 16, 0.85),
+        "excluded": ("#ff4d6d", "excluded", 12, 0.45),
+    }
+    for class_name, (color, label, size, alpha) in styles.items():
+        mask = classifications == class_name
+        if np.any(mask):
+            ax.scatter(
+                geojson_pixels[mask, 0],
+                geojson_pixels[mask, 1],
+                s=size,
+                c=color,
+                marker="o",
+                linewidths=0,
+                alpha=alpha,
+                label=label,
+            )
+    ax.set_title(title)
+    ax.set_xlim(0, warped_he_image.shape[1])
+    ax.set_ylim(warped_he_image.shape[0], 0)
+    ax.set_aspect("equal", adjustable="box")
+    ax.legend(loc="lower right", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
 def visualize_translation_anchors(anchors: pd.DataFrame, *, title: str):
     """Show accepted and rejected local-translation anchors."""
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -328,13 +417,118 @@ def visualize_displacement_field(grid_x, grid_y, displacement_x, displacement_y,
     return fig
 
 
-def visualize_distance_histogram(before_distances, after_distances, *, title: str, attempted_distances=None):
+def visualize_jacobian_heatmap(grid_x, grid_y, jacobian, *, title: str):
+    """Show expansion/compression/fold-over from a displacement-field Jacobian."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    jacobian = np.asarray(jacobian, dtype=float)
+    image = ax.imshow(
+        jacobian,
+        cmap="coolwarm",
+        vmin=0.0,
+        vmax=max(2.0, float(np.nanpercentile(jacobian, 99)) if np.isfinite(jacobian).any() else 2.0),
+        extent=[float(np.min(grid_x)), float(np.max(grid_x)), float(np.max(grid_y)), float(np.min(grid_y))],
+    )
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="Jacobian")
+    fold = jacobian <= 0
+    if np.any(fold):
+        ax.contour(grid_x, grid_y, fold.astype(float), levels=[0.5], colors="black", linewidths=1.0)
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    ax.invert_yaxis()
+    fig.tight_layout()
+    return fig
+
+
+def visualize_warp_grid_overlay(
+    warped_he_image,
+    before_lines: list[np.ndarray],
+    after_lines: list[np.ndarray],
+    *,
+    title: str,
+):
+    """Overlay a regular grid before and after fine warp in warped-image pixel coordinates."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.imshow(_to_grayscale_preview(warped_he_image), cmap="gray")
+    for line in before_lines:
+        line = np.asarray(line, dtype=float)
+        ax.plot(line[:, 0], line[:, 1], color="#00d1ff", linewidth=0.6, alpha=0.55)
+    for line in after_lines:
+        line = np.asarray(line, dtype=float)
+        ax.plot(line[:, 0], line[:, 1], color="#ffb000", linewidth=0.8, alpha=0.75)
+    ax.set_title(title)
+    ax.set_xlim(0, warped_he_image.shape[1])
+    ax.set_ylim(warped_he_image.shape[0], 0)
+    ax.set_aspect("equal", adjustable="box")
+    fig.tight_layout()
+    return fig
+
+
+def visualize_local_residual_map(
+    fixed_points: np.ndarray,
+    moving_points: np.ndarray,
+    *,
+    title: str,
+    max_points: int = 5000,
+):
+    """Plot moving points colored by nearest fixed-point residual distance."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    fixed_points = np.asarray(fixed_points, dtype=float)
+    moving_points = np.asarray(moving_points, dtype=float)
+    max_points = max(1, int(max_points))
+    if len(fixed_points) == 0 or len(moving_points) == 0:
+        ax.set_title(title)
+        ax.set_aspect("equal", adjustable="box")
+        fig.tight_layout()
+        return fig
+
+    from scipy.spatial import cKDTree
+
+    moving_display = moving_points[:max_points]
+    distances, _ = cKDTree(fixed_points).query(moving_display, k=1)
+    ax.scatter(
+        fixed_points[:max_points, 0],
+        fixed_points[:max_points, 1],
+        s=8,
+        c="#00d1ff",
+        alpha=0.25,
+        linewidths=0,
+        label="GeoJSON fixed",
+    )
+    scatter = ax.scatter(
+        moving_display[:, 0],
+        moving_display[:, 1],
+        c=distances,
+        s=14,
+        cmap="magma",
+        alpha=0.85,
+        marker="x",
+        label="HE residual",
+    )
+    fig.colorbar(scatter, ax=ax, fraction=0.046, pad=0.04, label="nearest residual")
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    ax.invert_yaxis()
+    ax.legend(loc="lower right", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_distance_histogram(
+    before_distances,
+    after_distances,
+    *,
+    title="Nearest-neighbor distance before/after fine alignment",
+    attempted_distances=None,
+):
     """Plot before/after nearest-neighbor distance histograms."""
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.hist(before_distances, bins=40, alpha=0.45, label="affine", color="#999999")
-    if attempted_distances is not None:
-        ax.hist(attempted_distances, bins=40, alpha=0.45, label="attempted fine", color="#ffb000")
-    ax.hist(after_distances, bins=40, alpha=0.45, label="applied fine", color="#00d1ff")
+    if attempted_distances is None:
+        ax.hist(before_distances, bins=40, alpha=0.55, label="before", color="#999999")
+        ax.hist(after_distances, bins=40, alpha=0.55, label="after", color="#00d1ff")
+    else:
+        ax.hist(before_distances, bins=40, alpha=0.45, label="Affine", color="#999999")
+        ax.hist(attempted_distances, bins=40, alpha=0.45, label="Attempted fine", color="#ffb000")
+        ax.hist(after_distances, bins=40, alpha=0.45, label="Applied fine", color="#00d1ff")
     ax.set_title(title)
     ax.set_xlabel("nearest distance")
     ax.set_ylabel("count")
@@ -357,6 +551,8 @@ def visualize_anchor_correlation_heatmap(anchors: pd.DataFrame, *, title: str):
         values = anchors["correlation"].to_numpy(dtype=float)
     elif "best_correlation" in anchors:
         values = anchors["best_correlation"].to_numpy(dtype=float)
+    elif "confidence" in anchors:
+        values = anchors["confidence"].to_numpy(dtype=float)
     else:
         values = np.full(len(anchors), np.nan, dtype=float)
     finite_values = values[np.isfinite(values)]

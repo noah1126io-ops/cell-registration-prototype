@@ -6,7 +6,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 from scipy.ndimage import gaussian_filter, map_coordinates
-from scipy.interpolate import RBFInterpolator
+from scipy.interpolate import RBFInterpolator, SmoothBivariateSpline
 from scipy.spatial import cKDTree
 
 
@@ -648,6 +648,221 @@ def fine_center_snap_warp(
     )
 
 
+def matched_nuclei_rbf_fine_warp(
+    moving_points: np.ndarray,
+    fixed_points: np.ndarray,
+    *,
+    match_radius: float = 10.0,
+    grid_spacing: float = 6.0,
+    padding: float = 30.0,
+    coherence_radius: float = 30.0,
+    max_local_deviation: float = 8.0,
+    min_pair_confidence: float = 0.05,
+    max_displacement: float = 40.0,
+    smoothing: float = 1.0,
+    kernel: str = "thin_plate_spline",
+    neighbors: int = 50,
+    min_pairs: int = 6,
+    jacobian_min_threshold: float = 0.05,
+) -> FineWarpResult:
+    """Create a fine warp from mutual nearest nuclei pairs using RBF interpolation."""
+    moving_points = _as_points(moving_points, name="moving_points")
+    fixed_points = _as_points(fixed_points, name="fixed_points")
+    (grid_x, grid_y), bounds = _build_grid(moving_points, fixed_points, padding=padding, grid_spacing=grid_spacing)
+    zeros = np.zeros_like(grid_x, dtype=float)
+    before_metrics = point_distance_metrics(fixed_points, moving_points)
+
+    moving_indices, fixed_indices, distances = mutual_nearest_pairs(
+        moving_points,
+        fixed_points,
+        max_distance=match_radius,
+    )
+    n_candidate_pairs = int(len(moving_indices))
+    if n_candidate_pairs == 0:
+        return FineWarpResult(
+            transformed_points=moving_points.copy(),
+            grid_x=grid_x,
+            grid_y=grid_y,
+            displacement_x=zeros,
+            displacement_y=zeros,
+            attempted_transformed_points=moving_points.copy(),
+            attempted_displacement_x=zeros,
+            attempted_displacement_y=zeros,
+            bounds=bounds,
+            grid_spacing=float(grid_spacing),
+            jacobian_min=1.0,
+            jacobian_max=1.0,
+            max_displacement=0.0,
+            n_candidate_pairs=0,
+            n_pairs=0,
+            n_filtered_pairs=0,
+            median_pair_distance_before=before_metrics["median_distance"],
+            median_pair_distance_after=before_metrics["median_distance"],
+            success=False,
+            message="No mutual nearest nuclei pairs within match_radius; matched-nuclei RBF warp was not applied.",
+            attempted_metrics=before_metrics,
+            applied_metrics=before_metrics,
+            rejection_reason="no_candidate_pairs",
+            applied=False,
+            anchors=pd.DataFrame(),
+            metrics={"before": before_metrics, "attempted": before_metrics, "applied": before_metrics},
+        )
+
+    anchor_points = moving_points[moving_indices]
+    target_points = fixed_points[fixed_indices]
+    vectors = target_points - anchor_points
+    magnitudes = np.linalg.norm(vectors, axis=1)
+    confidence = np.exp(-(distances**2) / (2.0 * max(match_radius / 2.0, 1e-6) ** 2))
+    local_deviation = np.zeros(len(anchor_points), dtype=float)
+    keep = np.ones(len(anchor_points), dtype=bool)
+
+    if len(anchor_points) >= 3 and coherence_radius > 0 and max_local_deviation > 0:
+        tree = cKDTree(anchor_points)
+        for pair_index, neighbor_indices in enumerate(tree.query_ball_point(anchor_points, coherence_radius)):
+            if len(neighbor_indices) < 3:
+                continue
+            local_median = np.median(vectors[neighbor_indices], axis=0)
+            local_deviation[pair_index] = np.linalg.norm(vectors[pair_index] - local_median)
+        coherence = np.exp(-(local_deviation**2) / (2.0 * max(max_local_deviation, 1e-6) ** 2))
+        confidence *= coherence
+        keep &= local_deviation <= max_local_deviation
+
+    keep &= confidence >= min_pair_confidence
+    if max_displacement > 0:
+        keep &= magnitudes <= max_displacement
+
+    anchors = pd.DataFrame(
+        {
+            "anchor_x": anchor_points[:, 0],
+            "anchor_y": anchor_points[:, 1],
+            "target_x": target_points[:, 0],
+            "target_y": target_points[:, 1],
+            "dx": vectors[:, 0],
+            "dy": vectors[:, 1],
+            "distance": distances,
+            "shift_magnitude": magnitudes,
+            "confidence": confidence,
+            "local_deviation": local_deviation,
+            "accepted": keep,
+            "rejection_reason": np.where(
+                keep,
+                "",
+                np.where(
+                    confidence < min_pair_confidence,
+                    "low_confidence",
+                    np.where(magnitudes > max_displacement, "large_displacement", "local_inconsistent"),
+                ),
+            ),
+        }
+    )
+
+    accepted = anchors[anchors["accepted"]]
+    if len(accepted) < min_pairs:
+        return FineWarpResult(
+            transformed_points=moving_points.copy(),
+            grid_x=grid_x,
+            grid_y=grid_y,
+            displacement_x=zeros,
+            displacement_y=zeros,
+            attempted_transformed_points=moving_points.copy(),
+            attempted_displacement_x=zeros,
+            attempted_displacement_y=zeros,
+            bounds=bounds,
+            grid_spacing=float(grid_spacing),
+            jacobian_min=1.0,
+            jacobian_max=1.0,
+            max_displacement=0.0,
+            n_candidate_pairs=n_candidate_pairs,
+            n_pairs=int(len(accepted)),
+            n_filtered_pairs=int(n_candidate_pairs - len(accepted)),
+            median_pair_distance_before=before_metrics["median_distance"],
+            median_pair_distance_after=before_metrics["median_distance"],
+            success=False,
+            message="Too few accepted matched nuclei anchors; matched-nuclei RBF warp was not applied.",
+            attempted_metrics=before_metrics,
+            applied_metrics=before_metrics,
+            rejection_reason="too_few_accepted_pairs",
+            applied=False,
+            anchors=anchors,
+            metrics={"before": before_metrics, "attempted": before_metrics, "applied": before_metrics},
+        )
+
+    accepted_points = accepted[["anchor_x", "anchor_y"]].to_numpy(dtype=float)
+    accepted_vectors = accepted[["dx", "dy"]].to_numpy(dtype=float)
+    query_grid = np.column_stack([grid_x.ravel(), grid_y.ravel()])
+    rbf_neighbors = min(int(neighbors), len(accepted_points)) if neighbors else None
+    interpolator = RBFInterpolator(
+        accepted_points,
+        accepted_vectors,
+        kernel=kernel,
+        smoothing=float(smoothing),
+        neighbors=rbf_neighbors,
+    )
+    field = interpolator(query_grid).reshape(*grid_x.shape, 2)
+    displacement_x = field[..., 0]
+    displacement_y = field[..., 1]
+    field_magnitude = np.sqrt(displacement_x**2 + displacement_y**2)
+    field_max_displacement = float(np.max(field_magnitude))
+
+    sampled = _sample_field(moving_points, displacement_x, displacement_y, bounds, grid_spacing)
+    attempted_transformed_points = moving_points + sampled
+    attempted_metrics = point_distance_metrics(fixed_points, attempted_transformed_points)
+
+    dfx_dy, dfx_dx = np.gradient(displacement_x, grid_spacing, grid_spacing)
+    dfy_dy, dfy_dx = np.gradient(displacement_y, grid_spacing, grid_spacing)
+    jacobian = (1.0 + dfx_dx) * (1.0 + dfy_dy) - dfx_dy * dfy_dx
+    jacobian_min = float(np.min(jacobian))
+    jacobian_max = float(np.max(jacobian))
+
+    success = True
+    message = "Matched nuclei RBF fine warp completed."
+    rejection_reason = ""
+    if attempted_metrics["median_distance"] > before_metrics["median_distance"]:
+        success = False
+        message = "Matched nuclei RBF warp rejected because median distance worsened."
+        rejection_reason = "median_distance_worsened"
+    elif max_displacement > 0 and field_max_displacement > max_displacement * 1.5:
+        success = False
+        message = "Matched nuclei RBF warp rejected because max displacement was too large."
+        rejection_reason = "max_displacement_too_large"
+    elif jacobian_min < jacobian_min_threshold:
+        success = False
+        message = "Matched nuclei RBF warp rejected because Jacobian/fold check failed."
+        rejection_reason = "jacobian_or_fold_check_failed"
+
+    transformed_points = attempted_transformed_points if success else moving_points.copy()
+    applied_metrics = attempted_metrics if success else before_metrics
+
+    return FineWarpResult(
+        transformed_points=transformed_points,
+        grid_x=grid_x,
+        grid_y=grid_y,
+        displacement_x=displacement_x if success else zeros,
+        displacement_y=displacement_y if success else zeros,
+        attempted_transformed_points=attempted_transformed_points,
+        attempted_displacement_x=displacement_x,
+        attempted_displacement_y=displacement_y,
+        bounds=bounds,
+        grid_spacing=float(grid_spacing),
+        jacobian_min=jacobian_min,
+        jacobian_max=jacobian_max,
+        max_displacement=field_max_displacement,
+        n_candidate_pairs=n_candidate_pairs,
+        n_pairs=int(len(accepted)),
+        n_filtered_pairs=int(n_candidate_pairs - len(accepted)),
+        median_pair_distance_before=before_metrics["median_distance"],
+        median_pair_distance_after=applied_metrics["median_distance"],
+        success=success,
+        message=message,
+        attempted_metrics=attempted_metrics,
+        applied_metrics=applied_metrics,
+        rejection_reason=rejection_reason,
+        applied=success,
+        anchors=anchors,
+        metrics={"before": before_metrics, "attempted": attempted_metrics, "applied": applied_metrics},
+    )
+
+
 def point_distance_metrics(
     fixed_points: np.ndarray,
     moving_points: np.ndarray,
@@ -1016,6 +1231,404 @@ def local_translation_fine_warp(
         n_candidate_pairs=int(len(anchors)),
         n_pairs=int(len(accepted)),
         n_filtered_pairs=int(len(anchors) - len(accepted)),
+        median_pair_distance_before=before_metrics["median_distance"],
+        median_pair_distance_after=applied_metrics["median_distance"],
+        success=success,
+        message=message,
+        attempted_metrics=attempted_metrics,
+        applied_metrics=applied_metrics,
+        rejection_reason=rejection_reason,
+        applied=success,
+        anchors=anchors,
+        metrics={"before": before_metrics, "attempted": attempted_metrics, "applied": applied_metrics},
+    )
+
+
+def _bidirectional_cluster_metrics(
+    fixed_cluster: np.ndarray,
+    moving_cluster: np.ndarray,
+    *,
+    match_threshold: float,
+    fixed_weights: np.ndarray | None = None,
+) -> tuple[float, float]:
+    fixed_tree = cKDTree(fixed_cluster)
+    moving_tree = cKDTree(moving_cluster)
+    moving_to_fixed, nearest_fixed = fixed_tree.query(moving_cluster, k=1)
+    fixed_to_moving, _ = moving_tree.query(fixed_cluster, k=1)
+    if fixed_weights is None:
+        distances = np.concatenate([moving_to_fixed, fixed_to_moving]).astype(float)
+        weights = np.ones(len(distances), dtype=float)
+    else:
+        fixed_weights = np.asarray(fixed_weights, dtype=float)
+        moving_weights = fixed_weights[nearest_fixed]
+        distances = np.concatenate([moving_to_fixed, fixed_to_moving]).astype(float)
+        weights = np.concatenate([moving_weights, fixed_weights]).astype(float)
+        weights = np.clip(weights, 0.01, None)
+
+    order = np.argsort(distances)
+    sorted_distances = distances[order]
+    sorted_weights = weights[order]
+    cumulative = np.cumsum(sorted_weights)
+    weighted_median = sorted_distances[np.searchsorted(cumulative, cumulative[-1] * 0.5)]
+    weighted_fraction = np.sum(weights[distances <= match_threshold]) / np.sum(weights)
+    return float(weighted_median), float(weighted_fraction)
+
+
+def cluster_anchor_fine_warp(
+    fixed_points: np.ndarray,
+    moving_points: np.ndarray,
+    *,
+    fixed_point_weights: np.ndarray | None = None,
+    boundary_anchor_points: np.ndarray | None = None,
+    boundary_anchor_weight: float = 2.0,
+    bounds: tuple[float, float, float, float] | None = None,
+    grid_spacing: float = 35.0,
+    patch_radius: float = 18.0,
+    search_radius: float = 25.0,
+    search_step: float = 2.5,
+    min_points_per_cluster: int = 5,
+    match_threshold: float = 5.0,
+    min_improvement: float = 1.0,
+    max_shift: float = 35.0,
+    outlier_percentile: float = 95.0,
+    neighbor_consistency_radius: float = 120.0,
+    smoothing: float = 3.0,
+    kernel: str = "thin_plate_spline",
+    neighbors: int = 50,
+    interpolation_method: str = "rbf",
+    regularization: float = 3.0,
+    local_support_radius: float = 120.0,
+    min_accepted_anchors: int = 5,
+    jacobian_min_threshold: float = 0.0,
+    jacobian_max_threshold: float = 4.0,
+) -> FineWarpResult:
+    """Estimate a fine warp from locally translated point clusters."""
+    fixed_points = _as_points(fixed_points, name="fixed_points")
+    moving_points = _as_points(moving_points, name="moving_points")
+    if fixed_point_weights is None:
+        fixed_point_weights = np.ones(len(fixed_points), dtype=float)
+    else:
+        fixed_point_weights = np.asarray(fixed_point_weights, dtype=float)
+        if fixed_point_weights.shape != (len(fixed_points),):
+            raise ValueError("fixed_point_weights must have shape (n_fixed_points,).")
+        if not np.isfinite(fixed_point_weights).all():
+            raise ValueError("fixed_point_weights must be finite.")
+        fixed_point_weights = np.clip(fixed_point_weights, 0.01, None)
+    if search_step <= 0 or not np.isfinite(search_step):
+        raise ValueError("search_step must be a positive finite value.")
+    if bounds is None:
+        all_points = np.vstack([fixed_points, moving_points])
+        min_x, min_y = np.min(all_points, axis=0) - patch_radius
+        max_x, max_y = np.max(all_points, axis=0) + patch_radius
+        bounds = (float(min_x), float(min_y), float(max_x), float(max_y))
+
+    min_x, min_y, max_x, max_y = bounds
+    xs = np.arange(min_x, max_x + grid_spacing, grid_spacing, dtype=float)
+    ys = np.arange(min_y, max_y + grid_spacing, grid_spacing, dtype=float)
+    grid_x, grid_y = np.meshgrid(xs, ys)
+    zeros = np.zeros_like(grid_x, dtype=float)
+    before_metrics = point_distance_metrics(fixed_points, moving_points)
+
+    fixed_tree = cKDTree(fixed_points)
+    moving_tree = cKDTree(moving_points)
+    shifts = np.arange(-search_radius, search_radius + search_step * 0.5, search_step, dtype=float)
+    candidate_shifts = np.array(
+        [(dx, dy) for dy in shifts for dx in shifts if np.hypot(dx, dy) <= min(search_radius, max_shift)],
+        dtype=float,
+    )
+    if candidate_shifts.size == 0:
+        candidate_shifts = np.array([[0.0, 0.0]], dtype=float)
+
+    rows = []
+    for anchor_y in ys:
+        for anchor_x in xs:
+            center = np.array([anchor_x, anchor_y], dtype=float)
+            fixed_indices = fixed_tree.query_ball_point(center, patch_radius)
+            moving_indices = moving_tree.query_ball_point(center, patch_radius + search_radius)
+            n_fixed = len(fixed_indices)
+            n_moving = len(moving_indices)
+            if n_fixed < min_points_per_cluster or n_moving < min_points_per_cluster:
+                rows.append(
+                    {
+                        "anchor_x": float(anchor_x),
+                        "anchor_y": float(anchor_y),
+                        "dx": 0.0,
+                        "dy": 0.0,
+                        "shift_magnitude": 0.0,
+                        "n_fixed_points": int(n_fixed),
+                        "n_moving_points": int(n_moving),
+                        "median_distance_zero_shift": np.nan,
+                        "median_distance_best_shift": np.nan,
+                        "improvement": 0.0,
+                        "fraction_within_threshold_zero_shift": 0.0,
+                        "fraction_within_threshold_best_shift": 0.0,
+                        "accepted": False,
+                        "rejection_reason": "too_few_cluster_points",
+                    }
+                )
+                continue
+
+            fixed_cluster = fixed_points[fixed_indices]
+            fixed_cluster_weights = fixed_point_weights[fixed_indices]
+            moving_cluster = moving_points[moving_indices]
+            zero_median, zero_fraction = _bidirectional_cluster_metrics(
+                fixed_cluster,
+                moving_cluster,
+                match_threshold=match_threshold,
+                fixed_weights=fixed_cluster_weights,
+            )
+
+            best_dx = 0.0
+            best_dy = 0.0
+            best_median = zero_median
+            best_fraction = zero_fraction
+            best_score = zero_median - zero_fraction * match_threshold
+            for dx, dy in candidate_shifts:
+                shifted = moving_cluster + np.array([dx, dy], dtype=float)
+                median_distance, fraction = _bidirectional_cluster_metrics(
+                    fixed_cluster,
+                    shifted,
+                    match_threshold=match_threshold,
+                    fixed_weights=fixed_cluster_weights,
+                )
+                score = median_distance - fraction * match_threshold
+                if score < best_score or (np.isclose(score, best_score) and median_distance < best_median):
+                    best_score = score
+                    best_median = median_distance
+                    best_fraction = fraction
+                    best_dx = float(dx)
+                    best_dy = float(dy)
+
+            improvement = float(zero_median - best_median)
+            shift_magnitude = float(np.hypot(best_dx, best_dy))
+            enough_points = min(n_fixed, n_moving) >= min_points_per_cluster
+            fraction_improved = best_fraction > zero_fraction
+            accepted = bool(
+                improvement >= min_improvement
+                and fraction_improved
+                and enough_points
+                and shift_magnitude <= max_shift
+            )
+            if accepted:
+                reason = ""
+            elif improvement < min_improvement:
+                reason = "insufficient_improvement"
+            elif not fraction_improved:
+                reason = "fraction_not_improved"
+            elif not enough_points:
+                reason = "too_few_participating_points"
+            else:
+                reason = "shift_too_large"
+            rows.append(
+                {
+                    "anchor_x": float(anchor_x),
+                    "anchor_y": float(anchor_y),
+                    "dx": best_dx,
+                    "dy": best_dy,
+                    "shift_magnitude": shift_magnitude,
+                    "n_fixed_points": int(n_fixed),
+                    "n_moving_points": int(n_moving),
+                    "median_distance_zero_shift": float(zero_median),
+                    "median_distance_best_shift": float(best_median),
+                    "improvement": improvement,
+                    "fraction_within_threshold_zero_shift": float(zero_fraction),
+                    "fraction_within_threshold_best_shift": float(best_fraction),
+                    "accepted": accepted,
+                    "anchor_type": "cluster",
+                    "weight": float(
+                        np.clip(
+                            np.sqrt(min(n_fixed, n_moving))
+                            * max(improvement, 0.0)
+                            * max(best_fraction, 0.01)
+                            * float(np.mean(fixed_cluster_weights)),
+                            0.05,
+                            10.0,
+                        )
+                    ),
+                    "rejection_reason": reason,
+                }
+            )
+
+    anchors = pd.DataFrame(rows)
+    if boundary_anchor_points is not None:
+        boundary_anchor_points = np.asarray(boundary_anchor_points, dtype=float)
+        if boundary_anchor_points.size:
+            if boundary_anchor_points.ndim != 2 or boundary_anchor_points.shape[1] != 2:
+                raise ValueError("boundary_anchor_points must have shape (n_points, 2).")
+            boundary_rows = pd.DataFrame(
+                {
+                    "anchor_x": boundary_anchor_points[:, 0],
+                    "anchor_y": boundary_anchor_points[:, 1],
+                    "dx": 0.0,
+                    "dy": 0.0,
+                    "shift_magnitude": 0.0,
+                    "n_fixed_points": 0,
+                    "n_moving_points": 0,
+                    "median_distance_zero_shift": np.nan,
+                    "median_distance_best_shift": np.nan,
+                    "improvement": 0.0,
+                    "fraction_within_threshold_zero_shift": 0.0,
+                    "fraction_within_threshold_best_shift": 0.0,
+                    "accepted": True,
+                    "anchor_type": "boundary_pin",
+                    "weight": float(max(boundary_anchor_weight, 0.01)),
+                    "rejection_reason": "",
+                }
+            )
+            anchors = pd.concat([anchors, boundary_rows], ignore_index=True)
+    anchors["correlation"] = anchors["fraction_within_threshold_best_shift"].fillna(0.0)
+    anchors["accepted_before_filter"] = anchors["accepted"]
+    anchors.loc[anchors["anchor_type"] == "boundary_pin", "accepted_before_filter"] = True
+    anchors = _filter_translation_anchor_outliers(
+        anchors,
+        outlier_percentile=outlier_percentile,
+        neighbor_consistency_radius=neighbor_consistency_radius,
+        min_correlation=0.0,
+    )
+    anchors.loc[anchors["anchor_type"] == "boundary_pin", ["accepted", "rejection_reason"]] = [True, ""]
+    accepted = anchors[anchors["accepted"]]
+    accepted_cluster = anchors[(anchors["accepted"]) & (anchors["anchor_type"] == "cluster")]
+    n_candidate_anchors = int(len(anchors))
+    if len(accepted_cluster) < min_accepted_anchors:
+        return FineWarpResult(
+            transformed_points=moving_points.copy(),
+            grid_x=grid_x,
+            grid_y=grid_y,
+            displacement_x=zeros,
+            displacement_y=zeros,
+            attempted_transformed_points=moving_points.copy(),
+            attempted_displacement_x=zeros,
+            attempted_displacement_y=zeros,
+            bounds=bounds,
+            grid_spacing=float(grid_spacing),
+            jacobian_min=1.0,
+            jacobian_max=1.0,
+            max_displacement=0.0,
+            n_candidate_pairs=n_candidate_anchors,
+            n_pairs=int(len(accepted_cluster)),
+            n_filtered_pairs=int(n_candidate_anchors - len(accepted)),
+            median_pair_distance_before=before_metrics["median_distance"],
+            median_pair_distance_after=before_metrics["median_distance"],
+            success=False,
+            message="Too few accepted cluster anchors; cluster-anchor fine warp was not applied.",
+            attempted_metrics=before_metrics,
+            applied_metrics=before_metrics,
+            rejection_reason="too_few_accepted_anchors",
+            applied=False,
+            anchors=anchors,
+            metrics={"before": before_metrics, "attempted": before_metrics, "applied": before_metrics},
+        )
+
+    anchor_points = accepted[["anchor_x", "anchor_y"]].to_numpy(dtype=float)
+    anchor_vectors = accepted[["dx", "dy"]].to_numpy(dtype=float)
+    anchor_weights = (
+        accepted["weight"].to_numpy(dtype=float)
+        if "weight" in accepted
+        else np.ones(len(accepted), dtype=float)
+    )
+    query_grid = np.column_stack([grid_x.ravel(), grid_y.ravel()])
+    if interpolation_method == "b-spline":
+        spline_k = min(3, max(1, int(np.sqrt(len(anchor_points))) - 1))
+        smooth = max(float(regularization), 0.0) * len(anchor_points)
+        spline_x = SmoothBivariateSpline(
+            anchor_points[:, 0],
+            anchor_points[:, 1],
+            anchor_vectors[:, 0],
+            w=anchor_weights,
+            kx=spline_k,
+            ky=spline_k,
+            s=smooth,
+        )
+        spline_y = SmoothBivariateSpline(
+            anchor_points[:, 0],
+            anchor_points[:, 1],
+            anchor_vectors[:, 1],
+            w=anchor_weights,
+            kx=spline_k,
+            ky=spline_k,
+            s=smooth,
+        )
+        field = np.stack(
+            [
+                spline_x.ev(query_grid[:, 0], query_grid[:, 1]),
+                spline_y.ev(query_grid[:, 0], query_grid[:, 1]),
+            ],
+            axis=1,
+        ).reshape(*grid_x.shape, 2)
+    else:
+        if neighbors:
+            rbf_neighbors = min(int(neighbors), len(anchor_points))
+        elif local_support_radius > 0 and len(anchor_points) > 1:
+            tree = cKDTree(anchor_points)
+            local_counts = [len(tree.query_ball_point(point, local_support_radius)) for point in anchor_points]
+            rbf_neighbors = max(3, min(int(np.median(local_counts)), len(anchor_points)))
+        else:
+            rbf_neighbors = None
+        if rbf_neighbors is not None:
+            rbf_neighbors = min(rbf_neighbors, len(anchor_points))
+        interpolator = RBFInterpolator(
+            anchor_points,
+            anchor_vectors,
+            kernel=kernel,
+            smoothing=float(smoothing),
+            neighbors=rbf_neighbors,
+        )
+        field = interpolator(query_grid).reshape(*grid_x.shape, 2)
+    displacement_x = field[..., 0]
+    displacement_y = field[..., 1]
+    magnitude = np.sqrt(displacement_x**2 + displacement_y**2)
+    field_max_displacement = float(np.max(magnitude))
+
+    sampled = _sample_field(moving_points, displacement_x, displacement_y, bounds, grid_spacing)
+    attempted_transformed_points = moving_points + sampled
+    attempted_metrics = point_distance_metrics(fixed_points, attempted_transformed_points)
+
+    dfx_dy, dfx_dx = np.gradient(displacement_x, grid_spacing, grid_spacing)
+    dfy_dy, dfy_dx = np.gradient(displacement_y, grid_spacing, grid_spacing)
+    jacobian = (1.0 + dfx_dx) * (1.0 + dfy_dy) - dfx_dy * dfy_dx
+    jacobian_min = float(np.min(jacobian))
+    jacobian_max = float(np.max(jacobian))
+
+    success = True
+    message = "Cluster-anchor fine warp completed."
+    rejection_reason = ""
+    if jacobian_min <= jacobian_min_threshold:
+        success = False
+        message = "Cluster-anchor warp rejected because Jacobian/fold check failed."
+        rejection_reason = "jacobian_or_fold_check_failed"
+    elif attempted_metrics["median_distance"] > before_metrics["median_distance"]:
+        success = False
+        message = "Cluster-anchor warp rejected because global median distance worsened."
+        rejection_reason = "median_distance_worsened"
+    elif jacobian_max > jacobian_max_threshold:
+        success = False
+        message = "Cluster-anchor warp rejected because Jacobian expansion was too high."
+        rejection_reason = "jacobian_expansion_too_high"
+    elif field_max_displacement > max_shift * 1.5:
+        success = False
+        message = "Cluster-anchor warp rejected because max displacement was too large."
+        rejection_reason = "max_displacement_too_large"
+
+    transformed_points = attempted_transformed_points if success else moving_points.copy()
+    applied_metrics = attempted_metrics if success else before_metrics
+
+    return FineWarpResult(
+        transformed_points=transformed_points,
+        grid_x=grid_x,
+        grid_y=grid_y,
+        displacement_x=displacement_x if success else zeros,
+        displacement_y=displacement_y if success else zeros,
+        attempted_transformed_points=attempted_transformed_points,
+        attempted_displacement_x=displacement_x,
+        attempted_displacement_y=displacement_y,
+        bounds=bounds,
+        grid_spacing=float(grid_spacing),
+        jacobian_min=jacobian_min,
+        jacobian_max=jacobian_max,
+        max_displacement=field_max_displacement,
+        n_candidate_pairs=n_candidate_anchors,
+        n_pairs=int(len(accepted_cluster)),
+        n_filtered_pairs=int(n_candidate_anchors - len(accepted)),
         median_pair_distance_before=before_metrics["median_distance"],
         median_pair_distance_after=applied_metrics["median_distance"],
         success=success,
