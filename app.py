@@ -1246,6 +1246,7 @@ def show_he_geojson_preparation() -> None:
         cluster_selection_mode = st.selectbox(
             tr("クラスタ選択方式", "Cluster selection mode"),
             ["radius", "hybrid k-nearest"],
+            index=1,
             format_func=lambda value: {
                 "radius": tr("半径（従来方式）", "Radius (legacy)"),
                 "hybrid k-nearest": tr("Hybrid k-nearest", "Hybrid k-nearest"),
@@ -1256,10 +1257,12 @@ def show_he_geojson_preparation() -> None:
                 "Hybrid balances cluster sizes while excluding nuclei beyond the radius limit.",
             ),
         )
+        cluster_patch_radius = 18.0
         cluster_left, cluster_right = st.columns(2)
         with cluster_left:
             cluster_grid_spacing = st.number_input(tr("クラスタグリッド間隔 (um)", "Cluster grid spacing (um)"), min_value=1.0, value=35.0, step=5.0, key="workflow-c-cluster-grid-spacing", help=tr("局所アンカー候補を評価する格子間隔です。", "Spacing between local anchor candidate centers."))
-            cluster_patch_radius = st.number_input(tr("クラスタパッチ半径 (um)", "Cluster patch radius (um)"), min_value=1.0, value=18.0, step=2.0, key="workflow-c-cluster-patch-radius", help=tr("各格子点で核集団を集める半径です。", "Radius used to collect nuclei around each grid center."))
+            if cluster_selection_mode == "radius":
+                cluster_patch_radius = st.number_input(tr("クラスタパッチ半径 (um)", "Cluster patch radius (um)"), min_value=1.0, value=18.0, step=2.0, key="workflow-c-cluster-patch-radius", help=tr("各格子点で核集団を集める半径です。", "Radius used to collect nuclei around each grid center."))
             cluster_search_radius = st.number_input(tr("クラスタ探索半径 (um)", "Cluster search radius (um)"), min_value=1.0, value=25.0, step=2.0, key="workflow-c-cluster-search-radius", help=tr("最良の局所平行移動を探す最大範囲です。", "Maximum region searched when estimating the best local translation."))
             min_points_per_cluster = st.number_input(tr("クラスタ最小点数", "Minimum points per cluster"), min_value=1, value=8, step=1, key="workflow-c-cluster-min-points", help=tr("fixedまたはmovingがこの点数未満の局所領域は除外します。", "Local windows are skipped when either fixed or moving has fewer points."))
         with cluster_right:
@@ -2206,6 +2209,7 @@ def show_he_geojson_preparation() -> None:
             "mutual_matches_after",
             "score_before",
             "score_after",
+            "score_improvement",
             "selected_dx",
             "selected_dy",
             "accepted",

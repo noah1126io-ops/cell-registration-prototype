@@ -434,6 +434,7 @@ def test_cluster_anchor_fine_warp_improves_local_cluster_shift():
         "mutual_matches_after",
         "score_before",
         "score_after",
+        "score_improvement",
         "selected_dx",
         "selected_dy",
     }
@@ -478,6 +479,10 @@ def test_cluster_anchor_hybrid_knn_caps_cluster_sizes_and_reports_diagnostics():
     accepted = evaluated_rows[evaluated_rows["accepted"]]
     assert not accepted.empty
     assert (accepted["score_after"] < accepted["score_before"]).all()
+    assert np.allclose(
+        accepted["score_improvement"],
+        accepted["score_before"] - accepted["score_after"],
+    )
     assert (accepted["mutual_matches_after"] >= accepted["mutual_matches_before"]).all()
     assert np.allclose(accepted[["selected_dx", "selected_dy"]], accepted[["dx", "dy"]])
 

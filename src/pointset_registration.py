@@ -1328,7 +1328,7 @@ def _cluster_match_diagnostics(
     }
 
 
-def _hybrid_cluster_score(
+def _cluster_candidate_score(
     diagnostics: dict[str, float | int],
     *,
     match_threshold: float,
@@ -1519,6 +1519,7 @@ def cluster_anchor_fine_warp(
                         "unmatched_moving_fraction_after": 1.0,
                         "score_before": np.nan,
                         "score_after": np.nan,
+                        "score_improvement": np.nan,
                         "selected_dx": 0.0,
                         "selected_dy": 0.0,
                         "cluster_selection_mode": cluster_selection_mode,
@@ -1546,15 +1547,12 @@ def cluster_anchor_fine_warp(
             best_dy = 0.0
             best_median = zero_median
             best_fraction = zero_fraction
-            if cluster_selection_mode == "hybrid k-nearest":
-                best_score = _hybrid_cluster_score(
-                    zero_diagnostics,
-                    match_threshold=match_threshold,
-                    shift_magnitude=0.0,
-                    max_shift=max_shift,
-                )
-            else:
-                best_score = zero_median - zero_fraction * match_threshold
+            best_score = _cluster_candidate_score(
+                zero_diagnostics,
+                match_threshold=match_threshold,
+                shift_magnitude=0.0,
+                max_shift=max_shift,
+            )
             zero_score = float(best_score)
             best_diagnostics = zero_diagnostics
             for dx, dy in candidate_shifts:
@@ -1567,15 +1565,12 @@ def cluster_anchor_fine_warp(
                 )
                 median_distance = float(diagnostics["median_distance"])
                 fraction = float(diagnostics["fraction_within_threshold"])
-                if cluster_selection_mode == "hybrid k-nearest":
-                    score = _hybrid_cluster_score(
-                        diagnostics,
-                        match_threshold=match_threshold,
-                        shift_magnitude=float(np.hypot(dx, dy)),
-                        max_shift=max_shift,
-                    )
-                else:
-                    score = median_distance - fraction * match_threshold
+                score = _cluster_candidate_score(
+                    diagnostics,
+                    match_threshold=match_threshold,
+                    shift_magnitude=float(np.hypot(dx, dy)),
+                    max_shift=max_shift,
+                )
                 if score < best_score or (np.isclose(score, best_score) and median_distance < best_median):
                     best_score = score
                     best_median = median_distance
@@ -1644,6 +1639,7 @@ def cluster_anchor_fine_warp(
                     ),
                     "score_before": zero_score,
                     "score_after": float(best_score),
+                    "score_improvement": float(zero_score - best_score),
                     "selected_dx": best_dx,
                     "selected_dy": best_dy,
                     "cluster_selection_mode": cluster_selection_mode,
@@ -1697,6 +1693,7 @@ def cluster_anchor_fine_warp(
                     "unmatched_moving_fraction_after": np.nan,
                     "score_before": np.nan,
                     "score_after": np.nan,
+                    "score_improvement": np.nan,
                     "selected_dx": 0.0,
                     "selected_dy": 0.0,
                     "cluster_selection_mode": cluster_selection_mode,
