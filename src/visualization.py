@@ -195,6 +195,10 @@ def visualize_warped_he_point_overlay(
     *,
     title: str,
     max_points: int = 3000,
+    geojson_classifications=None,
+    show_excluded_geojson: bool = True,
+    show_edge_candidate_geojson: bool = True,
+    boundary_pin_pixels: np.ndarray | None = None,
 ):
     """Overlay GeoJSON and transformed HE points on a warped HE image."""
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -203,15 +207,53 @@ def visualize_warped_he_point_overlay(
     max_points = max(1, int(max_points))
     if len(geojson_pixels):
         geojson_pixels = np.asarray(geojson_pixels, dtype=float)[:max_points]
+        if geojson_classifications is None:
+            ax.scatter(
+                geojson_pixels[:, 0],
+                geojson_pixels[:, 1],
+                s=12,
+                c="#00d1ff",
+                marker="o",
+                linewidths=0,
+                alpha=0.65,
+                label="valid GeoJSON",
+            )
+        else:
+            classifications = np.asarray(geojson_classifications, dtype=object)[:max_points]
+            styles = {
+                "valid": ("#00d1ff", "valid GeoJSON", 14, 0.75),
+                "edge_candidate": ("#8b5cf6", "edge candidate GeoJSON", 14, 0.75),
+                "excluded": ("#d1d5db", "excluded GeoJSON", 10, 0.25),
+            }
+            for class_name, (color, label, size, alpha) in styles.items():
+                if class_name == "excluded" and not show_excluded_geojson:
+                    continue
+                if class_name == "edge_candidate" and not show_edge_candidate_geojson:
+                    continue
+                mask = classifications == class_name
+                if np.any(mask):
+                    ax.scatter(
+                        geojson_pixels[mask, 0],
+                        geojson_pixels[mask, 1],
+                        s=size,
+                        c=color,
+                        marker="o",
+                        linewidths=0,
+                        alpha=alpha,
+                        label=label,
+                    )
+
+    if boundary_pin_pixels is not None and len(boundary_pin_pixels):
+        boundary_pin_pixels = np.asarray(boundary_pin_pixels, dtype=float)[:max_points]
         ax.scatter(
-            geojson_pixels[:, 0],
-            geojson_pixels[:, 1],
-            s=12,
-            c="#00d1ff",
-            marker="o",
-            linewidths=0,
-            alpha=0.65,
-            label="GeoJSON nuclei",
+            boundary_pin_pixels[:, 0],
+            boundary_pin_pixels[:, 1],
+            s=18,
+            c="#ffffff",
+            marker="+",
+            linewidths=0.8,
+            alpha=0.7,
+            label="boundary pin anchors",
         )
 
     if len(he_pixels):
