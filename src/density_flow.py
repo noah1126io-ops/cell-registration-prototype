@@ -122,14 +122,174 @@ def _sample_field(
     field_y: np.ndarray,
     bounds: tuple[float, float, float, float],
     pixel_size: float,
+    *,
+    mode: str = "constant",
 ) -> np.ndarray:
     min_x, min_y, _, _ = bounds
     cols = (points[:, 0] - min_x) / pixel_size
     rows = (points[:, 1] - min_y) / pixel_size
     coordinates = np.vstack([rows, cols])
-    sampled_x = map_coordinates(field_x, coordinates, order=1, mode="constant", cval=0.0)
-    sampled_y = map_coordinates(field_y, coordinates, order=1, mode="constant", cval=0.0)
+    sampled_x = map_coordinates(field_x, coordinates, order=1, mode=mode, cval=0.0)
+    sampled_y = map_coordinates(field_y, coordinates, order=1, mode=mode, cval=0.0)
     return np.column_stack([sampled_x, sampled_y])
+
+
+def _output_world_grid_from_metadata(
+    image_shape: tuple[int, ...],
+    warp_metadata: dict,
+) -> np.ndarray:
+    height, width = image_shape[:2]
+    if int(warp_metadata.get("height", height)) != height or int(warp_metadata.get("width", width)) != width:
+        raise ValueError("warp_metadata width/height must match affine_image shape.")
+    pixel_size = float(warp_metadata["output_pixel_size_um"])
+    if pixel_size <= 0 or not np.isfinite(pixel_size):
+        raise ValueError("warp_metadata output_pixel_size_um must be positive and finite.")
+    origin = warp_metadata.get("output_origin", "upper-left")
+    if origin not in {"upper-left", "upper-right", "lower-left"}:
+        raise ValueError("Unsupported output_origin in warp_metadata.")
+    col0_world_x = float(warp_metadata["col0_world_x"])
+    row0_world_y = float(warp_metadata["row0_world_y"])
+
+    columns = np.arange(width, dtype=float)
+    rows = np.arange(height, dtype=float)
+    world_x = (
+        col0_world_x - columns * pixel_size
+        if origin == "upper-right"
+        else col0_world_x + columns * pixel_size
+    )
+    world_y = (
+        row0_world_y + rows * pixel_size
+        if origin in {"upper-left", "upper-right"}
+        else row0_world_y - rows * pixel_size
+    )
+    grid_x, grid_y = np.meshgrid(world_x, world_y)
+    return np.column_stack([grid_x.ravel(), grid_y.ravel()])
+
+
+def _world_to_affine_image_rows_cols(world_points: np.ndarray, warp_metadata: dict) -> np.ndarray:
+    pixel_size = float(warp_metadata["output_pixel_size_um"])
+    origin = warp_metadata.get("output_origin", "upper-left")
+    col0_world_x = float(warp_metadata["col0_world_x"])
+    row0_world_y = float(warp_metadata["row0_world_y"])
+    if origin == "upper-right":
+        columns = (col0_world_x - world_points[:, 0]) / pixel_size
+    else:
+        columns = (world_points[:, 0] - col0_world_x) / pixel_size
+    if origin in {"upper-left", "upper-right"}:
+        rows = (world_points[:, 1] - row0_world_y) / pixel_size
+    else:
+        rows = (row0_world_y - world_points[:, 1]) / pixel_size
+    return np.column_stack([rows, columns])
+
+
+def warp_affine_image_with_density_flow(
+    affine_image: np.ndarray,
+    warp_metadata: dict,
+    displacement_x: np.ndarray,
+    displacement_y: np.ndarray,
+    *,
+    field_bounds: tuple[float, float, float, float],
+    field_spacing: float,
+    inverse_iterations: int = 12,
+) -> np.ndarray:
+    """Inverse-map an affine world image through a forward density-flow field."""
+    image = np.asarray(affine_image)
+    if image.ndim not in {2, 3}:
+        raise ValueError("affine_image must be a 2D or 3D array.")
+    field_x = np.asarray(displacement_x, dtype=float)
+    field_y = np.asarray(displacement_y, dtype=float)
+    if field_x.shape != field_y.shape or field_x.ndim != 2:
+        raise ValueError("displacement_x and displacement_y must be matching 2D arrays.")
+    if not np.isfinite(field_x).all() or not np.isfinite(field_y).all():
+        raise ValueError("Density-flow displacement fields must be finite.")
+    if field_spacing <= 0 or not np.isfinite(field_spacing):
+        raise ValueError("field_spacing must be positive and finite.")
+    if inverse_iterations < 1:
+        raise ValueError("inverse_iterations must be at least 1.")
+
+    output_world_points = _output_world_grid_from_metadata(image.shape, warp_metadata)
+    source_world_points = output_world_points.copy()
+    for _ in range(int(inverse_iterations)):
+        sampled_displacement = _sample_field(
+            source_world_points,
+            field_x,
+            field_y,
+            field_bounds,
+            field_spacing,
+            mode="nearest",
+        )
+        source_world_points = output_world_points - sampled_displacement
+
+    source_rows_cols = _world_to_affine_image_rows_cols(source_world_points, warp_metadata)
+    rows = source_rows_cols[:, 0]
+    columns = source_rows_cols[:, 1]
+    if image.ndim == 2:
+        sampled = map_coordinates(
+            image.astype(float),
+            [rows, columns],
+            order=1,
+            mode="constant",
+            cval=0.0,
+        ).reshape(image.shape)
+    else:
+        sampled_channels = [
+            map_coordinates(
+                image[..., channel].astype(float),
+                [rows, columns],
+                order=1,
+                mode="constant",
+                cval=0.0,
+            ).reshape(image.shape[:2])
+            for channel in range(image.shape[2])
+        ]
+        sampled = np.stack(sampled_channels, axis=2)
+
+    if np.issubdtype(image.dtype, np.integer):
+        limits = np.iinfo(image.dtype)
+        return np.clip(sampled, limits.min, limits.max).astype(image.dtype)
+    return sampled.astype(image.dtype, copy=False)
+
+
+def density_flow_image_outputs(
+    affine_image: np.ndarray,
+    warp_metadata: dict,
+    fine_result: FineWarpResult,
+    *,
+    inverse_iterations: int = 12,
+) -> dict[str, np.ndarray]:
+    """Return affine, attempted, and safety-gated final density-flow images."""
+    affine_output = np.asarray(affine_image).copy()
+    attempted_x = getattr(fine_result, "attempted_displacement_x", None)
+    attempted_y = getattr(fine_result, "attempted_displacement_y", None)
+    if attempted_x is None or attempted_y is None:
+        attempted_x = np.zeros_like(fine_result.displacement_x, dtype=float)
+        attempted_y = np.zeros_like(fine_result.displacement_y, dtype=float)
+    attempted_output = warp_affine_image_with_density_flow(
+        affine_output,
+        warp_metadata,
+        attempted_x,
+        attempted_y,
+        field_bounds=fine_result.bounds,
+        field_spacing=fine_result.grid_spacing,
+        inverse_iterations=inverse_iterations,
+    )
+    if bool(getattr(fine_result, "applied", False)):
+        final_output = warp_affine_image_with_density_flow(
+            affine_output,
+            warp_metadata,
+            fine_result.displacement_x,
+            fine_result.displacement_y,
+            field_bounds=fine_result.bounds,
+            field_spacing=fine_result.grid_spacing,
+            inverse_iterations=inverse_iterations,
+        )
+    else:
+        final_output = affine_output.copy()
+    return {
+        "affine": affine_output,
+        "attempted": attempted_output,
+        "final": final_output,
+    }
 
 
 def _compose_fields(

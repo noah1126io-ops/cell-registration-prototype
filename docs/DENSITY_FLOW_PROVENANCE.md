@@ -32,7 +32,7 @@ Only publicly described mathematical concepts were used: point-density rasteriza
 - Residual updates are derived from density differences and density gradients, then explicitly smoothed and magnitude-limited.
 - Updates are composed with backtracking Jacobian checks rather than solved as a geodesic shooting problem.
 - Safety is decided using this application's existing Workflow C point-set and deformation QC contract.
-- The first milestone transforms points only; no density-flow HE raster warp is produced.
+- HE raster warping uses a repository-specific iterative inverse map over the affine world image; rejected fields retain attempted QC output while final output falls back to affine-only.
 
 ## Claims intentionally not made
 

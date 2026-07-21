@@ -11,7 +11,7 @@ from scipy.ndimage import binary_erosion, distance_transform_edt
 from scipy.spatial import cKDTree
 
 from src.density import create_density_map
-from src.density_flow import tissue_aware_density_flow_registration
+from src.density_flow import density_flow_image_outputs, tissue_aware_density_flow_registration
 from src.export import array_to_png_bytes, figure_to_png_bytes
 from src.features import extract_cell_features, point_features_to_cell_features
 from src.geojson_utils import load_geojson_centroids
@@ -42,6 +42,7 @@ from src.visualization import (
     visualize_cell_matches,
     visualize_anchor_correlation_heatmap,
     visualize_displacement_field,
+    visualize_density_flow_point_comparison,
     visualize_distance_histogram,
     visualize_geojson_classification_overlay,
     visualize_jacobian_heatmap,
@@ -1209,8 +1210,8 @@ def show_he_geojson_preparation() -> None:
     if fine_alignment_method == "tissue-aware density flow":
         st.warning(
             tr(
-                "実験的な独立実装です。現段階ではHE点群だけを変形し、HE画像はaffine-onlyで出力します。",
-                "This is an independent experimental implementation. At this milestone only HE points are deformed; HE raster output remains affine-only.",
+                "実験的な独立実装です。HE画像warpも安全判定前後を分けて表示し、結果は必ずQCしてください。",
+                "This is an independent experimental implementation. HE raster warps are shown separately before and after safety gating and require visual QC.",
             )
         )
         flow_left, flow_right = st.columns(2)
@@ -1886,13 +1887,9 @@ def show_he_geojson_preparation() -> None:
     final_displacement_x = variants["final_displacement_x"]
     final_displacement_y = variants["final_displacement_y"]
     applied_result_label = variants["applied_result_label"]
-    density_flow_points_only = fine_alignment_method == "tissue-aware density flow"
-    image_fine_applied = fine_applied and not density_flow_points_only
-    image_applied_result_label = (
-        "Affine only (density-flow point milestone)"
-        if density_flow_points_only
-        else applied_result_label
-    )
+    density_flow_mode = fine_alignment_method == "tissue-aware density flow"
+    image_fine_applied = fine_applied
+    image_applied_result_label = applied_result_label
 
     final_fine_result = replace(
         fine_result,
@@ -2030,7 +2027,7 @@ def show_he_geojson_preparation() -> None:
                 [
                     {
                         **flow_metadata,
-                        "points_only_milestone": True,
+                        "experimental_inverse_raster_warp": True,
                         "finite_output": safety_metrics.get("finite_output"),
                         "points_outside_tissue_before_fraction": safety_metrics.get(
                             "points_outside_tissue_before_fraction"
@@ -2271,6 +2268,7 @@ def show_he_geojson_preparation() -> None:
     )
     point_tab.dataframe(pd.DataFrame(metric_rows), use_container_width=True)
 
+    point_tab.subheader(tr("点群registration結果", "Point registration result"))
     plot_left, plot_mid, plot_right = point_tab.columns(3)
     geojson_features = _cell_features_from_points(geojson_points)
     affine_features = _cell_features_from_points(transformed_affine_points)
@@ -2328,6 +2326,31 @@ def show_he_geojson_preparation() -> None:
         )
     overview_tab.subheader(tr("最終適用結果", "Final applied result"))
     overview_tab.pyplot(fine_figure, clear_figure=False)
+    if density_flow_mode:
+        density_flow_comparison_figure = visualize_density_flow_point_comparison(
+            geojson_array,
+            affine_points,
+            attempted_points,
+            final_points,
+            title="Density-flow point registration: fixed / affine / attempted / applied",
+            max_points=max_warped_overlay_points,
+            invert_x_axis=invert_x_axis,
+            invert_y_axis=invert_y_axis,
+        )
+        point_tab.subheader(tr("Density-flow点群4状態比較", "Density-flow four-state point comparison"))
+        point_tab.caption(
+            tr(
+                "Fixed GeoJSONは移動しません。reject時のapplied HE点はaffine HE点と一致します。",
+                "Fixed GeoJSON points never move. When rejected, applied HE points coincide with affine HE points.",
+            )
+        )
+        point_tab.pyplot(density_flow_comparison_figure, clear_figure=False)
+        point_tab.download_button(
+            "Download density-flow four-state point comparison PNG",
+            data=figure_to_png_bytes(density_flow_comparison_figure),
+            file_name="density_flow_point_states.png",
+            mime="image/png",
+        )
 
     before_distances = point_nearest_distances(metric_fixed_points, metric_moving_affine_points)
     attempted_distances = point_nearest_distances(metric_fixed_points, metric_moving_attempted_points)
@@ -2577,7 +2600,17 @@ def show_he_geojson_preparation() -> None:
                 output_origin=warped_he_output_origin,
                 bounds=fine_result.bounds,
             )
-            if image_fine_applied:
+            if density_flow_mode:
+                density_flow_images = density_flow_image_outputs(
+                    affine_warped_he_image,
+                    affine_warped_he_metadata,
+                    fine_result,
+                )
+                attempted_warped_he_image = density_flow_images["attempted"]
+                attempted_warped_he_metadata = dict(affine_warped_he_metadata)
+                warped_he_image = density_flow_images["final"]
+                warped_he_metadata = dict(affine_warped_he_metadata)
+            elif image_fine_applied:
                 warped_he_image, warped_he_metadata = warp_he_image_to_world(
                     he_image,
                     affine_result,
@@ -2593,7 +2626,7 @@ def show_he_geojson_preparation() -> None:
             image_tab.warning(f"Could not warp HE image: {exc}")
         if (
             fine_alignment_method != "off"
-            and not density_flow_points_only
+            and not density_flow_mode
             and attempted_displacement_x_value is not None
         ):
             try:
@@ -2619,11 +2652,35 @@ def show_he_geojson_preparation() -> None:
     if warped_he_image is not None:
         image_tab.subheader(tr("Warp済みHE画像", "Warped HE image"))
         image_tab.info(tr("出力原点は画像の向きだけを制御し、位置合わせ品質には影響しません。", "Warped HE output origin controls exported image orientation, not registration quality."))
-        if density_flow_points_only:
-            image_tab.info(
+        if density_flow_mode:
+            image_tab.subheader(tr("Density-flow画像出力状態", "Density-flow image output states"))
+            image_tab.dataframe(
+                pd.DataFrame(
+                    [
+                        {"image_output": "Affine-only HE image", "field": "affine", "purpose": "baseline"},
+                        {"image_output": "Attempted density-flow warped HE image", "field": "attempted", "purpose": "QC even when rejected"},
+                        {
+                            "image_output": "Final applied HE image",
+                            "field": "density-flow" if fine_applied else "affine fallback",
+                            "purpose": "safety-gated result",
+                        },
+                    ]
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+        if density_flow_mode and fine_applied:
+            image_tab.success(
                 tr(
-                    "Density-flowは第一段階として点群だけに適用されています。HE画像はaffine-onlyです。",
-                    "Density-flow is applied to points only in this first milestone. The HE raster image remains affine-only.",
+                    "点群結果と最終HE画像には、safety checkを通過したdensity-flow fieldを適用しています。",
+                    "The safety-approved density-flow field is applied to both the point result and final HE image.",
+                )
+            )
+        elif density_flow_mode:
+            image_tab.warning(
+                tr(
+                    "Density-flowはrejectされました。attempted画像はQC用に表示し、最終HE画像はaffine-onlyです。",
+                    "Density-flow was rejected. The attempted image remains visible for QC; the final HE image is affine-only.",
                 )
             )
         elif fine_applied:
@@ -2656,6 +2713,7 @@ def show_he_geojson_preparation() -> None:
         image_tab.dataframe(pixel_diagnostics, use_container_width=True)
 
         if affine_warped_he_image is not None:
+            image_tab.subheader(tr("Affine-only HE画像", "Affine-only HE image"))
             image_tab.image(
                 affine_warped_he_image,
                 caption="Affine-only warped HE image",
@@ -2685,6 +2743,7 @@ def show_he_geojson_preparation() -> None:
 
         image_only_col, overlay_col = image_tab.columns(2)
         with image_only_col:
+            st.subheader(tr("最終適用HE画像", "Final applied HE image warp"))
             st.image(
                 warped_he_image,
                 caption=(
@@ -2706,24 +2765,37 @@ def show_he_geojson_preparation() -> None:
                 if show_boundary_pin_anchors and boundary_anchor_points is not None and len(boundary_anchor_points)
                 else None
             )
+            image_tab.subheader(tr("Attempted HE画像warp", "Attempted HE image warp"))
             image_tab.image(
                 attempted_warped_he_image,
                 caption=(
-                    "Attempted fine-warp HE image"
+                    (
+                        "Attempted density-flow warped HE image"
+                        if density_flow_mode
+                        else "Attempted fine-warp HE image"
+                    )
                     + (" - rejected / unsafe" if not fine_applied else "")
                 ),
             )
             image_tab.download_button(
                 "Download attempted warped HE preview PNG",
                 data=array_to_png_bytes(attempted_warped_he_image),
-                file_name="attempted_warped_he_preview.png",
+                file_name=(
+                    "attempted_density_flow_warped_he.png"
+                    if density_flow_mode
+                    else "attempted_warped_he_preview.png"
+                ),
                 mime="image/png",
             )
             attempted_overlay_figure = visualize_warped_he_point_overlay(
                 attempted_warped_he_image,
                 attempted_geojson_pixels,
                 attempted_he_pixels,
-                title="Attempted HE warp preview with GeoJSON and HE nuclei overlay",
+                title=(
+                    "Attempted density-flow HE image with GeoJSON and HE nuclei overlay"
+                    if density_flow_mode
+                    else "Attempted HE warp preview with GeoJSON and HE nuclei overlay"
+                ),
                 max_points=max_warped_overlay_points,
                 geojson_classifications=geojson_classification,
                 show_excluded_geojson=show_excluded_geojson_points,
@@ -2884,7 +2956,7 @@ def show_he_geojson_preparation() -> None:
         "fine_alignment_method": fine_alignment_method,
         "fine_applied": fine_applied,
         "applied_result_label": applied_result_label,
-        "density_flow_points_only_milestone": density_flow_points_only,
+        "density_flow_experimental_raster_warp": density_flow_mode,
         "density_flow_pixel_size_um": density_flow_pixel_size,
         "density_flow_blur_scales_px": density_flow_blur_scales_text,
         "density_flow_optimization_levels": density_flow_levels,

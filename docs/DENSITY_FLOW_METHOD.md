@@ -4,7 +4,7 @@
 
 This is an experimental, independently written Workflow C method for residual alignment after affine registration. It transforms affine-registered HE nuclei points toward valid fixed GeoJSON nuclei. Fixed GeoJSON points never move.
 
-The first milestone transforms points only. It does not apply the density-flow field to the HE raster image. Raster output remains affine-only until coordinate ordering, synthetic tests, Jacobian behavior, and real-data QC are validated.
+The method transforms HE points and can generate an experimental HE raster warp. Raster output is safety-gated independently: attempted output always remains available for QC, while final output uses the density-flow field only when the point/field safety checks pass.
 
 The method is not STalign, does not import STalign, and does not claim equivalent behavior or biological accuracy.
 
@@ -54,6 +54,18 @@ phi_new(x) = phi(x) + u(phi(x))
 
 Each proposed composition is reduced by backtracking when its Jacobian becomes non-finite, approaches fold-over, expands excessively, or exceeds the provisional displacement envelope. This is diffeomorphic-style numerical integration; it is not a proof that every accepted map is mathematically diffeomorphic.
 
+## Experimental HE raster warp
+
+The point field is a forward map `phi(x) = x + d(x)`. It is not used directly as an output-to-input raster sampling map. For every output world-grid pixel `y`, the implementation approximately solves the inverse relation by fixed-point iteration:
+
+```text
+x_(n+1) = y - d(x_n)
+```
+
+The converged source world coordinate `x` is converted explicitly to affine-image `(row, column)` coordinates using the selected output origin. `scipy.ndimage.map_coordinates` then samples the affine HE image with linear interpolation. This inverse mapping visits every output pixel and avoids holes caused by forward splatting.
+
+Three image states are retained: affine-only, attempted density-flow, and final applied. If safety rejects the field, attempted remains visible but final is an affine-only copy.
+
 ## Shared safety decision
 
 The attempted field and points are always retained for QC. Application is rejected and final points fall back to affine-only when any of these checks fail:
@@ -74,7 +86,7 @@ Reported QC includes bidirectional median and mean distance, fractions within 3/
 - Density similarity can have ambiguous local optima in repeated or sparse structures.
 - The x/y reversal check is heuristic and can be disabled after coordinate order is independently validated.
 - Real-data biological accuracy has not been established.
-- HE raster warping is intentionally excluded from this milestone.
+- HE raster warping is experimental and requires visual QC; full-resolution tiled export is not implemented.
 
 ## Conceptual references
 

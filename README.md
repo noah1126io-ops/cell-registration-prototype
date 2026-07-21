@@ -112,7 +112,7 @@ HE 側の `.npy` は StarDist などで事前検出済みの核中心を想定�
 
 Workflow C では、registration QC scatter の表示向きと warped HE image の出力向きを別々に指定できます。registration QC図だけが上下反転して見える場合は、`Registration QC display origin` を切り替えて確認します。warped HE image が上下反転して見える場合は、`Warped HE output origin` を `lower-left` / `upper-left` で切り替えて確認します。
 
-`Tissue-aware density flow [Experimental]` は独立実装の実験方式です。現在の第一段階ではHE点群だけに適用し、HE raster imageはaffine-onlyで出力します。設計は [docs/DENSITY_FLOW_METHOD.md](docs/DENSITY_FLOW_METHOD.md)、独立実装の来歴は [docs/DENSITY_FLOW_PROVENANCE.md](docs/DENSITY_FLOW_PROVENANCE.md) を参照してください。STalignとの同等性や生物学的精度向上は主張していません。
+`Tissue-aware density flow [Experimental]` は独立実装の実験方式です。HE点群に加え、反復inverse mappingでHE raster imageのattempted/final warpも生成します。reject時はattempted画像をQC用に残し、final画像はaffine-onlyへ戻ります。設計は [docs/DENSITY_FLOW_METHOD.md](docs/DENSITY_FLOW_METHOD.md)、独立実装の来歴は [docs/DENSITY_FLOW_PROVENANCE.md](docs/DENSITY_FLOW_PROVENANCE.md) を参照してください。STalignとの同等性や生物学的精度向上は主張していません。
 
 ## 既存 HE-to-GeoJSON 研究パイプラインの設計メモ
 
@@ -146,7 +146,7 @@ Workflow C では、registration QC scatter の表示向きと warped HE image �
 - fine center-snap warp
 - robust pair filtering for fine center-snap warp
 - local translation field fine alignment
-- tissue-aware density-flow point registration（実験的、点群のみ）
+- tissue-aware density-flow point/raster registration（実験的、inverse raster mapping）
 - local translation anchors CSV export
 - attempted/applied fine alignment diagnostics
 - warped HE image PNG export for QC

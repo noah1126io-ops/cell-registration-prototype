@@ -188,6 +188,52 @@ def visualize_point_sets(
     return fig
 
 
+def visualize_density_flow_point_comparison(
+    fixed_points: np.ndarray,
+    affine_points: np.ndarray,
+    attempted_points: np.ndarray,
+    applied_points: np.ndarray,
+    *,
+    title: str = "Density-flow point registration states",
+    max_points: int = 5000,
+    invert_x_axis: bool = False,
+    invert_y_axis: bool = False,
+):
+    """Compare fixed, affine, attempted, and safety-gated HE point states."""
+    point_sets = [
+        (np.asarray(fixed_points, dtype=float), "#00d1ff", "o", "fixed GeoJSON", 16, 0.75),
+        (np.asarray(affine_points, dtype=float), "#64748b", "+", "affine HE", 18, 0.55),
+        (np.asarray(attempted_points, dtype=float), "#d946ef", "x", "attempted density-flow HE", 18, 0.7),
+        (np.asarray(applied_points, dtype=float), "#ffb000", "o", "applied HE", 12, 0.65),
+    ]
+    fig, ax = plt.subplots(figsize=(9, 8))
+    limit = max(1, int(max_points))
+    for points, color, marker, label, size, alpha in point_sets:
+        if points.ndim != 2 or points.shape[1] != 2:
+            raise ValueError(f"{label} points must have shape (n, 2).")
+        display_points = points[:limit]
+        if len(display_points):
+            ax.scatter(
+                display_points[:, 0],
+                display_points[:, 1],
+                s=size,
+                c=color,
+                marker=marker,
+                linewidths=0.8,
+                alpha=alpha,
+                label=label,
+            )
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    if invert_x_axis:
+        ax.invert_xaxis()
+    if invert_y_axis:
+        ax.invert_yaxis()
+    ax.legend(loc="best", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
 def visualize_warped_he_point_overlay(
     warped_he_image,
     geojson_pixels: np.ndarray,
