@@ -313,6 +313,61 @@ def _jacobian(field_x: np.ndarray, field_y: np.ndarray, pixel_size: float) -> np
     return (1.0 + dfx_dx) * (1.0 + dfy_dy) - dfx_dy * dfy_dx
 
 
+def density_flow_deformation_diagnostics(
+    field_x: np.ndarray,
+    field_y: np.ndarray,
+    *,
+    pixel_size: float = 1.0,
+) -> dict[str, float | bool | np.ndarray]:
+    """Separate a displacement field's median translation from local variation."""
+    dx = np.asarray(field_x, dtype=float)
+    dy = np.asarray(field_y, dtype=float)
+    if dx.shape != dy.shape or dx.ndim != 2:
+        raise ValueError("field_x and field_y must be matching 2D arrays.")
+    if not np.isfinite(dx).all() or not np.isfinite(dy).all():
+        raise ValueError("Displacement fields must contain only finite values.")
+    if pixel_size <= 0 or not np.isfinite(pixel_size):
+        raise ValueError("pixel_size must be positive and finite.")
+
+    median_dx = float(np.median(dx))
+    median_dy = float(np.median(dy))
+    raw_magnitude = np.hypot(dx, dy)
+    local_x = dx - median_dx
+    local_y = dy - median_dy
+    local_magnitude = np.hypot(local_x, local_y)
+    jacobian = _jacobian(dx, dy, float(pixel_size))
+    raw_p95 = float(np.percentile(raw_magnitude, 95))
+    local_p95 = float(np.percentile(local_magnitude, 95))
+    translation_dominated = bool(
+        raw_p95 > np.finfo(float).eps
+        and local_p95 < max(1.0, 0.15 * raw_p95)
+    )
+    return {
+        "raw_displacement_median": float(np.median(raw_magnitude)),
+        "raw_displacement_p95": raw_p95,
+        "raw_displacement_max": float(np.max(raw_magnitude)),
+        "median_displacement_x": median_dx,
+        "median_displacement_y": median_dy,
+        "local_residual_median": float(np.median(local_magnitude)),
+        "local_residual_p95": local_p95,
+        "local_residual_max": float(np.max(local_magnitude)),
+        "displacement_std_x": float(np.std(dx)),
+        "displacement_std_y": float(np.std(dy)),
+        "fraction_local_residual_above_1_um": float(np.mean(local_magnitude > 1.0)),
+        "fraction_local_residual_above_2_um": float(np.mean(local_magnitude > 2.0)),
+        "fraction_local_residual_above_5_um": float(np.mean(local_magnitude > 5.0)),
+        "jacobian_p05": float(np.percentile(jacobian, 5)),
+        "jacobian_median": float(np.median(jacobian)),
+        "jacobian_p95": float(np.percentile(jacobian, 95)),
+        "translation_dominated": translation_dominated,
+        "raw_magnitude": raw_magnitude,
+        "local_residual_x": local_x,
+        "local_residual_y": local_y,
+        "local_residual_magnitude": local_magnitude,
+        "jacobian": jacobian,
+    }
+
+
 def _phase_translation(fixed_density: np.ndarray, moving_density: np.ndarray, pixel_size: float) -> np.ndarray:
     correlation = fftconvolve(fixed_density, moving_density[::-1, ::-1], mode="full")
     peak_row, peak_col = np.unravel_index(np.argmax(correlation), correlation.shape)
@@ -424,6 +479,7 @@ def tissue_aware_density_flow_registration(
     jacobian_max_threshold: float = 4.0,
     max_displacement: float = 35.0,
     displacement_p95_limit: float | None = 30.0,
+    global_translation_initialization: str = "off",
     detect_axis_reversal: bool = True,
     max_grid_side: int = 1024,
 ) -> FineWarpResult:
@@ -441,6 +497,9 @@ def tissue_aware_density_flow_registration(
         raise ValueError("optimization_levels and iterations_per_level must be at least 1.")
     if max_displacement <= 0 or not np.isfinite(max_displacement):
         raise ValueError("max_displacement must be positive and finite.")
+    global_initialization = str(global_translation_initialization).strip().lower()
+    if global_initialization not in {"off", "auto"}:
+        raise ValueError("global_translation_initialization must be 'off' or 'auto'.")
 
     active_scales = tuple(sorted(scales, reverse=True)[: min(int(optimization_levels), len(scales))])
     padding = max(active_scales) * density_pixel_size * 3.0
@@ -511,18 +570,20 @@ def tissue_aware_density_flow_registration(
         _rasterize_points(moving, shape, resolved_bounds, density_pixel_size),
         active_scales[0],
     )
-    global_shift = _best_global_shift(
-        metric_fixed,
-        metric_moving,
-        coarse_fixed,
-        coarse_moving,
-        density_pixel_size,
-    )
-    global_magnitude = float(np.linalg.norm(global_shift))
-    if global_magnitude > max_displacement * 1.25:
-        global_shift *= (max_displacement * 1.25) / global_magnitude
-    field_x.fill(global_shift[0])
-    field_y.fill(global_shift[1])
+    global_shift = np.zeros(2, dtype=float)
+    if global_initialization == "auto":
+        global_shift = _best_global_shift(
+            metric_fixed,
+            metric_moving,
+            coarse_fixed,
+            coarse_moving,
+            density_pixel_size,
+        )
+        global_magnitude = float(np.linalg.norm(global_shift))
+        if global_magnitude > max_displacement * 1.25:
+            global_shift *= (max_displacement * 1.25) / global_magnitude
+        field_x.fill(global_shift[0])
+        field_y.fill(global_shift[1])
 
     for level, sigma_px in enumerate(active_scales):
         fixed_density = _normalized_density(fixed_impulses, sigma_px)
@@ -631,8 +692,13 @@ def tissue_aware_density_flow_registration(
     attempted_metrics["possible_xy_reversal"] = False
     attempted_metrics["xy_reversal_diagnostics"] = reversal
 
-    jacobian = _jacobian(field_x, field_y, density_pixel_size)
-    displacement = np.sqrt(field_x**2 + field_y**2)
+    deformation = density_flow_deformation_diagnostics(
+        field_x,
+        field_y,
+        pixel_size=density_pixel_size,
+    )
+    jacobian = deformation["jacobian"]
+    displacement = deformation["raw_magnitude"]
     jacobian_min = float(np.min(jacobian))
     jacobian_max = float(np.max(jacobian))
     jacobian_median = float(np.median(jacobian))
@@ -690,6 +756,11 @@ def tissue_aware_density_flow_registration(
         "fraction_jacobian_foldover_le_0": fold_fraction,
         "attempted_max_displacement": maximum_displacement,
         "attempted_p95_displacement": p95_displacement,
+        **{
+            key: value
+            for key, value in deformation.items()
+            if not isinstance(value, np.ndarray)
+        },
         "max_final_displacement_limit": float(max_displacement),
         "displacement_p95_limit": None if displacement_p95_limit is None else float(displacement_p95_limit),
         "points_outside_tissue_before_fraction": outside_before,
@@ -741,6 +812,12 @@ def tissue_aware_density_flow_registration(
                 "iterations_per_level": int(iterations_per_level),
                 "global_density_shift_x": float(global_shift[0]),
                 "global_density_shift_y": float(global_shift[1]),
+                "global_translation_initialization": global_initialization,
+                "global_translation_description": (
+                    "additional post-affine global translation"
+                    if global_initialization == "auto"
+                    else "disabled; nonlinear field initialized at zero"
+                ),
             },
         },
     )

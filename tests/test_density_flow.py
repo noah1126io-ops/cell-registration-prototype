@@ -5,6 +5,7 @@ import numpy as np
 
 from app import show_he_geojson_preparation, show_mask_to_mask_workflow, show_point_registration_workflow
 from src.density_flow import (
+    density_flow_deformation_diagnostics,
     density_flow_image_outputs,
     detect_xy_reversal,
     tissue_aware_density_flow_registration,
@@ -25,6 +26,7 @@ def _run(fixed: np.ndarray, moving: np.ndarray, **kwargs):
         "max_displacement": 20.0,
         "displacement_p95_limit": 20.0,
         "detect_axis_reversal": False,
+        "global_translation_initialization": "auto",
     }
     parameters.update(kwargs)
     return tissue_aware_density_flow_registration(fixed, moving, **parameters)
@@ -344,3 +346,77 @@ def test_density_flow_has_no_stalign_runtime_or_source_dependency():
 
     assert "stalign" not in implementation
     assert "stalign" not in requirements
+
+
+def test_constant_displacement_is_classified_as_translation_dominated():
+    dx = np.full((20, 24), 8.0)
+    dy = np.full((20, 24), -3.0)
+
+    diagnostics = density_flow_deformation_diagnostics(dx, dy)
+
+    assert diagnostics["translation_dominated"] is True
+    assert diagnostics["local_residual_p95"] == 0.0
+
+
+def test_spatially_varying_field_is_not_translation_dominated():
+    rows, columns = np.indices((30, 40), dtype=float)
+    dx = 0.25 * columns
+    dy = 0.2 * np.sin(rows / 3.0)
+
+    diagnostics = density_flow_deformation_diagnostics(dx, dy)
+
+    assert diagnostics["translation_dominated"] is False
+    assert diagnostics["local_residual_p95"] > 1.0
+
+
+def test_global_initialization_off_records_zero_initial_shift():
+    fixed = _grid_points()
+    moving = fixed + np.array([6.0, -4.0])
+
+    result = _run(
+        fixed,
+        moving,
+        global_translation_initialization="off",
+        iterations_per_level=1,
+    )
+
+    metadata = result.metrics["density_flow"]
+    assert metadata["global_translation_initialization"] == "off"
+    assert metadata["global_density_shift_x"] == 0.0
+    assert metadata["global_density_shift_y"] == 0.0
+
+
+def test_identity_field_gives_zero_image_difference():
+    image = np.arange(120, dtype=float).reshape(10, 12)
+    zeros = np.zeros_like(image)
+
+    warped = warp_affine_image_with_density_flow(
+        image,
+        _image_metadata(*image.shape),
+        zeros,
+        zeros,
+        field_bounds=(0.5, 0.5, 11.5, 9.5),
+        field_spacing=1.0,
+    )
+
+    np.testing.assert_array_equal(np.abs(warped - image), 0.0)
+
+
+def test_local_field_gives_spatially_nonuniform_image_difference():
+    rows, columns = np.indices((20, 24), dtype=float)
+    image = columns**2 + 3.0 * rows
+    field_x = 2.0 * columns / columns.max()
+    field_y = np.zeros_like(field_x)
+
+    warped = warp_affine_image_with_density_flow(
+        image,
+        _image_metadata(*image.shape),
+        field_x,
+        field_y,
+        field_bounds=(0.5, 0.5, 23.5, 19.5),
+        field_spacing=1.0,
+    )
+    difference = np.abs(warped - image)
+
+    assert float(np.max(difference)) > 0.0
+    assert float(np.std(difference[:, 3:])) > 0.0

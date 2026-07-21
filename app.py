@@ -11,7 +11,11 @@ from scipy.ndimage import binary_erosion, distance_transform_edt
 from scipy.spatial import cKDTree
 
 from src.density import create_density_map
-from src.density_flow import density_flow_image_outputs, tissue_aware_density_flow_registration
+from src.density_flow import (
+    density_flow_deformation_diagnostics,
+    density_flow_image_outputs,
+    tissue_aware_density_flow_registration,
+)
 from src.export import array_to_png_bytes, figure_to_png_bytes
 from src.features import extract_cell_features, point_features_to_cell_features
 from src.geojson_utils import load_geojson_centroids
@@ -41,7 +45,9 @@ from src.visualization import (
     colorize_label_image,
     visualize_cell_matches,
     visualize_anchor_correlation_heatmap,
+    visualize_absolute_image_difference,
     visualize_displacement_field,
+    visualize_displacement_magnitude_heatmap,
     visualize_density_flow_point_comparison,
     visualize_distance_histogram,
     visualize_geojson_classification_overlay,
@@ -1189,6 +1195,7 @@ def show_he_geojson_preparation() -> None:
     density_flow_boundary_weight = 0.02
     density_flow_inverse_weight = 0.0
     density_flow_detect_axis_reversal = True
+    density_flow_global_initialization = "off"
 
     st.subheader(tr("3. 詳細位置合わせ", "3. Fine alignment"))
     fine_alignment_method = st.selectbox(
@@ -1216,6 +1223,17 @@ def show_he_geojson_preparation() -> None:
         )
         flow_left, flow_right = st.columns(2)
         with flow_left:
+            density_flow_global_initialization = st.selectbox(
+                tr("グローバル残差平行移動の初期化", "Global residual translation initialization"),
+                ["off", "auto"],
+                index=0,
+                key="workflow-c-density-flow-global-initialization",
+                format_func=lambda value: "Off" if value == "off" else "Auto",
+                help=tr(
+                    "Offは変位場をゼロから開始します。Autoはaffine後に追加の全体平行移動候補を選びます。",
+                    "Off initializes the field at zero. Auto selects an additional post-affine global translation candidate.",
+                ),
+            )
             density_flow_pixel_size = st.number_input(
                 tr("密度画素サイズ (um)", "Density pixel size (um)"),
                 min_value=0.1,
@@ -1745,6 +1763,7 @@ def show_he_geojson_preparation() -> None:
                 displacement_p95_limit=(
                     displacement_p95_limit_um if enable_displacement_p95_limit else None
                 ),
+                global_translation_initialization=density_flow_global_initialization,
                 detect_axis_reversal=density_flow_detect_axis_reversal,
             )
         elif fine_alignment_method == "cluster-anchor":
@@ -2021,6 +2040,11 @@ def show_he_geojson_preparation() -> None:
     if fine_alignment_method == "tissue-aware density flow" and isinstance(fine_result.metrics, dict):
         flow_metadata = fine_result.metrics.get("density_flow", {})
         flow_history = pd.DataFrame(fine_result.metrics.get("optimization_history", []))
+        flow_deformation = density_flow_deformation_diagnostics(
+            attempted_displacement_x,
+            attempted_displacement_y,
+            pixel_size=fine_result.grid_spacing,
+        )
         safety_tab.subheader(tr("Density-flow診断", "Density-flow diagnostics"))
         safety_tab.dataframe(
             pd.DataFrame(
@@ -2046,6 +2070,61 @@ def show_he_geojson_preparation() -> None:
             ),
             use_container_width=True,
         )
+        safety_tab.caption(
+            tr(
+                "Global shiftはaffine後に追加された初期平行移動です。Local residualは最終fieldから中央値ベクトルを除いた空間変動です。",
+                "Global shift is an additional post-affine initialization. Local residual is spatial variation after subtracting the field median vector.",
+            )
+        )
+        safety_tab.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "global_initialization": flow_metadata.get("global_translation_initialization", "off"),
+                        "global_shift_x_um": flow_metadata.get("global_density_shift_x", 0.0),
+                        "global_shift_y_um": flow_metadata.get("global_density_shift_y", 0.0),
+                        **{
+                            key: value
+                            for key, value in flow_deformation.items()
+                            if not isinstance(value, np.ndarray)
+                        },
+                    }
+                ]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+        if bool(flow_deformation["translation_dominated"]):
+            safety_tab.warning(
+                "The density-flow result is dominated by global translation; little local nonlinear correction was detected."
+            )
+        else:
+            safety_tab.info(
+                tr(
+                    "変位場には測定可能な空間変動があります。生物学的妥当性ではなく、Jacobianと画像QCで評価してください。",
+                    "Measurable spatially varying deformation is present. This is not a biological-accuracy claim; review the Jacobian and image QC.",
+                )
+            )
+        magnitude_col, residual_col = safety_tab.columns(2)
+        with magnitude_col:
+            flow_magnitude_figure = visualize_displacement_magnitude_heatmap(
+                fine_result.grid_x,
+                fine_result.grid_y,
+                attempted_displacement_x,
+                attempted_displacement_y,
+                title="Attempted density-flow displacement magnitude",
+            )
+            st.pyplot(flow_magnitude_figure, clear_figure=False)
+        with residual_col:
+            flow_local_figure = visualize_displacement_magnitude_heatmap(
+                fine_result.grid_x,
+                fine_result.grid_y,
+                flow_deformation["local_residual_x"],
+                flow_deformation["local_residual_y"],
+                title="Local residual displacement after median translation removal",
+                colorbar_label="local residual (um)",
+            )
+            st.pyplot(flow_local_figure, clear_figure=False)
         if not flow_history.empty:
             safety_tab.caption(
                 tr(
@@ -2777,6 +2856,25 @@ def show_he_geojson_preparation() -> None:
                     + (" - rejected / unsafe" if not fine_applied else "")
                 ),
             )
+            if density_flow_mode and affine_warped_he_image is not None:
+                difference_figure = visualize_absolute_image_difference(
+                    affine_warped_he_image,
+                    attempted_warped_he_image,
+                    title="Absolute pixel difference: attempted density-flow minus affine-only",
+                )
+                image_tab.pyplot(difference_figure, clear_figure=False)
+                image_tab.caption(
+                    tr(
+                        "画像差分はラスターが変化した場所を示すだけで、非線形補正の量はlocal residual fieldで判定します。",
+                        "Raster difference only shows where pixels changed; nonlinear correction is assessed from the local residual field.",
+                    )
+                )
+                image_tab.download_button(
+                    "Download density-flow absolute pixel-difference PNG",
+                    data=figure_to_png_bytes(difference_figure),
+                    file_name="density_flow_absolute_pixel_difference.png",
+                    mime="image/png",
+                )
             image_tab.download_button(
                 "Download attempted warped HE preview PNG",
                 data=array_to_png_bytes(attempted_warped_he_image),
@@ -2968,6 +3066,7 @@ def show_he_geojson_preparation() -> None:
         "density_flow_jacobian_barrier_weight": density_flow_jacobian_weight,
         "density_flow_tissue_boundary_weight": density_flow_boundary_weight,
         "density_flow_inverse_consistency_weight": density_flow_inverse_weight,
+        "density_flow_global_translation_initialization": density_flow_global_initialization,
         "density_flow_detect_axis_reversal": density_flow_detect_axis_reversal,
         "local_translation_preset": local_preset,
         "he_coordinate_order": he_coordinate_order,

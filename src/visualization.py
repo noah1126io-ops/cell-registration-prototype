@@ -505,6 +505,59 @@ def visualize_displacement_field(grid_x, grid_y, displacement_x, displacement_y,
     return fig
 
 
+def visualize_displacement_magnitude_heatmap(
+    grid_x,
+    grid_y,
+    displacement_x,
+    displacement_y,
+    *,
+    title: str,
+    colorbar_label: str = "displacement (um)",
+):
+    """Show displacement magnitude on the displacement field's world-xy extent."""
+    magnitude = np.hypot(
+        np.asarray(displacement_x, dtype=float),
+        np.asarray(displacement_y, dtype=float),
+    )
+    fig, ax = plt.subplots(figsize=(8, 8))
+    image = ax.imshow(
+        magnitude,
+        cmap="magma",
+        extent=[float(np.min(grid_x)), float(np.max(grid_x)), float(np.max(grid_y)), float(np.min(grid_y))],
+    )
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label=colorbar_label)
+    ax.set_title(title)
+    ax.set_xlabel("world x (um)")
+    ax.set_ylabel("world y (um)")
+    ax.set_aspect("equal", adjustable="box")
+    fig.tight_layout()
+    return fig
+
+
+def visualize_absolute_image_difference(
+    affine_image,
+    attempted_image,
+    *,
+    title: str = "Absolute pixel difference: attempted minus affine",
+):
+    """Display an absolute raster difference without implying registration quality."""
+    affine = np.asarray(affine_image, dtype=float)
+    attempted = np.asarray(attempted_image, dtype=float)
+    if affine.shape != attempted.shape:
+        raise ValueError("affine_image and attempted_image must have matching shapes.")
+    difference = np.abs(attempted - affine)
+    if difference.ndim == 3:
+        difference = np.mean(difference, axis=2)
+    fig, ax = plt.subplots(figsize=(8, 8))
+    image = ax.imshow(difference, cmap="inferno")
+    fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="absolute pixel difference")
+    ax.set_title(title)
+    ax.set_xlabel("column")
+    ax.set_ylabel("row")
+    fig.tight_layout()
+    return fig
+
+
 def visualize_jacobian_heatmap(grid_x, grid_y, jacobian, *, title: str):
     """Show expansion/compression/fold-over from a displacement-field Jacobian."""
     fig, ax = plt.subplots(figsize=(8, 8))
