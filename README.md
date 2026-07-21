@@ -104,13 +104,15 @@ HE nuclei `.npy` と fluorescence nuclei GeoJSON を使う特殊座標系 workfl
 | 項目 | 内容 |
 | --- | --- |
 | 入力 | HE nuclei centers `.npy`, fluorescence nuclei GeoJSON, optional HE image |
-| 主な処理 | GeoJSON centroid loading, HE point loading, Y-flip centered orientation handling, optional X/Y-flip candidate selection, similarity ICP, affine ICP, robust fine center-snap warp, Jacobian QC, world-µm scatter QC |
+| 主な処理 | GeoJSON centroid loading, HE point loading, Y-flip centered orientation handling, optional X/Y-flip candidate selection, similarity ICP, affine ICP, cluster-anchor / local translation / experimental tissue-aware density-flow point warp, Jacobian QC, world-µm scatter QC |
 | 出力 | transformed HE centers CSV, local translation anchors CSV, HE-GeoJSON transform summary JSON, affine/fine scatter QC PNG, warped HE image PNG |
 | 未実装 | full-resolution tiled raster warp export, GeoJSON polygon overlay QC, production-grade warp report |
 
 HE 側の `.npy` は StarDist などで事前検出済みの核中心を想定します。StarDist 由来ファイルでは座標順が `xy` か `yx` かを必ず確認してください。
 
 Workflow C では、registration QC scatter の表示向きと warped HE image の出力向きを別々に指定できます。registration QC図だけが上下反転して見える場合は、`Registration QC display origin` を切り替えて確認します。warped HE image が上下反転して見える場合は、`Warped HE output origin` を `lower-left` / `upper-left` で切り替えて確認します。
+
+`Tissue-aware density flow [Experimental]` は独立実装の実験方式です。現在の第一段階ではHE点群だけに適用し、HE raster imageはaffine-onlyで出力します。設計は [docs/DENSITY_FLOW_METHOD.md](docs/DENSITY_FLOW_METHOD.md)、独立実装の来歴は [docs/DENSITY_FLOW_PROVENANCE.md](docs/DENSITY_FLOW_PROVENANCE.md) を参照してください。STalignとの同等性や生物学的精度向上は主張していません。
 
 ## 既存 HE-to-GeoJSON 研究パイプラインの設計メモ
 
@@ -144,6 +146,7 @@ Workflow C では、registration QC scatter の表示向きと warped HE image �
 - fine center-snap warp
 - robust pair filtering for fine center-snap warp
 - local translation field fine alignment
+- tissue-aware density-flow point registration（実験的、点群のみ）
 - local translation anchors CSV export
 - attempted/applied fine alignment diagnostics
 - warped HE image PNG export for QC
