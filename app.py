@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import io
+import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -58,6 +60,13 @@ from src.visualization import (
     visualize_warp_grid_overlay,
     visualize_warped_he_point_overlay,
     visualize_warped_pixel_point_scatter,
+)
+from src.workflow_c_run_export import (
+    build_workflow_c_run_bundle,
+    default_provenance,
+    experiment_history_csv,
+    generate_run_id,
+    input_file_record,
 )
 
 
@@ -1047,7 +1056,46 @@ def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict, wa
     return json.dumps(summary, indent=2).encode("utf-8")
 
 
+def _numpy_array_bytes(array: np.ndarray) -> bytes:
+    buffer = io.BytesIO()
+    np.save(buffer, np.asarray(array), allow_pickle=False)
+    return buffer.getvalue()
+
+
+def _displacement_field_npz_bytes(
+    displacement_x: np.ndarray,
+    displacement_y: np.ndarray,
+    *,
+    bounds,
+    grid_spacing: float,
+) -> bytes:
+    buffer = io.BytesIO()
+    np.savez_compressed(
+        buffer,
+        displacement_x=np.asarray(displacement_x),
+        displacement_y=np.asarray(displacement_y),
+        bounds=np.asarray(bounds, dtype=float),
+        grid_spacing=np.asarray(float(grid_spacing)),
+    )
+    return buffer.getvalue()
+
+
+def _mutual_nearest_fraction_for_export(fixed: np.ndarray, moving: np.ndarray) -> float | None:
+    if len(fixed) == 0 or len(moving) == 0:
+        return None
+    fixed_tree = cKDTree(fixed)
+    moving_tree = cKDTree(moving)
+    _, moving_to_fixed = fixed_tree.query(moving, k=1)
+    _, fixed_to_moving = moving_tree.query(fixed, k=1)
+    mutual = sum(
+        fixed_to_moving[int(fixed_index)] == moving_index
+        for moving_index, fixed_index in enumerate(moving_to_fixed)
+    )
+    return float(2.0 * mutual / max(len(fixed) + len(moving), 1))
+
+
 def show_he_geojson_preparation() -> None:
+    workflow_c_started_at = time.perf_counter()
     language = st.selectbox(
         "Language / 言語",
         ["日本語", "English"],
@@ -2077,6 +2125,8 @@ def show_he_geojson_preparation() -> None:
             "Density Flow reports optimization steps and checkpoints; it does not use displacement anchors."
         )
 
+    flow_magnitude_figure = None
+    flow_local_figure = None
     overview_tab, point_tab, image_tab, tissue_tab, safety_tab, anchor_tab, downloads_tab = st.tabs(
         [
             tr("概要", "Overview"),
@@ -2735,6 +2785,11 @@ def show_he_geojson_preparation() -> None:
     warped_he_metadata = None
     attempted_warped_he_image = None
     attempted_warped_he_metadata = None
+    affine_overlay_figure = None
+    attempted_overlay_figure = None
+    warped_overlay_figure = None
+    attempted_grid_figure = None
+    applied_grid_figure = None
     if he_image is not None:
         try:
             affine_warped_he_image, affine_warped_he_metadata = warp_he_image_to_world(
@@ -2837,6 +2892,18 @@ def show_he_geojson_preparation() -> None:
         warped_image_height, warped_image_width = warped_he_image.shape[:2]
         geojson_pixels = world_points_to_warped_image_pixels(geojson_array, warped_he_metadata)
         he_pixels = world_points_to_warped_image_pixels(final_points, warped_he_metadata)
+        affine_geojson_pixels = world_points_to_warped_image_pixels(geojson_array, affine_warped_he_metadata)
+        affine_he_pixels = world_points_to_warped_image_pixels(affine_points, affine_warped_he_metadata)
+        affine_overlay_figure = visualize_warped_he_point_overlay(
+            affine_warped_he_image,
+            affine_geojson_pixels,
+            affine_he_pixels,
+            title="Affine-only HE image with GeoJSON and HE nuclei overlay",
+            max_points=max_warped_overlay_points,
+            geojson_classifications=geojson_classification,
+            show_excluded_geojson=show_excluded_geojson_points,
+            show_edge_candidate_geojson=show_edge_candidate_geojson_points,
+        )
 
         image_tab.subheader(tr("Warp後の画素座標診断", "Warped pixel-coordinate diagnostics"))
         pixel_diagnostics = pd.DataFrame(
@@ -3117,6 +3184,8 @@ def show_he_geojson_preparation() -> None:
             mime="text/csv",
         )
     parameters = {
+        "workflow": "Workflow C: HE-GeoJSON alignment",
+        "language": language,
         "fine_alignment_method": fine_alignment_method,
         "fine_applied": fine_applied,
         "applied_result_label": applied_result_label,
@@ -3213,6 +3282,279 @@ def show_he_geojson_preparation() -> None:
         data=_he_geojson_summary_to_json(affine_result, final_fine_result, parameters, warped_he_metadata),
         file_name="he_geojson_transform_summary.json",
         mime="application/json",
+    )
+
+    downloads_tab.divider()
+    downloads_tab.subheader(tr("再現可能な実験run", "Reproducible experiment run"))
+    experiment_label = downloads_tab.text_input(
+        tr("実験ラベル", "Experiment label"),
+        value="experiment",
+        key="workflow-c-experiment-label",
+    )
+    experiment_notes = downloads_tab.text_area(
+        tr("自由記載メモ", "Free-text notes"),
+        value="",
+        key="workflow-c-experiment-notes",
+    )
+    include_original_inputs = downloads_tab.checkbox(
+        tr("元のアップロード入力をrun bundleに含める", "Include original uploaded inputs in run bundle"),
+        value=False,
+        key="workflow-c-include-original-inputs",
+    )
+    downloads_tab.warning(
+        tr(
+            "元入力は大容量または研究上センシティブな情報を含む可能性があります。既定ではZIPに含めません。",
+            "Original inputs may be large or research-sensitive and are excluded from the ZIP by default.",
+        )
+    )
+
+    history_key = "workflow_c_experiment_history"
+    if history_key not in st.session_state:
+        st.session_state[history_key] = []
+    experiment_history = st.session_state[history_key]
+    comparison_options = ["__previous__"] + [entry["run_id"] for entry in experiment_history]
+    selected_comparison = downloads_tab.selectbox(
+        tr("比較するsession内run", "Optional comparison run from this session"),
+        comparison_options,
+        index=0,
+        key="workflow-c-comparison-run",
+        format_func=lambda value: (
+            tr("直前のrun（存在する場合）", "Immediately previous run (when available)")
+            if value == "__previous__"
+            else value
+        ),
+    )
+    previous_entry = None
+    if experiment_history:
+        if selected_comparison == "__previous__":
+            previous_entry = experiment_history[-1]
+        else:
+            previous_entry = next(
+                (entry for entry in experiment_history if entry["run_id"] == selected_comparison),
+                None,
+            )
+    previous_parameters = previous_entry.get("parameters") if previous_entry else None
+
+    density_flow_metadata = (
+        fine_result.metrics.get("density_flow", {})
+        if isinstance(fine_result.metrics, dict)
+        else {}
+    )
+    runtime_seconds = float(time.perf_counter() - workflow_c_started_at)
+    mutual_before = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_affine_points)
+    mutual_attempted = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_attempted_points)
+    mutual_applied = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_applied_points)
+    run_metrics = {
+        "fine_method": fine_alignment_method,
+        "fine_status": status,
+        "rejection_reason": rejection_reason or None,
+        "affine_symmetric_median": before_metrics.get("symmetric_median_distance"),
+        "attempted_symmetric_median": attempted_metrics.get("symmetric_median_distance"),
+        "final_applied_symmetric_median": applied_metrics.get("symmetric_median_distance"),
+        "attempted_minus_affine_median": (
+            attempted_metrics.get("symmetric_median_distance", np.nan)
+            - before_metrics.get("symmetric_median_distance", np.nan)
+        ),
+        "within_3_um": {
+            "affine": before_metrics.get("symmetric_within_3"),
+            "attempted": attempted_metrics.get("symmetric_within_3"),
+            "applied": applied_metrics.get("symmetric_within_3"),
+        },
+        "within_5_um": {
+            "affine": before_metrics.get("symmetric_within_5"),
+            "attempted": attempted_metrics.get("symmetric_within_5"),
+            "applied": applied_metrics.get("symmetric_within_5"),
+        },
+        "within_10_um": {
+            "affine": before_metrics.get("symmetric_within_10"),
+            "attempted": attempted_metrics.get("symmetric_within_10"),
+            "applied": applied_metrics.get("symmetric_within_10"),
+        },
+        "mutual_nearest_fraction": {
+            "before": mutual_before,
+            "attempted": mutual_attempted,
+            "applied": mutual_applied,
+        },
+        "global_shift_x": density_flow_metadata.get("global_density_shift_x"),
+        "global_shift_y": density_flow_metadata.get("global_density_shift_y"),
+        "raw_displacement_median": safety_metrics.get("raw_displacement_median"),
+        "raw_displacement_p95": safety_metrics.get("raw_displacement_p95"),
+        "raw_displacement_max": safety_metrics.get("raw_displacement_max"),
+        "local_residual_median": safety_metrics.get("local_residual_median"),
+        "local_residual_p95": safety_metrics.get("local_residual_p95"),
+        "local_residual_max": safety_metrics.get("local_residual_max"),
+        "displacement_std_x": safety_metrics.get("displacement_std_x"),
+        "displacement_std_y": safety_metrics.get("displacement_std_y"),
+        "jacobian_min": float(np.min(attempted_jacobian)),
+        "jacobian_p05": float(np.percentile(attempted_jacobian, 5)),
+        "jacobian_median": float(np.median(attempted_jacobian)),
+        "jacobian_p95": float(np.percentile(attempted_jacobian, 95)),
+        "jacobian_max": float(np.max(attempted_jacobian)),
+        "fold_over_fraction": float(np.mean(attempted_jacobian <= 0)),
+        "max_displacement": safety_metrics.get("attempted_max_displacement", fine_result.max_displacement),
+        "p95_displacement": safety_metrics.get("attempted_p95_displacement"),
+        "outside_tissue_before_fraction": safety_metrics.get("points_outside_tissue_before_fraction"),
+        "outside_tissue_attempted_fraction": safety_metrics.get("points_outside_tissue_attempted_fraction"),
+        "optimization_attempted_steps": density_flow_metadata.get("attempted_optimization_steps"),
+        "optimization_accepted_updates": density_flow_metadata.get("accepted_update_steps"),
+        "optimization_rejected_updates": density_flow_metadata.get("rejected_update_steps"),
+        "optimization_backtracked_updates": density_flow_metadata.get("rejected_or_backtracked_update_steps"),
+        "best_checkpoint_iteration": density_flow_metadata.get("best_checkpoint_iteration"),
+        "best_checkpoint_objective": density_flow_metadata.get("best_objective"),
+        "best_checkpoint_median": density_flow_metadata.get("best_attempted_symmetric_median"),
+        "best_checkpoint_mutual_fraction": density_flow_metadata.get("mutual_nearest_fraction_best"),
+        "runtime_seconds": runtime_seconds,
+    }
+    parameters["include_original_uploaded_inputs"] = include_original_inputs
+    parameters["comparison_run_id"] = previous_entry.get("run_id") if previous_entry else None
+
+    artifacts = {
+        "points/affine_he_nuclei.csv": transformed_affine_points.to_csv(index=False).encode("utf-8"),
+        "points/attempted_he_nuclei.csv": transformed_attempted_points.to_csv(index=False).encode("utf-8"),
+        "points/final_applied_he_nuclei.csv": transformed_fine_points.to_csv(index=False).encode("utf-8"),
+        "fields/attempted_displacement_field.npz": _displacement_field_npz_bytes(
+            attempted_displacement_x,
+            attempted_displacement_y,
+            bounds=fine_result.bounds,
+            grid_spacing=fine_result.grid_spacing,
+        ),
+        "fields/applied_displacement_field.npz": _displacement_field_npz_bytes(
+            final_displacement_x,
+            final_displacement_y,
+            bounds=fine_result.bounds,
+            grid_spacing=fine_result.grid_spacing,
+        ),
+        "fields/grid_x.npy": _numpy_array_bytes(fine_result.grid_x),
+        "fields/grid_y.npy": _numpy_array_bytes(fine_result.grid_y),
+        "images/affine_he.png": array_to_png_bytes(affine_warped_he_image) if affine_warped_he_image is not None else None,
+        "images/attempted_he.png": array_to_png_bytes(attempted_warped_he_image) if attempted_warped_he_image is not None else None,
+        "images/final_applied_he.png": array_to_png_bytes(warped_he_image) if warped_he_image is not None else None,
+        "images/affine_overlay.png": figure_to_png_bytes(
+            affine_overlay_figure if affine_overlay_figure is not None else affine_figure
+        ),
+        "images/attempted_overlay.png": figure_to_png_bytes(attempted_overlay_figure or attempted_figure),
+        "images/final_overlay.png": figure_to_png_bytes(warped_overlay_figure or fine_figure),
+        "images/displacement_magnitude.png": figure_to_png_bytes(flow_magnitude_figure or attempted_field_figure),
+        "images/local_residual_displacement.png": (
+            figure_to_png_bytes(flow_local_figure) if flow_local_figure is not None else None
+        ),
+        "images/jacobian.png": figure_to_png_bytes(attempted_jacobian_figure),
+        "images/attempted_warp_grid.png": (
+            figure_to_png_bytes(attempted_grid_figure) if attempted_grid_figure is not None else None
+        ),
+        "images/applied_warp_grid.png": (
+            figure_to_png_bytes(applied_grid_figure) if applied_grid_figure is not None else None
+        ),
+        "images/distance_histogram.png": figure_to_png_bytes(hist_figure),
+    }
+    uploaded_input_records = []
+    for uploaded in (he_centers_file, geojson_file, he_image_file):
+        if uploaded is not None:
+            uploaded_input_records.append(input_file_record(uploaded.name, uploaded.getvalue()))
+
+    existing_run_ids = [entry["run_id"] for entry in experiment_history]
+    current_bundle_state = st.session_state.get("workflow_c_current_bundle")
+    if current_bundle_state and current_bundle_state.get("run_id"):
+        existing_run_ids.append(current_bundle_state["run_id"])
+    run_id = generate_run_id(experiment_label, existing_run_ids=existing_run_ids)
+    provenance = {
+        **default_provenance(Path(__file__).resolve().parent),
+        "array_shapes": {
+            "fixed_geojson_points": list(geojson_array.shape),
+            "he_raw_points": list(he_array.shape),
+            "displacement_grid": list(fine_result.grid_x.shape),
+            "affine_he_image": list(affine_warped_he_image.shape) if affine_warped_he_image is not None else None,
+        },
+        "point_counts": {
+            "fixed_geojson": int(len(geojson_array)),
+            "he_raw": int(len(he_array)),
+            "he_affine": int(len(affine_points)),
+            "he_attempted": int(len(attempted_points)),
+            "he_final_applied": int(len(final_points)),
+        },
+        "coordinate_conventions": {
+            "registration_coordinates": "GeoJSON world-um xy",
+            "he_npy_coordinate_order": he_coordinate_order,
+            "registration_display_origin": registration_display_origin,
+            "warped_he_output_origin": warped_he_output_origin,
+            "fixed_points_move": False,
+        },
+    }
+    optimization_history = (
+        fine_result.metrics.get("optimization_history", [])
+        if isinstance(fine_result.metrics, dict)
+        else []
+    )
+    run_bundle, run_manifest = build_workflow_c_run_bundle(
+        run_id=run_id,
+        label=experiment_label,
+        notes=experiment_notes,
+        parameters=parameters,
+        metrics=run_metrics,
+        artifacts=artifacts,
+        optimization_history=optimization_history,
+        previous_parameters=previous_parameters,
+        provenance=provenance,
+        input_files=uploaded_input_records,
+        include_original_inputs=include_original_inputs,
+    )
+    st.session_state["workflow_c_current_bundle"] = {"run_id": run_id, "bytes": run_bundle}
+
+    history_row = {
+        "run_id": run_id,
+        "label": experiment_label,
+        "fine_method": fine_alignment_method,
+        "status": status,
+        "rejection_reason": rejection_reason or None,
+        "affine_median": before_metrics.get("symmetric_median_distance"),
+        "attempted_median": attempted_metrics.get("symmetric_median_distance"),
+        "delta_median": run_metrics["attempted_minus_affine_median"],
+        "final_median": applied_metrics.get("symmetric_median_distance"),
+        "mutual_before": mutual_before,
+        "mutual_attempted": mutual_attempted,
+        "jacobian_min": run_metrics["jacobian_min"],
+        "jacobian_max": run_metrics["jacobian_max"],
+        "local_residual_p95": run_metrics["local_residual_p95"],
+        "max_displacement": run_metrics["max_displacement"],
+        "timestamp": run_manifest["local_timestamp"],
+        "parameters": dict(parameters),
+    }
+    action_left, action_right = downloads_tab.columns(2)
+    with action_left:
+        if st.button(
+            tr("現在のrunを実験履歴へ追加", "Add current run to experiment history"),
+            key="workflow-c-add-run-history",
+        ):
+            experiment_history.append(history_row)
+            st.success(f"Added {run_id}")
+    with action_right:
+        downloads_tab.download_button(
+            tr("完全なrun bundle ZIPをダウンロード", "Download complete run bundle ZIP"),
+            data=run_bundle,
+            file_name=f"{run_id}.zip",
+            mime="application/zip",
+            key="workflow-c-download-run-bundle",
+        )
+
+    history_display_fields = [
+        "run_id", "label", "fine_method", "status", "rejection_reason", "affine_median",
+        "attempted_median", "delta_median", "final_median", "mutual_before", "mutual_attempted",
+        "jacobian_min", "jacobian_max", "local_residual_p95", "max_displacement", "timestamp",
+    ]
+    if experiment_history:
+        downloads_tab.dataframe(
+            pd.DataFrame(
+                [{key: entry.get(key) for key in history_display_fields} for entry in experiment_history]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+    downloads_tab.download_button(
+        tr("実験履歴CSVをダウンロード", "Download experiment history CSV"),
+        data=experiment_history_csv(experiment_history),
+        file_name="workflow_c_experiment_history.csv",
+        mime="text/csv",
+        key="workflow-c-download-experiment-history",
     )
 
     # TODO: Add inverse-warp refinement controls and larger tiled exports for full-resolution HE images.
