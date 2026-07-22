@@ -422,15 +422,24 @@ def _field_objective(
     boundary_weight: float,
     inverse_consistency_weight: float,
     jacobian_min_threshold: float,
+    jacobian_max_threshold: float,
     pixel_size: float,
 ) -> dict[str, float]:
     residual = fixed_density - moving_density
-    density_term = float(np.mean(tissue_weight * residual**2))
+    density_energy = float(np.mean(tissue_weight * fixed_density**2))
+    density_term = float(
+        np.mean(tissue_weight * residual**2) / max(density_energy, np.finfo(float).eps)
+    )
     dfx_dy, dfx_dx = np.gradient(field_x, pixel_size, pixel_size)
     dfy_dy, dfy_dx = np.gradient(field_y, pixel_size, pixel_size)
     smoothness_term = float(np.mean(dfx_dx**2 + dfx_dy**2 + dfy_dx**2 + dfy_dy**2))
     magnitude_term = float(np.mean(field_x**2 + field_y**2))
-    jacobian_term = float(np.mean(np.maximum(jacobian_min_threshold - jacobian, 0.0) ** 2))
+    jacobian_term = float(
+        np.mean(
+            np.maximum(jacobian_min_threshold - jacobian, 0.0) ** 2
+            + np.maximum(jacobian - jacobian_max_threshold, 0.0) ** 2
+        )
+    )
     boundary_term = float(np.mean((1.0 - tissue_weight) * (field_x**2 + field_y**2)))
     rows, cols = np.indices(field_x.shape, dtype=float)
     mapped_rows = rows + field_y / pixel_size
@@ -457,6 +466,158 @@ def _field_objective(
     }
 
 
+def _evaluate_density_flow_state(
+    moving_points: np.ndarray,
+    field_x: np.ndarray,
+    field_y: np.ndarray,
+    *,
+    fixed_density: np.ndarray,
+    density_sigma: float,
+    shape: tuple[int, int],
+    bounds: tuple[float, float, float, float],
+    pixel_size: float,
+    tissue_weight: np.ndarray,
+    smoothness_weight: float,
+    magnitude_weight: float,
+    jacobian_weight: float,
+    boundary_weight: float,
+    inverse_consistency_weight: float,
+    jacobian_min_threshold: float,
+    jacobian_max_threshold: float,
+) -> dict[str, object]:
+    """Evaluate density and field penalties from one internally consistent field."""
+    transformed_points = moving_points + _sample_field(
+        moving_points, field_x, field_y, bounds, pixel_size
+    )
+    moving_impulses = _rasterize_points(transformed_points, shape, bounds, pixel_size)
+    moving_density = _normalized_density(moving_impulses, density_sigma)
+    jacobian = _jacobian(field_x, field_y, pixel_size)
+    displacement = np.hypot(field_x, field_y)
+    objective = _field_objective(
+        fixed_density,
+        moving_density,
+        field_x,
+        field_y,
+        tissue_weight,
+        jacobian,
+        smoothness_weight=smoothness_weight,
+        magnitude_weight=magnitude_weight,
+        jacobian_weight=jacobian_weight,
+        boundary_weight=boundary_weight,
+        inverse_consistency_weight=inverse_consistency_weight,
+        jacobian_min_threshold=jacobian_min_threshold,
+        jacobian_max_threshold=jacobian_max_threshold,
+        pixel_size=pixel_size,
+    )
+    return {
+        "transformed_points": transformed_points,
+        "moving_density": moving_density,
+        "jacobian": jacobian,
+        "displacement": displacement,
+        "objective": objective,
+        "finite": bool(
+            np.isfinite(transformed_points).all()
+            and np.isfinite(moving_density).all()
+            and np.isfinite(field_x).all()
+            and np.isfinite(field_y).all()
+            and np.isfinite(jacobian).all()
+            and np.isfinite(displacement).all()
+            and np.isfinite(float(objective["total"]))
+        ),
+        "jacobian_min": float(np.min(jacobian)),
+        "jacobian_max": float(np.max(jacobian)),
+        "max_displacement": float(np.max(displacement)),
+        "p95_displacement": float(np.percentile(displacement, 95)),
+    }
+
+
+def _density_flow_trial_is_safe(
+    state: dict[str, object],
+    *,
+    jacobian_min_threshold: float,
+    jacobian_max_threshold: float,
+    max_displacement: float,
+    displacement_p95_limit: float | None,
+) -> tuple[bool, str | None]:
+    """Apply the same hard limits used for trial and final density-flow fields."""
+    if not bool(state["finite"]):
+        return False, "non_finite_density_flow_output"
+    if float(state["jacobian_min"]) <= 0.0:
+        return False, "jacobian_foldover"
+    if float(state["jacobian_min"]) < jacobian_min_threshold:
+        return False, "jacobian_min_below_limit"
+    if float(state["jacobian_max"]) > jacobian_max_threshold:
+        return False, "jacobian_max_above_limit"
+    if float(state["max_displacement"]) > max_displacement:
+        return False, "max_displacement_too_large"
+    if (
+        displacement_p95_limit is not None
+        and float(state["p95_displacement"]) > displacement_p95_limit
+    ):
+        return False, "displacement_p95_too_large"
+    return True, None
+
+
+def _density_flow_trial_is_acceptable(
+    state: dict[str, object],
+    *,
+    current_objective: float,
+    objective_tolerance: float,
+    jacobian_min_threshold: float,
+    jacobian_max_threshold: float,
+    max_displacement: float,
+    displacement_p95_limit: float | None,
+) -> tuple[bool, str | None]:
+    safe, reason = _density_flow_trial_is_safe(
+        state,
+        jacobian_min_threshold=jacobian_min_threshold,
+        jacobian_max_threshold=jacobian_max_threshold,
+        max_displacement=max_displacement,
+        displacement_p95_limit=displacement_p95_limit,
+    )
+    if not safe:
+        return False, reason
+    required_decrease = max(float(objective_tolerance), abs(current_objective) * 1e-8)
+    if float(state["objective"]["total"]) > current_objective - required_decrease:
+        return False, "objective_not_decreased"
+    return True, None
+
+
+def _checkpoint_improves_affine(
+    metrics: dict,
+    *,
+    affine_median: float,
+    affine_mutual_fraction: float,
+) -> bool:
+    median = float(metrics["symmetric_median_distance"])
+    mutual = float(metrics["mutual_nearest_fraction"])
+    return bool(
+        median <= affine_median + 1e-12
+        and (median < affine_median - 1e-12 or mutual > affine_mutual_fraction + 1e-12)
+    )
+
+
+def _better_density_flow_checkpoint(candidate: dict, current: dict | None) -> bool:
+    """Rank safe checkpoints by point median, then mutual fraction, then objective."""
+    if current is None:
+        return True
+    candidate_metrics = candidate["metrics"]
+    current_metrics = current["metrics"]
+    candidate_median = float(candidate_metrics["symmetric_median_distance"])
+    current_median = float(current_metrics["symmetric_median_distance"])
+    if candidate_median < current_median - 1e-12:
+        return True
+    if not np.isclose(candidate_median, current_median):
+        return False
+    candidate_mutual = float(candidate_metrics["mutual_nearest_fraction"])
+    current_mutual = float(current_metrics["mutual_nearest_fraction"])
+    if candidate_mutual > current_mutual + 1e-12:
+        return True
+    if not np.isclose(candidate_mutual, current_mutual):
+        return False
+    return float(candidate.get("objective", np.inf)) < float(current.get("objective", np.inf))
+
+
 def tissue_aware_density_flow_registration(
     fixed_points: np.ndarray,
     moving_points: np.ndarray,
@@ -480,6 +641,10 @@ def tissue_aware_density_flow_registration(
     max_displacement: float = 35.0,
     displacement_p95_limit: float | None = 30.0,
     global_translation_initialization: str = "off",
+    objective_tolerance: float = 1e-12,
+    early_stopping_patience: int = 3,
+    point_metric_patience: int = 6,
+    max_backtracking_steps: int = 8,
     detect_axis_reversal: bool = True,
     max_grid_side: int = 1024,
 ) -> FineWarpResult:
@@ -497,6 +662,10 @@ def tissue_aware_density_flow_registration(
         raise ValueError("optimization_levels and iterations_per_level must be at least 1.")
     if max_displacement <= 0 or not np.isfinite(max_displacement):
         raise ValueError("max_displacement must be positive and finite.")
+    if objective_tolerance < 0 or not np.isfinite(objective_tolerance):
+        raise ValueError("objective_tolerance must be finite and non-negative.")
+    if early_stopping_patience < 1 or point_metric_patience < 1 or max_backtracking_steps < 1:
+        raise ValueError("Density-flow patience and backtracking values must be at least 1.")
     global_initialization = str(global_translation_initialization).strip().lower()
     if global_initialization not in {"off", "auto"}:
         raise ValueError("global_translation_initialization must be 'off' or 'auto'.")
@@ -563,7 +732,7 @@ def tissue_aware_density_flow_registration(
     field_x = zeros.copy()
     field_y = zeros.copy()
     original_moving = moving.copy()
-    history: list[dict[str, float | int]] = []
+    history: list[dict[str, float | int | bool | str | None]] = []
 
     coarse_fixed = _normalized_density(fixed_impulses, active_scales[0])
     coarse_moving = _normalized_density(
@@ -580,19 +749,84 @@ def tissue_aware_density_flow_registration(
             density_pixel_size,
         )
         global_magnitude = float(np.linalg.norm(global_shift))
-        if global_magnitude > max_displacement * 1.25:
-            global_shift *= (max_displacement * 1.25) / global_magnitude
+        initial_limit = min(
+            max_displacement,
+            displacement_p95_limit if displacement_p95_limit is not None else max_displacement,
+        )
+        if global_magnitude > initial_limit:
+            global_shift *= initial_limit / global_magnitude
         field_x.fill(global_shift[0])
         field_y.fill(global_shift[1])
+    initial_field_x = field_x.copy()
+    initial_field_y = field_y.copy()
+    def evaluate_state(current_x: np.ndarray, current_y: np.ndarray, sigma_px: float) -> dict[str, object]:
+        return _evaluate_density_flow_state(
+            original_moving,
+            current_x,
+            current_y,
+            fixed_density=_normalized_density(fixed_impulses, sigma_px),
+            density_sigma=sigma_px,
+            shape=shape,
+            bounds=resolved_bounds,
+            pixel_size=density_pixel_size,
+            tissue_weight=tissue_weight_map,
+            smoothness_weight=smoothness_weight,
+            magnitude_weight=magnitude_weight,
+            jacobian_weight=jacobian_barrier_weight,
+            boundary_weight=tissue_boundary_weight,
+            inverse_consistency_weight=inverse_consistency_weight,
+            jacobian_min_threshold=jacobian_min_threshold,
+            jacobian_max_threshold=jacobian_max_threshold,
+        )
+
+    def point_metrics_for_field(current_x: np.ndarray, current_y: np.ndarray) -> tuple[dict, np.ndarray]:
+        transformed = metric_moving + _sample_field(
+            metric_moving, current_x, current_y, resolved_bounds, density_pixel_size
+        )
+        values = point_bidirectional_distance_metrics(metric_fixed, transformed)
+        values["mutual_nearest_fraction"] = _mutual_nearest_fraction(metric_fixed, transformed)
+        return values, transformed
+
+    def improves_affine(values: dict) -> bool:
+        return _checkpoint_improves_affine(
+            values,
+            affine_median=float(before_metrics["symmetric_median_distance"]),
+            affine_mutual_fraction=before_mutual,
+        )
+
+    attempted_steps = 0
+    accepted_steps = 0
+    backtracked_steps = 0
+    rejected_steps = 0
+    global_iteration = 0
+    best_checkpoint: dict[str, object] | None = None
+    best_attempted: dict[str, object] | None = None
+    best_observed_median = float(before_metrics["symmetric_median_distance"])
+    best_observed_mutual = before_mutual
+    initial_objective: float | None = None
+    consecutive_failed_updates = 0
+    point_stall_count = 0
+
+    initial_metric_values, _ = point_metrics_for_field(field_x, field_y)
+    if improves_affine(initial_metric_values):
+        best_checkpoint = {
+            "field_x": field_x.copy(),
+            "field_y": field_y.copy(),
+            "metrics": initial_metric_values,
+            "iteration": -1,
+        }
 
     for level, sigma_px in enumerate(active_scales):
         fixed_density = _normalized_density(fixed_impulses, sigma_px)
+        current_state = evaluate_state(field_x, field_y, sigma_px)
+        if initial_objective is None:
+            initial_objective = float(current_state["objective"]["total"])
+        objective_stall_count = 0
+        consecutive_failed_updates = 0
         for iteration in range(int(iterations_per_level)):
-            current_points = original_moving + _sample_field(
-                original_moving, field_x, field_y, resolved_bounds, density_pixel_size
-            )
-            moving_impulses = _rasterize_points(current_points, shape, resolved_bounds, density_pixel_size)
-            moving_density = _normalized_density(moving_impulses, sigma_px)
+            attempted_steps += 1
+            global_iteration += 1
+            moving_density = np.asarray(current_state["moving_density"])
             residual = fixed_density - moving_density
             fixed_grad_y, fixed_grad_x = np.gradient(fixed_density)
             moving_grad_y, moving_grad_x = np.gradient(moving_density)
@@ -613,84 +847,157 @@ def tissue_aware_density_flow_registration(
                 grid_rows, grid_cols = np.indices(field_x.shape, dtype=float)
                 mapped_rows = grid_rows + field_y / density_pixel_size
                 mapped_cols = grid_cols + field_x / density_pixel_size
-                mapped_field_x = map_coordinates(
-                    field_x, [mapped_rows, mapped_cols], order=1, mode="nearest"
-                )
-                mapped_field_y = map_coordinates(
-                    field_y, [mapped_rows, mapped_cols], order=1, mode="nearest"
-                )
+                mapped_field_x = map_coordinates(field_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
+                mapped_field_y = map_coordinates(field_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
                 update_x -= learning_rate * inverse_consistency_weight * (field_x - mapped_field_x)
                 update_y -= learning_rate * inverse_consistency_weight * (field_y - mapped_field_y)
             update_x = gaussian_filter(update_x, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
             update_y = gaussian_filter(update_y, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
-            magnitude_damping = 1.0 / (
-                1.0 + magnitude_weight * np.sqrt(field_x**2 + field_y**2)
-            )
+            magnitude_damping = 1.0 / (1.0 + magnitude_weight * np.hypot(field_x, field_y))
             update_x *= magnitude_damping
             update_y *= magnitude_damping
-            update_magnitude = np.sqrt(update_x**2 + update_y**2)
-            maximum_update = density_pixel_size * 0.25
-            update_scale = np.minimum(1.0, maximum_update / np.maximum(update_magnitude, 1e-12))
+            update_magnitude = np.hypot(update_x, update_y)
+            update_scale = np.minimum(
+                1.0,
+                (density_pixel_size * 0.25) / np.maximum(update_magnitude, 1e-12),
+            )
             update_x *= update_scale
             update_y *= update_scale
 
-            accepted_scale = 1.0
-            for _ in range(8):
+            accepted_scale = 0.0
+            rejection = "line_search_exhausted"
+            previous_total = float(current_state["objective"]["total"])
+            trial_scale = 1.0
+            accepted_state: dict[str, object] | None = None
+            for _ in range(int(max_backtracking_steps)):
                 trial_x, trial_y = _compose_fields(
                     field_x,
                     field_y,
-                    update_x * accepted_scale,
-                    update_y * accepted_scale,
+                    update_x * trial_scale,
+                    update_y * trial_scale,
                     density_pixel_size,
                 )
-                trial_jacobian = _jacobian(trial_x, trial_y, density_pixel_size)
-                trial_magnitude = np.sqrt(trial_x**2 + trial_y**2)
-                if (
-                    np.isfinite(trial_jacobian).all()
-                    and float(np.min(trial_jacobian)) > 0.01
-                    and float(np.max(trial_jacobian)) < max(jacobian_max_threshold * 1.5, 2.0)
-                    and float(np.max(trial_magnitude)) <= max_displacement * 1.25
-                ):
+                trial_state = evaluate_state(trial_x, trial_y, sigma_px)
+                accepted, rejection = _density_flow_trial_is_acceptable(
+                    trial_state,
+                    current_objective=previous_total,
+                    objective_tolerance=objective_tolerance,
+                    jacobian_min_threshold=jacobian_min_threshold,
+                    jacobian_max_threshold=jacobian_max_threshold,
+                    max_displacement=max_displacement,
+                    displacement_p95_limit=displacement_p95_limit,
+                )
+                if accepted:
+                    accepted_scale = trial_scale
+                    accepted_state = trial_state
                     field_x, field_y = trial_x, trial_y
                     break
-                accepted_scale *= 0.5
+                backtracked_steps += 1
+                trial_scale *= 0.5
 
-            current_jacobian = _jacobian(field_x, field_y, density_pixel_size)
-            objective = _field_objective(
-                fixed_density,
-                moving_density,
-                field_x,
-                field_y,
-                tissue_weight_map,
-                current_jacobian,
-                smoothness_weight=smoothness_weight,
-                magnitude_weight=magnitude_weight,
-                jacobian_weight=jacobian_barrier_weight,
-                boundary_weight=tissue_boundary_weight,
-                inverse_consistency_weight=inverse_consistency_weight,
-                jacobian_min_threshold=jacobian_min_threshold,
-                pixel_size=density_pixel_size,
+            if accepted_state is None:
+                rejected_steps += 1
+                consecutive_failed_updates += 1
+                history.append(
+                    {
+                        "level": int(level),
+                        "iteration": int(iteration),
+                        "global_iteration": global_iteration,
+                        "sigma_px": float(sigma_px),
+                        "accepted": False,
+                        "accepted_update_scale": 0.0,
+                        "backtracking_attempts": int(max_backtracking_steps),
+                        "rejection_reason": rejection,
+                        **current_state["objective"],
+                    }
+                )
+                if consecutive_failed_updates >= early_stopping_patience:
+                    break
+                continue
+
+            accepted_steps += 1
+            consecutive_failed_updates = 0
+            current_state = accepted_state
+            objective_improvement = previous_total - float(current_state["objective"]["total"])
+            objective_stall_count = (
+                objective_stall_count + 1
+                if objective_improvement <= max(objective_tolerance * 10.0, abs(previous_total) * 1e-6)
+                else 0
             )
+            metric_values, _ = point_metrics_for_field(field_x, field_y)
+            metric_improved = bool(
+                float(metric_values["symmetric_median_distance"]) < best_observed_median - 1e-12
+                or float(metric_values["mutual_nearest_fraction"]) > best_observed_mutual + 1e-12
+            )
+            if metric_improved:
+                best_observed_median = min(best_observed_median, float(metric_values["symmetric_median_distance"]))
+                best_observed_mutual = max(best_observed_mutual, float(metric_values["mutual_nearest_fraction"]))
+                point_stall_count = 0
+            else:
+                point_stall_count += 1
+
+            checkpoint = {
+                "field_x": field_x.copy(),
+                "field_y": field_y.copy(),
+                "metrics": metric_values,
+                "iteration": global_iteration,
+                "objective": float(current_state["objective"]["total"]),
+            }
+            if _better_density_flow_checkpoint(checkpoint, best_attempted):
+                best_attempted = checkpoint
+            if improves_affine(metric_values) and _better_density_flow_checkpoint(
+                checkpoint, best_checkpoint
+            ):
+                best_checkpoint = checkpoint
             history.append(
                 {
                     "level": int(level),
                     "iteration": int(iteration),
+                    "global_iteration": global_iteration,
                     "sigma_px": float(sigma_px),
+                    "accepted": True,
                     "accepted_update_scale": float(accepted_scale),
-                    **objective,
+                    "backtracking_attempts": int(round(-np.log2(accepted_scale))) if accepted_scale > 0 else 0,
+                    "rejection_reason": None,
+                    "symmetric_median_distance": float(metric_values["symmetric_median_distance"]),
+                    "mutual_nearest_fraction": float(metric_values["mutual_nearest_fraction"]),
+                    "jacobian_min": float(current_state["jacobian_min"]),
+                    "jacobian_max": float(current_state["jacobian_max"]),
+                    "max_displacement": float(current_state["max_displacement"]),
+                    "p95_displacement": float(current_state["p95_displacement"]),
+                    **current_state["objective"],
                 }
             )
+            if objective_stall_count >= early_stopping_patience or point_stall_count >= point_metric_patience:
+                break
 
-    attempted_points = original_moving + _sample_field(
-        original_moving, field_x, field_y, resolved_bounds, density_pixel_size
-    )
-    attempted_metric_points = metric_moving + _sample_field(
-        metric_moving, field_x, field_y, resolved_bounds, density_pixel_size
-    )
+    final_field_x = field_x.copy()
+    final_field_y = field_y.copy()
+    final_metric_values, _ = point_metrics_for_field(final_field_x, final_field_y)
+    selected = best_checkpoint if best_checkpoint is not None else best_attempted
+    if selected is None:
+        selected = {
+            "field_x": zeros.copy(),
+            "field_y": zeros.copy(),
+            "metrics": {**before_metrics, "mutual_nearest_fraction": before_mutual},
+            "iteration": None,
+        }
+    field_x = np.asarray(selected["field_x"]).copy()
+    field_y = np.asarray(selected["field_y"]).copy()
+    attempted_points = original_moving + _sample_field(original_moving, field_x, field_y, resolved_bounds, density_pixel_size)
+    attempted_metric_points = metric_moving + _sample_field(metric_moving, field_x, field_y, resolved_bounds, density_pixel_size)
     attempted_metrics = point_bidirectional_distance_metrics(metric_fixed, attempted_metric_points)
     attempted_metrics["mutual_nearest_fraction"] = _mutual_nearest_fraction(metric_fixed, attempted_metric_points)
     attempted_metrics["possible_xy_reversal"] = False
     attempted_metrics["xy_reversal_diagnostics"] = reversal
+
+    canonical_sigma = active_scales[-1]
+    canonical_initial_state = evaluate_state(initial_field_x, initial_field_y, canonical_sigma)
+    canonical_attempted_state = evaluate_state(field_x, field_y, canonical_sigma)
+    canonical_final_state = evaluate_state(final_field_x, final_field_y, canonical_sigma)
+    initial_objective = float(canonical_initial_state["objective"]["total"])
+    best_objective = float(canonical_attempted_state["objective"]["total"])
+    final_objective = float(canonical_final_state["objective"]["total"])
 
     deformation = density_flow_deformation_diagnostics(
         field_x,
@@ -716,33 +1023,23 @@ def tissue_aware_density_flow_registration(
         and np.isfinite(jacobian).all()
     )
 
-    success = True
+    candidate_safe, candidate_safety_reason = _density_flow_trial_is_safe(
+        canonical_attempted_state,
+        jacobian_min_threshold=jacobian_min_threshold,
+        jacobian_max_threshold=jacobian_max_threshold,
+        max_displacement=max_displacement,
+        displacement_p95_limit=displacement_p95_limit,
+    )
+    success = bool(best_checkpoint is not None and candidate_safe)
     rejection_reason: str | None = None
     message = "Tissue-aware density-flow point registration completed."
-    if not finite_output:
+    if best_checkpoint is None:
+        rejection_reason = "no_improving_safe_checkpoint"
+        message = "Density-flow was rejected because no safe checkpoint improved the affine point metrics."
+    elif not candidate_safe:
         success = False
-        rejection_reason = "non_finite_density_flow_output"
-        message = "Density-flow candidate was rejected because it contains non-finite values."
-    elif jacobian_min <= jacobian_min_threshold or fold_fraction > 0:
-        success = False
-        rejection_reason = "jacobian_or_fold_check_failed"
-        message = "Density-flow candidate was rejected by the Jacobian/fold-over check."
-    elif jacobian_max >= jacobian_max_threshold:
-        success = False
-        rejection_reason = "jacobian_expansion_too_high"
-        message = "Density-flow candidate was rejected because local expansion was too high."
-    elif maximum_displacement > max_displacement:
-        success = False
-        rejection_reason = "max_displacement_too_large"
-        message = "Density-flow candidate was rejected because maximum displacement was too large."
-    elif displacement_p95_limit is not None and p95_displacement > displacement_p95_limit:
-        success = False
-        rejection_reason = "displacement_p95_too_large"
-        message = "Density-flow candidate was rejected because p95 displacement was too large."
-    elif attempted_metrics["symmetric_median_distance"] > before_metrics["symmetric_median_distance"]:
-        success = False
-        rejection_reason = "valid_region_median_distance_worsened"
-        message = "Density-flow candidate was rejected because valid-region median distance worsened."
+        rejection_reason = candidate_safety_reason
+        message = f"Density-flow best checkpoint failed the strict final safety check: {candidate_safety_reason}."
     elif outside_after > outside_before + 0.05:
         success = False
         rejection_reason = "points_outside_tissue_increased"
@@ -810,6 +1107,26 @@ def tissue_aware_density_flow_registration(
                 "density_blur_scales_px": list(active_scales),
                 "optimization_levels": len(active_scales),
                 "iterations_per_level": int(iterations_per_level),
+                "attempted_optimization_steps": attempted_steps,
+                "accepted_update_steps": accepted_steps,
+                "rejected_update_steps": rejected_steps,
+                "rejected_or_backtracked_update_steps": backtracked_steps,
+                "best_checkpoint_iteration": (
+                    None if best_checkpoint is None else best_checkpoint.get("iteration")
+                ),
+                "initial_objective": initial_objective,
+                "best_objective": best_objective,
+                "final_objective": final_objective,
+                "affine_symmetric_median": float(before_metrics["symmetric_median_distance"]),
+                "best_attempted_symmetric_median": float(attempted_metrics["symmetric_median_distance"]),
+                "final_attempted_symmetric_median": float(final_metric_values["symmetric_median_distance"]),
+                "mutual_nearest_fraction_before": before_mutual,
+                "mutual_nearest_fraction_best": float(attempted_metrics["mutual_nearest_fraction"]),
+                "mutual_nearest_fraction_final": float(final_metric_values["mutual_nearest_fraction"]),
+                "objective_tolerance": float(objective_tolerance),
+                "early_stopping_patience": int(early_stopping_patience),
+                "point_metric_patience": int(point_metric_patience),
+                "max_backtracking_steps": int(max_backtracking_steps),
                 "global_density_shift_x": float(global_shift[0]),
                 "global_density_shift_y": float(global_shift[1]),
                 "global_translation_initialization": global_initialization,

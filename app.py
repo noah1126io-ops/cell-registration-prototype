@@ -1196,6 +1196,10 @@ def show_he_geojson_preparation() -> None:
     density_flow_inverse_weight = 0.0
     density_flow_detect_axis_reversal = True
     density_flow_global_initialization = "off"
+    density_flow_objective_tolerance = 1e-12
+    density_flow_early_stopping_patience = 3
+    density_flow_point_metric_patience = 6
+    density_flow_max_backtracking_steps = 8
 
     st.subheader(tr("3. 詳細位置合わせ", "3. Fine alignment"))
     fine_alignment_method = st.selectbox(
@@ -1291,6 +1295,38 @@ def show_he_geojson_preparation() -> None:
             with regularization_right:
                 density_flow_jacobian_weight = st.number_input(tr("Jacobian barrier重み", "Jacobian barrier weight"), min_value=0.0, value=1.0, step=0.25, key="workflow-c-density-flow-jacobian")
                 density_flow_inverse_weight = st.number_input(tr("逆整合性penalty（任意）", "Inverse-consistency penalty (optional)"), min_value=0.0, value=0.0, step=0.01, key="workflow-c-density-flow-inverse")
+        with st.expander(tr("Density-flow line searchと早期停止", "Density-flow line search and early stopping"), expanded=False):
+            stop_left, stop_right = st.columns(2)
+            with stop_left:
+                density_flow_objective_tolerance = st.number_input(
+                    tr("目的関数の最小減少量", "Minimum objective decrease"),
+                    min_value=0.0,
+                    value=1e-12,
+                    format="%.2e",
+                    key="workflow-c-density-flow-objective-tolerance",
+                )
+                density_flow_early_stopping_patience = st.number_input(
+                    tr("更新失敗patience", "Failed-update patience"),
+                    min_value=1,
+                    value=3,
+                    step=1,
+                    key="workflow-c-density-flow-failure-patience",
+                )
+            with stop_right:
+                density_flow_point_metric_patience = st.number_input(
+                    tr("点群指標patience", "Point-metric patience"),
+                    min_value=1,
+                    value=6,
+                    step=1,
+                    key="workflow-c-density-flow-point-patience",
+                )
+                density_flow_max_backtracking_steps = st.number_input(
+                    tr("最大backtracking回数", "Maximum backtracking attempts"),
+                    min_value=1,
+                    value=8,
+                    step=1,
+                    key="workflow-c-density-flow-backtracking",
+                )
 
     elif fine_alignment_method == "matched nuclei RBF":
         rbf_left, rbf_right = st.columns(2)
@@ -1764,6 +1800,10 @@ def show_he_geojson_preparation() -> None:
                     displacement_p95_limit_um if enable_displacement_p95_limit else None
                 ),
                 global_translation_initialization=density_flow_global_initialization,
+                objective_tolerance=density_flow_objective_tolerance,
+                early_stopping_patience=int(density_flow_early_stopping_patience),
+                point_metric_patience=int(density_flow_point_metric_patience),
+                max_backtracking_steps=int(density_flow_max_backtracking_steps),
                 detect_axis_reversal=density_flow_detect_axis_reversal,
             )
         elif fine_alignment_method == "cluster-anchor":
@@ -1991,7 +2031,15 @@ def show_he_geojson_preparation() -> None:
     diag_a, diag_b, diag_c, diag_d = st.columns(4)
     diag_a.metric("Fine method", fine_alignment_method)
     diag_b.metric("Fine status", status)
-    if fine_alignment_method == "cluster-anchor" and fine_result.anchors is not None and "anchor_type" in fine_result.anchors:
+    density_flow_run_metrics = (
+        fine_result.metrics.get("density_flow", {})
+        if fine_alignment_method == "tissue-aware density flow" and isinstance(fine_result.metrics, dict)
+        else {}
+    )
+    if fine_alignment_method == "tissue-aware density flow":
+        diag_c.metric("Attempted optimization steps", density_flow_run_metrics.get("attempted_optimization_steps", 0))
+        diag_d.metric("Accepted update steps", density_flow_run_metrics.get("accepted_update_steps", 0))
+    elif fine_alignment_method == "cluster-anchor" and fine_result.anchors is not None and "anchor_type" in fine_result.anchors:
         status_anchor_types = fine_result.anchors["anchor_type"]
         status_accepted = fine_result.anchors["accepted"].astype(bool)
         status_cluster_mask = status_anchor_types == "cluster"
@@ -2019,10 +2067,14 @@ def show_he_geojson_preparation() -> None:
         cluster_b.metric("Rejected cluster anchors", int(np.count_nonzero(cluster_mask & ~accepted_flags)))
         cluster_c.metric("Boundary pin anchors", int(np.count_nonzero(boundary_mask)))
         cluster_d.metric("Total candidate cluster anchors", int(np.count_nonzero(cluster_mask)))
-    else:
+    elif fine_alignment_method != "tissue-aware density flow":
         st.caption(
             f"Fine alignment anchors: {fine_result.n_pairs} accepted / "
             f"{fine_result.n_candidate_pairs} candidates ({fine_result.n_filtered_pairs} rejected)"
+        )
+    else:
+        st.caption(
+            "Density Flow reports optimization steps and checkpoints; it does not use displacement anchors."
         )
 
     overview_tab, point_tab, image_tab, tissue_tab, safety_tab, anchor_tab, downloads_tab = st.tabs(
@@ -2032,7 +2084,11 @@ def show_he_geojson_preparation() -> None:
             tr("Warp済みHE画像", "Warped HE image"),
             tr("組織分類", "Tissue classification"),
             tr("Warp安全性", "Warp safety"),
-            tr("アンカー診断", "Anchor diagnostics"),
+            (
+                tr("最適化診断", "Optimization diagnostics")
+                if fine_alignment_method == "tissue-aware density flow"
+                else tr("アンカー診断", "Anchor diagnostics")
+            ),
             tr("ダウンロード", "Downloads"),
         ]
     )
@@ -2258,10 +2314,7 @@ def show_he_geojson_preparation() -> None:
         cluster_anchors_after_filter = int(
             np.count_nonzero(cluster_anchor_mask & fine_result.anchors["accepted"].astype(bool))
         )
-    tissue_tab.dataframe(
-        pd.DataFrame(
-            [
-                {
+    tissue_diagnostics_row = {
                     "total_geojson_points": int(len(geojson_array)),
                     "valid_geojson_points": n_valid_geojson,
                     "edge_candidate_geojson_points": n_edge_geojson,
@@ -2276,13 +2329,18 @@ def show_he_geojson_preparation() -> None:
                     "valid_he_points": n_valid_he,
                     "edge_candidate_he_points": n_edge_he,
                     "excluded_he_points": n_excluded_he,
-                    "cluster_anchors_before_filtering": cluster_anchors_before_filter,
-                    "cluster_anchors_after_filtering": cluster_anchors_after_filter,
-                    "boundary_pinned_anchors": boundary_pinned_anchors,
-                    "boundary_anchor_weight": boundary_anchor_weight,
-                }
-            ]
-        ),
+    }
+    if fine_alignment_method != "tissue-aware density flow":
+        tissue_diagnostics_row.update(
+            {
+                "cluster_anchors_before_filtering": cluster_anchors_before_filter,
+                "cluster_anchors_after_filtering": cluster_anchors_after_filter,
+                "boundary_pinned_anchors": boundary_pinned_anchors,
+                "boundary_anchor_weight": boundary_anchor_weight,
+            }
+        )
+    tissue_tab.dataframe(
+        pd.DataFrame([tissue_diagnostics_row]),
         use_container_width=True,
     )
     safety_tab.dataframe(
@@ -2586,7 +2644,15 @@ def show_he_geojson_preparation() -> None:
                 mime="image/png",
             )
     else:
-        anchor_tab.info(tr("この結果にはアンカー診断データがありません。", "No anchor diagnostics are available for this result."))
+        if fine_alignment_method == "tissue-aware density flow":
+            anchor_tab.info(
+                tr(
+                    "Density Flowはアンカーを使用しません。更新stepとcheckpointはWarp安全性タブに表示されます。",
+                    "Density Flow does not use anchors. Update steps and checkpoints are reported in Warp safety.",
+                )
+            )
+        else:
+            anchor_tab.info(tr("この結果にはアンカー診断データがありません。", "No anchor diagnostics are available for this result."))
 
     safety_tab.subheader(tr("変位場", "Displacement field"))
     field_left, field_right = safety_tab.columns(2)
@@ -3067,6 +3133,10 @@ def show_he_geojson_preparation() -> None:
         "density_flow_tissue_boundary_weight": density_flow_boundary_weight,
         "density_flow_inverse_consistency_weight": density_flow_inverse_weight,
         "density_flow_global_translation_initialization": density_flow_global_initialization,
+        "density_flow_objective_tolerance": density_flow_objective_tolerance,
+        "density_flow_early_stopping_patience": density_flow_early_stopping_patience,
+        "density_flow_point_metric_patience": density_flow_point_metric_patience,
+        "density_flow_max_backtracking_steps": density_flow_max_backtracking_steps,
         "density_flow_detect_axis_reversal": density_flow_detect_axis_reversal,
         "local_translation_preset": local_preset,
         "he_coordinate_order": he_coordinate_order,

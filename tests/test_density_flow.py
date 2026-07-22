@@ -5,6 +5,11 @@ import numpy as np
 
 from app import show_he_geojson_preparation, show_mask_to_mask_workflow, show_point_registration_workflow
 from src.density_flow import (
+    _better_density_flow_checkpoint,
+    _density_flow_trial_is_acceptable,
+    _evaluate_density_flow_state,
+    _normalized_density,
+    _rasterize_points,
     density_flow_deformation_diagnostics,
     density_flow_image_outputs,
     detect_xy_reversal,
@@ -89,8 +94,9 @@ def test_density_flow_identity_transformation():
     points = _grid_points()
     result = _run(points, points)
 
-    assert result.success is True
-    assert result.applied is True
+    assert result.success is False
+    assert result.applied is False
+    assert result.rejection_reason == "no_improving_safe_checkpoint"
     np.testing.assert_allclose(result.transformed_points, points, atol=1e-8)
     np.testing.assert_allclose(result.attempted_displacement_x, 0.0, atol=1e-8)
     assert result.jacobian_min == 1.0
@@ -132,6 +138,14 @@ def test_density_flow_improves_known_smooth_deformation():
     )
     assert result.jacobian_min > 0.0
     assert result.jacobian_max < 4.0
+    accepted_history = [
+        row for row in result.metrics["optimization_history"] if row.get("accepted")
+    ]
+    assert accepted_history
+    assert np.isclose(
+        result.metrics["attempted"]["symmetric_median_distance"],
+        min(row["symmetric_median_distance"] for row in accepted_history),
+    )
 
 
 def test_density_flow_supports_unequal_point_counts():
@@ -198,15 +212,17 @@ def test_density_flow_rejection_falls_back_to_affine_points():
     result = _run(
         fixed,
         moving,
+        global_translation_initialization="off",
+        learning_rate=0.0,
         max_displacement=2.0,
         displacement_p95_limit=None,
     )
 
     assert result.success is False
     assert result.applied is False
-    assert result.rejection_reason == "max_displacement_too_large"
+    assert result.rejection_reason == "no_improving_safe_checkpoint"
     np.testing.assert_allclose(result.transformed_points, moving)
-    assert not np.allclose(result.attempted_transformed_points, moving)
+    np.testing.assert_allclose(result.attempted_transformed_points, moving)
     np.testing.assert_allclose(result.displacement_x, 0.0)
     np.testing.assert_allclose(result.displacement_y, 0.0)
 
@@ -420,3 +436,118 @@ def test_local_field_gives_spatially_nonuniform_image_difference():
 
     assert float(np.max(difference)) > 0.0
     assert float(np.std(difference[:, 3:])) > 0.0
+
+
+def _trial_state(*, jacobian_min=1.0, jacobian_max=1.0, objective=0.5):
+    return {
+        "finite": True,
+        "jacobian_min": jacobian_min,
+        "jacobian_max": jacobian_max,
+        "max_displacement": 4.0,
+        "p95_displacement": 3.0,
+        "objective": {"total": objective},
+    }
+
+
+def _accept_trial(state, *, current_objective=1.0):
+    return _density_flow_trial_is_acceptable(
+        state,
+        current_objective=current_objective,
+        objective_tolerance=1e-12,
+        jacobian_min_threshold=0.2,
+        jacobian_max_threshold=3.0,
+        max_displacement=10.0,
+        displacement_p95_limit=8.0,
+    )
+
+
+def test_trial_above_configured_jacobian_max_is_never_accepted():
+    accepted, reason = _accept_trial(_trial_state(jacobian_max=3.01))
+
+    assert accepted is False
+    assert reason == "jacobian_max_above_limit"
+
+
+def test_trial_below_configured_jacobian_min_is_never_accepted():
+    accepted, reason = _accept_trial(_trial_state(jacobian_min=0.19))
+
+    assert accepted is False
+    assert reason == "jacobian_min_below_limit"
+
+
+def test_trial_that_worsens_objective_is_rejected():
+    accepted, reason = _accept_trial(
+        _trial_state(objective=1.01),
+        current_objective=1.0,
+    )
+
+    assert accepted is False
+    assert reason == "objective_not_decreased"
+
+
+def test_trial_density_is_recomputed_after_applying_trial_field():
+    moving = np.array([[4.0, 4.0], [8.0, 8.0], [11.0, 5.0]])
+    shape = (16, 16)
+    bounds = (0.0, 0.0, 15.0, 15.0)
+    zeros = np.zeros(shape, dtype=float)
+    shifted_x = np.full(shape, 2.0)
+    fixed_density = _normalized_density(
+        _rasterize_points(moving, shape, bounds, 1.0),
+        1.0,
+    )
+    common = {
+        "fixed_density": fixed_density,
+        "density_sigma": 1.0,
+        "shape": shape,
+        "bounds": bounds,
+        "pixel_size": 1.0,
+        "tissue_weight": np.ones(shape),
+        "smoothness_weight": 0.0,
+        "magnitude_weight": 0.0,
+        "jacobian_weight": 1.0,
+        "boundary_weight": 0.0,
+        "inverse_consistency_weight": 0.0,
+        "jacobian_min_threshold": 0.2,
+        "jacobian_max_threshold": 3.0,
+    }
+
+    initial = _evaluate_density_flow_state(moving, zeros, zeros, **common)
+    trial = _evaluate_density_flow_state(moving, shifted_x, zeros, **common)
+
+    np.testing.assert_allclose(trial["transformed_points"], moving + np.array([2.0, 0.0]))
+    assert not np.allclose(trial["moving_density"], initial["moving_density"])
+
+
+def test_best_safe_checkpoint_is_kept_instead_of_worse_later_checkpoint():
+    best = {
+        "metrics": {"symmetric_median_distance": 7.0, "mutual_nearest_fraction": 0.6},
+        "objective": 0.3,
+    }
+    worse_final = {
+        "metrics": {"symmetric_median_distance": 7.5, "mutual_nearest_fraction": 0.65},
+        "objective": 0.2,
+    }
+
+    assert _better_density_flow_checkpoint(worse_final, best) is False
+
+
+def test_no_improving_checkpoint_returns_affine_only():
+    points = _grid_points()
+    result = _run(
+        points,
+        points,
+        global_translation_initialization="off",
+        learning_rate=0.0,
+    )
+
+    assert result.applied is False
+    assert result.rejection_reason == "no_improving_safe_checkpoint"
+    np.testing.assert_allclose(result.transformed_points, points)
+
+
+def test_density_flow_ui_uses_optimization_terms_instead_of_anchor_counts():
+    source = inspect.getsource(show_he_geojson_preparation)
+
+    assert 'diag_c.metric("Attempted optimization steps"' in source
+    assert 'diag_d.metric("Accepted update steps"' in source
+    assert "Density Flow reports optimization steps and checkpoints" in source
