@@ -254,12 +254,14 @@ def test_density_flow_does_not_regress_cluster_anchor():
 def test_density_flow_is_not_added_to_workflow_a_or_b():
     assert "tissue_aware_density_flow_registration" not in inspect.getsource(show_point_registration_workflow)
     assert "tissue_aware_density_flow_registration" not in inspect.getsource(show_mask_to_mask_workflow)
+    assert "joint_density_tissue_structure_registration" not in inspect.getsource(show_point_registration_workflow)
+    assert "joint_density_tissue_structure_registration" not in inspect.getsource(show_mask_to_mask_workflow)
 
 
 def test_density_flow_workflow_uses_safety_gated_raster_outputs():
     source = inspect.getsource(show_he_geojson_preparation)
 
-    assert 'density_flow_mode = fine_alignment_method == "tissue-aware density flow"' in source
+    assert "density_flow_mode = density_flow_method_selected" in source
     assert "density_flow_image_outputs(" in source
     assert 'attempted_warped_he_image = density_flow_images["attempted"]' in source
     assert 'warped_he_image = density_flow_images["final"]' in source

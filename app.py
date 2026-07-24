@@ -16,7 +16,9 @@ from src.density import create_density_map
 from src.density_flow import (
     density_flow_deformation_diagnostics,
     density_flow_image_outputs,
+    joint_density_tissue_structure_registration,
     tissue_aware_density_flow_registration,
+    warp_affine_image_with_density_flow,
 )
 from src.export import array_to_png_bytes, figure_to_png_bytes
 from src.features import extract_cell_features, point_features_to_cell_features
@@ -43,6 +45,13 @@ from src.registration import (
     warp_image,
     warp_mask,
 )
+from src.raster_deformation_qc import (
+    checkerboard_comparison,
+    edge_overlay,
+    local_region_metrics,
+    point_displacement_pixel_summary,
+    raster_difference_metrics,
+)
 from src.visualization import (
     colorize_label_image,
     visualize_cell_matches,
@@ -55,7 +64,9 @@ from src.visualization import (
     visualize_geojson_classification_overlay,
     visualize_jacobian_heatmap,
     visualize_local_residual_map,
+    visualize_local_improvement_heatmap,
     visualize_point_sets,
+    visualize_roi_comparisons,
     visualize_translation_anchors,
     visualize_warp_grid_overlay,
     visualize_warped_he_point_overlay,
@@ -1112,6 +1123,10 @@ def show_he_geojson_preparation() -> None:
             "組織考慮density flow［実験的］",
             "Tissue-aware density flow [Experimental]",
         ),
+        "joint density + tissue-structure flow": tr(
+            "密度＋組織構造joint flow［実験的］",
+            "Joint density + tissue-structure flow [Experimental]",
+        ),
         "cluster-anchor": tr("クラスターアンカー", "Cluster-anchor"),
         "matched nuclei RBF": tr("対応核RBF", "Matched nuclei RBF"),
         "local translation field": tr("局所平行移動場", "Local translation field"),
@@ -1248,6 +1263,21 @@ def show_he_geojson_preparation() -> None:
     density_flow_early_stopping_patience = 3
     density_flow_point_metric_patience = 6
     density_flow_max_backtracking_steps = 8
+    density_flow_preset = "Safe baseline"
+    density_flow_inverse_iterations = 30
+    density_flow_inverse_tolerance_pixels = 0.05
+    density_flow_qc_gain = 1
+    density_flow_min_absolute_improvement = 0.10
+    density_flow_min_relative_improvement = 0.005
+    density_flow_max_mutual_decrease = 0.005
+    density_flow_max_within_decrease = 0.01
+    density_flow_min_jacobian_p05 = 0.8
+    density_flow_max_jacobian_p95 = 1.25
+    density_flow_local_region_size = 100.0
+    joint_density_weight = 1.0
+    joint_support_weight = 0.25
+    joint_structure_weight = 0.15
+    joint_soft_jacobian_weight = 0.05
 
     st.subheader(tr("3. 詳細位置合わせ", "3. Fine alignment"))
     fine_alignment_method = st.selectbox(
@@ -1255,6 +1285,7 @@ def show_he_geojson_preparation() -> None:
         [
             "cluster-anchor",
             "tissue-aware density flow",
+            "joint density + tissue-structure flow",
             "matched nuclei RBF",
             "local translation field",
             "center-snap",
@@ -1266,7 +1297,53 @@ def show_he_geojson_preparation() -> None:
         help=tr("選択した方式に関係する設定だけを表示します。GeoJSON固定点は移動しません。", "Only settings for the selected method are shown. Fixed GeoJSON points are never moved."),
     )
 
-    if fine_alignment_method == "tissue-aware density flow":
+    density_flow_method_selected = fine_alignment_method in {
+        "tissue-aware density flow",
+        "joint density + tissue-structure flow",
+    }
+    if density_flow_method_selected:
+        density_flow_presets = {
+            "Safe baseline": {
+                "pixel_size": 2.0, "blur_scales": "8, 4, 2", "levels": 3,
+                "iterations": 8, "learning_rate": 0.08, "update_smoothing": 4.0,
+                "smoothness": 0.10, "magnitude": 0.002, "boundary": 0.05,
+                "global_initialization": "off",
+            },
+            "Fine local": {
+                "pixel_size": 2.0, "blur_scales": "2", "levels": 1,
+                "iterations": 12, "learning_rate": 0.08, "update_smoothing": 4.0,
+                "smoothness": 0.10, "magnitude": 0.002, "boundary": 0.05,
+                "global_initialization": "off",
+            },
+            "Exploratory": {
+                "pixel_size": 2.0, "blur_scales": "8, 4, 2", "levels": 3,
+                "iterations": 12, "learning_rate": 0.20, "update_smoothing": 3.0,
+                "smoothness": 0.05, "magnitude": 0.0005, "boundary": 0.02,
+                "global_initialization": "auto",
+            },
+            "Custom": {
+                "pixel_size": 2.0, "blur_scales": "8, 4, 2", "levels": 3,
+                "iterations": 8, "learning_rate": 0.08, "update_smoothing": 4.0,
+                "smoothness": 0.10, "magnitude": 0.002, "boundary": 0.05,
+                "global_initialization": "off",
+            },
+        }
+        density_flow_preset = st.selectbox(
+            tr("Density Flowプリセット", "Density Flow preset"),
+            list(density_flow_presets),
+            index=0,
+            key="workflow-c-density-flow-preset",
+        )
+        flow_default = density_flow_presets[density_flow_preset]
+        flow_controls_disabled = density_flow_preset != "Custom"
+        flow_key_suffix = density_flow_preset.lower().replace(" ", "-")
+        if density_flow_preset == "Exploratory":
+            st.warning(
+                tr(
+                    "Exploratoryは以前の強い設定です。安全QCを確認してください。",
+                    "Exploratory preserves the previous stronger defaults. Review all safety QC.",
+                )
+            )
         st.warning(
             tr(
                 "実験的な独立実装です。HE画像warpも安全判定前後を分けて表示し、結果は必ずQCしてください。",
@@ -1278,8 +1355,9 @@ def show_he_geojson_preparation() -> None:
             density_flow_global_initialization = st.selectbox(
                 tr("グローバル残差平行移動の初期化", "Global residual translation initialization"),
                 ["off", "auto"],
-                index=0,
-                key="workflow-c-density-flow-global-initialization",
+                index=0 if flow_default["global_initialization"] == "off" else 1,
+                key=f"workflow-c-density-flow-global-initialization-{flow_key_suffix}",
+                disabled=flow_controls_disabled,
                 format_func=lambda value: "Off" if value == "off" else "Auto",
                 help=tr(
                     "Offは変位場をゼロから開始します。Autoはaffine後に追加の全体平行移動候補を選びます。",
@@ -1289,45 +1367,51 @@ def show_he_geojson_preparation() -> None:
             density_flow_pixel_size = st.number_input(
                 tr("密度画素サイズ (um)", "Density pixel size (um)"),
                 min_value=0.1,
-                value=2.0,
+                value=flow_default["pixel_size"],
                 step=0.5,
-                key="workflow-c-density-flow-pixel-size",
+                key=f"workflow-c-density-flow-pixel-size-{flow_key_suffix}",
+                disabled=flow_controls_disabled,
                 help=tr("共有world-xy密度グリッドの画素サイズです。", "Pixel size of the shared world-xy density grid."),
             )
             density_flow_blur_scales_text = st.text_input(
                 tr("密度blur scale (pixel)", "Density blur scales (pixels)"),
-                value="8, 4, 2",
-                key="workflow-c-density-flow-blur-scales",
+                value=flow_default["blur_scales"],
+                key=f"workflow-c-density-flow-blur-scales-{flow_key_suffix}",
+                disabled=flow_controls_disabled,
                 help=tr("粗い順にカンマ区切りで指定します。", "Comma-separated Gaussian scales, ordered coarse to fine."),
             )
             density_flow_levels = st.number_input(
                 tr("最適化level数", "Number of optimization levels"),
                 min_value=1,
-                value=3,
+                value=flow_default["levels"],
                 step=1,
-                key="workflow-c-density-flow-levels",
+                key=f"workflow-c-density-flow-levels-{flow_key_suffix}",
+                disabled=flow_controls_disabled,
             )
             density_flow_iterations = st.number_input(
                 tr("各levelの反復回数", "Iterations per level"),
                 min_value=1,
-                value=8,
+                value=flow_default["iterations"],
                 step=1,
-                key="workflow-c-density-flow-iterations",
+                key=f"workflow-c-density-flow-iterations-{flow_key_suffix}",
+                disabled=flow_controls_disabled,
             )
         with flow_right:
             density_flow_learning_rate = st.number_input(
                 tr("更新率", "Learning rate"),
                 min_value=0.01,
-                value=0.08,
+                value=flow_default["learning_rate"],
                 step=0.01,
-                key="workflow-c-density-flow-learning-rate",
+                key=f"workflow-c-density-flow-learning-rate-{flow_key_suffix}",
+                disabled=flow_controls_disabled,
             )
             density_flow_update_smoothing = st.number_input(
                 tr("更新場の平滑化sigma (pixel)", "Update smoothing sigma (pixels)"),
                 min_value=0.1,
-                value=4.0,
+                value=flow_default["update_smoothing"],
                 step=0.5,
-                key="workflow-c-density-flow-update-smoothing",
+                key=f"workflow-c-density-flow-update-smoothing-{flow_key_suffix}",
+                disabled=flow_controls_disabled,
             )
             density_flow_detect_axis_reversal = st.checkbox(
                 tr("x/y逆転を検出して停止", "Detect x/y reversal and stop"),
@@ -1337,9 +1421,9 @@ def show_he_geojson_preparation() -> None:
         with st.expander(tr("Density-flow正則化", "Density-flow regularization"), expanded=False):
             regularization_left, regularization_right = st.columns(2)
             with regularization_left:
-                density_flow_smoothness_weight = st.number_input(tr("平滑性penalty", "Smoothness penalty"), min_value=0.0, value=0.10, step=0.01, key="workflow-c-density-flow-smoothness")
-                density_flow_magnitude_weight = st.number_input(tr("変位量penalty", "Field-magnitude penalty"), min_value=0.0, value=0.002, step=0.0005, format="%.4f", key="workflow-c-density-flow-magnitude")
-                density_flow_boundary_weight = st.number_input(tr("組織境界penalty", "Tissue-boundary penalty"), min_value=0.0, value=0.05, step=0.01, key="workflow-c-density-flow-boundary")
+                density_flow_smoothness_weight = st.number_input(tr("平滑性penalty", "Smoothness penalty"), min_value=0.0, value=flow_default["smoothness"], step=0.01, key=f"workflow-c-density-flow-smoothness-{flow_key_suffix}", disabled=flow_controls_disabled)
+                density_flow_magnitude_weight = st.number_input(tr("変位量penalty", "Field-magnitude penalty"), min_value=0.0, value=flow_default["magnitude"], step=0.0005, format="%.4f", key=f"workflow-c-density-flow-magnitude-{flow_key_suffix}", disabled=flow_controls_disabled)
+                density_flow_boundary_weight = st.number_input(tr("組織境界penalty", "Tissue-boundary penalty"), min_value=0.0, value=flow_default["boundary"], step=0.01, key=f"workflow-c-density-flow-boundary-{flow_key_suffix}", disabled=flow_controls_disabled)
             with regularization_right:
                 density_flow_jacobian_weight = st.number_input(tr("Jacobian barrier重み", "Jacobian barrier weight"), min_value=0.0, value=1.0, step=0.25, key="workflow-c-density-flow-jacobian")
                 density_flow_inverse_weight = st.number_input(tr("逆整合性penalty（任意）", "Inverse-consistency penalty (optional)"), min_value=0.0, value=0.0, step=0.01, key="workflow-c-density-flow-inverse")
@@ -1375,6 +1459,32 @@ def show_he_geojson_preparation() -> None:
                     step=1,
                     key="workflow-c-density-flow-backtracking",
                 )
+        with st.expander(tr("適用判定とraster inverse", "Application criteria and raster inverse"), expanded=False):
+            criteria_left, criteria_right = st.columns(2)
+            with criteria_left:
+                density_flow_min_absolute_improvement = st.number_input(tr("最小median改善 (um)", "Minimum median improvement (um)"), min_value=0.0, value=0.10, step=0.05, key="workflow-c-density-flow-min-absolute-improvement")
+                density_flow_min_relative_improvement = st.number_input(tr("最小相対median改善", "Minimum relative median improvement"), min_value=0.0, value=0.005, step=0.001, format="%.3f", key="workflow-c-density-flow-min-relative-improvement")
+                density_flow_max_mutual_decrease = st.number_input(tr("Mutual-nearest最大低下", "Maximum mutual-nearest decrease"), min_value=0.0, value=0.005, step=0.001, format="%.3f", key="workflow-c-density-flow-max-mutual-decrease")
+                density_flow_max_within_decrease = st.number_input(tr("Within率の最大低下", "Maximum within-fraction decrease"), min_value=0.0, value=0.01, step=0.005, format="%.3f", key="workflow-c-density-flow-max-within-decrease")
+            with criteria_right:
+                density_flow_min_jacobian_p05 = st.number_input("Minimum Jacobian p05", min_value=0.01, value=0.8, step=0.05, key="workflow-c-density-flow-min-jac-p05")
+                density_flow_max_jacobian_p95 = st.number_input("Maximum Jacobian p95", min_value=1.0, value=1.25, step=0.05, key="workflow-c-density-flow-max-jac-p95")
+                density_flow_inverse_iterations = st.number_input(tr("Inverse最大反復", "Inverse maximum iterations"), min_value=1, value=30, step=5, key="workflow-c-density-flow-inverse-iterations")
+                density_flow_inverse_tolerance_pixels = st.number_input(tr("Inverse収束許容値 (output pixel)", "Inverse convergence tolerance (output pixels)"), min_value=0.001, value=0.05, step=0.01, format="%.3f", key="workflow-c-density-flow-inverse-tolerance")
+                density_flow_local_region_size = st.number_input(tr("局所評価block size (um)", "Local validation block size (um)"), min_value=10.0, value=100.0, step=10.0, key="workflow-c-density-flow-local-region-size")
+        density_flow_qc_gain = st.select_slider(
+            tr("QC変形表示gain", "QC deformation display gain"),
+            options=[1, 2, 5, 10],
+            value=1,
+            key="workflow-c-density-flow-qc-gain",
+            help=tr("表示専用です。点群・最終画像・metricsは変更しません。", "Visual QC only. It never changes points, final images, or metrics."),
+        )
+        if fine_alignment_method == "joint density + tissue-structure flow":
+            with st.expander(tr("Joint objective重み", "Joint objective weights"), expanded=True):
+                joint_density_weight = st.number_input("Point-density weight", min_value=0.0, value=1.0, step=0.1, key="workflow-c-joint-density-weight")
+                joint_support_weight = st.number_input("HE tissue-support weight", min_value=0.0, value=0.25, step=0.05, key="workflow-c-joint-support-weight")
+                joint_structure_weight = st.number_input("HE structural-feature weight", min_value=0.0, value=0.15, step=0.05, key="workflow-c-joint-structure-weight")
+                joint_soft_jacobian_weight = st.number_input("Soft log-Jacobian weight", min_value=0.0, value=0.05, step=0.01, key="workflow-c-joint-soft-jacobian-weight")
 
     elif fine_alignment_method == "matched nuclei RBF":
         rbf_left, rbf_right = st.columns(2)
@@ -1599,8 +1709,8 @@ def show_he_geojson_preparation() -> None:
     show_edge_candidate_geojson_points = st.checkbox(tr("Edge candidateを表示", "Show edge candidates"), value=True, key="workflow-c-show-edge")
     show_boundary_pin_anchors = st.checkbox(tr("境界ピンアンカーを重ねる", "Overlay boundary pin anchors"), value=True, key="workflow-c-show-boundary-pins")
 
-    if fine_alignment_method == "tissue-aware density flow":
-        selected_preset = "experimental multiscale"
+    if density_flow_method_selected:
+        selected_preset = density_flow_preset
         search_radius_summary = "density objective"
         local_shift_summary = max_final_displacement_um
         interpolation_summary = "composed smooth updates"
@@ -1811,7 +1921,7 @@ def show_he_geojson_preparation() -> None:
                 grid_spacing,
                 "No GeoJSON points are valid inside the affine HE tissue mask; fine warp was not applied.",
             )
-        elif fine_alignment_method == "tissue-aware density flow":
+        elif density_flow_method_selected:
             try:
                 density_flow_blur_scales = tuple(
                     float(value.strip())
@@ -1825,9 +1935,7 @@ def show_he_geojson_preparation() -> None:
             density_flow_fixed_points = (
                 success_metric_targets if len(success_metric_targets) else fine_target_array
             )
-            fine_result = tissue_aware_density_flow_registration(
-                density_flow_fixed_points,
-                affine_result.transformed_points,
+            density_flow_kwargs = dict(
                 success_metric_fixed_points=density_flow_fixed_points,
                 success_metric_moving_points=success_metric_moving_points,
                 density_pixel_size=density_flow_pixel_size,
@@ -1852,8 +1960,42 @@ def show_he_geojson_preparation() -> None:
                 early_stopping_patience=int(density_flow_early_stopping_patience),
                 point_metric_patience=int(density_flow_point_metric_patience),
                 max_backtracking_steps=int(density_flow_max_backtracking_steps),
+                minimum_absolute_median_improvement=density_flow_min_absolute_improvement,
+                minimum_relative_median_improvement=density_flow_min_relative_improvement,
+                maximum_mutual_nearest_decrease=density_flow_max_mutual_decrease,
+                maximum_within_fraction_decrease=density_flow_max_within_decrease,
+                minimum_jacobian_p05=density_flow_min_jacobian_p05,
+                maximum_jacobian_p95=density_flow_max_jacobian_p95,
+                local_region_block_size=density_flow_local_region_size,
                 detect_axis_reversal=density_flow_detect_axis_reversal,
             )
+            if fine_alignment_method == "joint density + tissue-structure flow":
+                if affine_tissue_image is None or tissue_mask is None or affine_tissue_metadata is None:
+                    fine_result = _identity_fine_result(
+                        affine_result.transformed_points,
+                        density_flow_fixed_points,
+                        density_flow_pixel_size,
+                        "Joint density + tissue-structure flow requires an uploaded HE image and tissue mask.",
+                    )
+                else:
+                    fine_result = joint_density_tissue_structure_registration(
+                        density_flow_fixed_points,
+                        affine_result.transformed_points,
+                        affine_he_image=affine_tissue_image,
+                        affine_he_tissue_mask=tissue_mask,
+                        affine_he_metadata=affine_tissue_metadata,
+                        density_weight=joint_density_weight,
+                        support_weight=joint_support_weight,
+                        structure_weight=joint_structure_weight,
+                        soft_jacobian_weight=joint_soft_jacobian_weight,
+                        **density_flow_kwargs,
+                    )
+            else:
+                fine_result = tissue_aware_density_flow_registration(
+                    density_flow_fixed_points,
+                    affine_result.transformed_points,
+                    **density_flow_kwargs,
+                )
         elif fine_alignment_method == "cluster-anchor":
             fine_result = cluster_anchor_fine_warp(
                 fine_target_array,
@@ -1994,7 +2136,7 @@ def show_he_geojson_preparation() -> None:
     final_displacement_x = variants["final_displacement_x"]
     final_displacement_y = variants["final_displacement_y"]
     applied_result_label = variants["applied_result_label"]
-    density_flow_mode = fine_alignment_method == "tissue-aware density flow"
+    density_flow_mode = density_flow_method_selected
     image_fine_applied = fine_applied
     image_applied_result_label = applied_result_label
 
@@ -2081,10 +2223,10 @@ def show_he_geojson_preparation() -> None:
     diag_b.metric("Fine status", status)
     density_flow_run_metrics = (
         fine_result.metrics.get("density_flow", {})
-        if fine_alignment_method == "tissue-aware density flow" and isinstance(fine_result.metrics, dict)
+        if density_flow_mode and isinstance(fine_result.metrics, dict)
         else {}
     )
-    if fine_alignment_method == "tissue-aware density flow":
+    if density_flow_mode:
         diag_c.metric("Attempted optimization steps", density_flow_run_metrics.get("attempted_optimization_steps", 0))
         diag_d.metric("Accepted update steps", density_flow_run_metrics.get("accepted_update_steps", 0))
     elif fine_alignment_method == "cluster-anchor" and fine_result.anchors is not None and "anchor_type" in fine_result.anchors:
@@ -2115,7 +2257,7 @@ def show_he_geojson_preparation() -> None:
         cluster_b.metric("Rejected cluster anchors", int(np.count_nonzero(cluster_mask & ~accepted_flags)))
         cluster_c.metric("Boundary pin anchors", int(np.count_nonzero(boundary_mask)))
         cluster_d.metric("Total candidate cluster anchors", int(np.count_nonzero(cluster_mask)))
-    elif fine_alignment_method != "tissue-aware density flow":
+    elif not density_flow_mode:
         st.caption(
             f"Fine alignment anchors: {fine_result.n_pairs} accepted / "
             f"{fine_result.n_candidate_pairs} candidates ({fine_result.n_filtered_pairs} rejected)"
@@ -2136,14 +2278,14 @@ def show_he_geojson_preparation() -> None:
             tr("Warp安全性", "Warp safety"),
             (
                 tr("最適化診断", "Optimization diagnostics")
-                if fine_alignment_method == "tissue-aware density flow"
+                if density_flow_mode
                 else tr("アンカー診断", "Anchor diagnostics")
             ),
             tr("ダウンロード", "Downloads"),
         ]
     )
 
-    if fine_alignment_method == "tissue-aware density flow" and isinstance(fine_result.metrics, dict):
+    if density_flow_mode and isinstance(fine_result.metrics, dict):
         flow_metadata = fine_result.metrics.get("density_flow", {})
         flow_history = pd.DataFrame(fine_result.metrics.get("optimization_history", []))
         flow_deformation = density_flow_deformation_diagnostics(
@@ -2380,7 +2522,7 @@ def show_he_geojson_preparation() -> None:
                     "edge_candidate_he_points": n_edge_he,
                     "excluded_he_points": n_excluded_he,
     }
-    if fine_alignment_method != "tissue-aware density flow":
+    if not density_flow_mode:
         tissue_diagnostics_row.update(
             {
                 "cluster_anchors_before_filtering": cluster_anchors_before_filter,
@@ -2694,7 +2836,7 @@ def show_he_geojson_preparation() -> None:
                 mime="image/png",
             )
     else:
-        if fine_alignment_method == "tissue-aware density flow":
+        if density_flow_mode:
             anchor_tab.info(
                 tr(
                     "Density Flowはアンカーを使用しません。更新stepとcheckpointはWarp安全性タブに表示されます。",
@@ -2790,6 +2932,16 @@ def show_he_geojson_preparation() -> None:
     warped_overlay_figure = None
     attempted_grid_figure = None
     applied_grid_figure = None
+    inverse_solver_diagnostics = None
+    raster_warp_metrics_values = None
+    displacement_pixel_summary = None
+    checkerboard_image = None
+    edge_overlay_image = None
+    qc_amplified_image = None
+    difference_figure = None
+    roi_comparison_figure = None
+    local_improvement_figure = None
+    local_metrics_table = pd.DataFrame()
     if he_image is not None:
         try:
             affine_warped_he_image, affine_warped_he_metadata = warp_he_image_to_world(
@@ -2805,11 +2957,20 @@ def show_he_geojson_preparation() -> None:
                     affine_warped_he_image,
                     affine_warped_he_metadata,
                     fine_result,
+                    inverse_iterations=int(density_flow_inverse_iterations),
+                    inverse_convergence_tolerance_pixels=density_flow_inverse_tolerance_pixels,
                 )
                 attempted_warped_he_image = density_flow_images["attempted"]
                 attempted_warped_he_metadata = dict(affine_warped_he_metadata)
                 warped_he_image = density_flow_images["final"]
                 warped_he_metadata = dict(affine_warped_he_metadata)
+                inverse_solver_diagnostics = density_flow_images["attempted_inverse_diagnostics"]
+                image_fine_applied = bool(density_flow_images["raster_applied"])
+                image_applied_result_label = (
+                    applied_result_label
+                    if image_fine_applied
+                    else "affine-only raster fallback"
+                )
             elif image_fine_applied:
                 warped_he_image, warped_he_metadata = warp_he_image_to_world(
                     he_image,
@@ -2861,7 +3022,7 @@ def show_he_geojson_preparation() -> None:
                         {"image_output": "Attempted density-flow warped HE image", "field": "attempted", "purpose": "QC even when rejected"},
                         {
                             "image_output": "Final applied HE image",
-                            "field": "density-flow" if fine_applied else "affine fallback",
+                            "field": "density-flow" if image_fine_applied else "affine fallback",
                             "purpose": "safety-gated result",
                         },
                     ]
@@ -2869,7 +3030,7 @@ def show_he_geojson_preparation() -> None:
                 use_container_width=True,
                 hide_index=True,
             )
-        if density_flow_mode and fine_applied:
+        if density_flow_mode and image_fine_applied:
             image_tab.success(
                 tr(
                     "点群結果と最終HE画像には、safety checkを通過したdensity-flow fieldを適用しています。",
@@ -2879,8 +3040,8 @@ def show_he_geojson_preparation() -> None:
         elif density_flow_mode:
             image_tab.warning(
                 tr(
-                    "Density-flowはrejectされました。attempted画像はQC用に表示し、最終HE画像はaffine-onlyです。",
-                    "Density-flow was rejected. The attempted image remains visible for QC; the final HE image is affine-only.",
+                    "Density-flow point fieldまたはinverse raster solverがrejectされました。attempted画像はQC用に表示し、最終HE画像はaffine-onlyです。",
+                    "The density-flow point field or inverse raster solver was rejected. The attempted image remains visible for QC; the final HE image is affine-only.",
                 )
             )
         elif fine_applied:
@@ -2889,6 +3050,139 @@ def show_he_geojson_preparation() -> None:
             image_tab.warning("Fine warp was rejected or disabled; warped HE image is affine-only.")
             if attempted_warped_he_image is not None:
                 image_tab.info("Attempted warp preview shows the rejected candidate deformation for QC only.")
+        if density_flow_mode and attempted_warped_he_image is not None:
+            image_tab.subheader(tr("Raster変形QC", "Raster deformation QC"))
+            if inverse_solver_diagnostics is not None:
+                image_tab.caption(tr("Inverse solver診断", "Inverse solver diagnostics"))
+                image_tab.dataframe(
+                    pd.DataFrame([{key: value for key, value in inverse_solver_diagnostics.items() if key != "history"}]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                if not inverse_solver_diagnostics.get("converged", False):
+                    image_tab.warning(
+                        "Inverse raster mapping did not meet its residual tolerance. The attempted image is retained for QC, but the final raster is affine-only."
+                    )
+                inverse_history = pd.DataFrame(inverse_solver_diagnostics.get("history", []))
+                if not inverse_history.empty:
+                    with image_tab.expander(tr("Inverse solver収束履歴", "Inverse solver convergence history")):
+                        st.dataframe(inverse_history, use_container_width=True, hide_index=True)
+            output_tissue_mask = _tissue_mask_from_image(affine_warped_he_image, tissue_mask_threshold)
+            raster_warp_metrics_values = raster_difference_metrics(
+                affine_warped_he_image,
+                attempted_warped_he_image,
+                tissue_mask=output_tissue_mask,
+            )
+            displacement_pixel_summary = point_displacement_pixel_summary(
+                attempted_displacement_x,
+                attempted_displacement_y,
+                output_pixel_size_um=warped_he_pixel_size,
+            )
+            image_tab.dataframe(
+                pd.DataFrame(
+                    [
+                        {"region": region, **values}
+                        for region, values in raster_warp_metrics_values.items()
+                    ]
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+            image_tab.dataframe(pd.DataFrame([displacement_pixel_summary]), use_container_width=True, hide_index=True)
+            if displacement_pixel_summary["visually_subpixel"]:
+                image_tab.info(
+                    "The accepted deformation is sub-pixel at the selected output resolution. "
+                    "A visually obvious raster distortion is not expected."
+                )
+            true_left, true_right = image_tab.columns(2)
+            with true_left:
+                st.image(affine_warped_he_image, caption="Affine-only HE image")
+            with true_right:
+                st.image(attempted_warped_he_image, caption="True density-flow warped HE image")
+            checkerboard_image = checkerboard_comparison(
+                affine_warped_he_image,
+                attempted_warped_he_image,
+                tile_size=32,
+            )
+            edge_overlay_image = edge_overlay(affine_warped_he_image, attempted_warped_he_image)
+            blink_stage = image_tab.radio(
+                tr("Blink比較", "Blink comparison"),
+                ["Affine-only", "True density-flow warped"],
+                horizontal=True,
+                key="workflow-c-density-flow-blink",
+            )
+            image_tab.image(
+                affine_warped_he_image if blink_stage == "Affine-only" else attempted_warped_he_image,
+                caption=f"Blink frame: {blink_stage}",
+            )
+            qc_left, qc_right = image_tab.columns(2)
+            with qc_left:
+                st.image(checkerboard_image, caption="50/50 checkerboard: affine / true density-flow")
+            with qc_right:
+                st.image(edge_overlay_image, caption="Edge overlay: red affine / green warped / white overlap")
+            difference_figure = visualize_absolute_image_difference(
+                affine_warped_he_image,
+                attempted_warped_he_image,
+                title="Absolute pixel difference: true density-flow minus affine-only",
+            )
+            image_tab.pyplot(difference_figure, clear_figure=False)
+
+            difference_gray = np.abs(
+                np.asarray(attempted_warped_he_image, dtype=float)
+                - np.asarray(affine_warped_he_image, dtype=float)
+            )
+            if difference_gray.ndim == 3:
+                difference_gray = np.mean(difference_gray, axis=2)
+            roi_definitions = []
+            field_candidates = [
+                ("largest displacement", np.unravel_index(np.argmax(np.hypot(attempted_displacement_x, attempted_displacement_y)), attempted_displacement_x.shape)),
+                ("lowest Jacobian", np.unravel_index(np.argmin(attempted_jacobian), attempted_jacobian.shape)),
+                ("highest Jacobian", np.unravel_index(np.argmax(attempted_jacobian), attempted_jacobian.shape)),
+            ]
+            for label, (field_row, field_col) in field_candidates:
+                world_point = np.array([[fine_result.grid_x[field_row, field_col], fine_result.grid_y[field_row, field_col]]])
+                pixel = world_points_to_warped_image_pixels(world_point, affine_warped_he_metadata)[0]
+                roi_definitions.append({"label": label, "row": pixel[1], "col": pixel[0]})
+            diff_row, diff_col = np.unravel_index(np.argmax(difference_gray), difference_gray.shape)
+            roi_definitions.append({"label": "largest absolute image difference", "row": diff_row, "col": diff_col})
+            roi_comparison_figure = visualize_roi_comparisons(
+                affine_warped_he_image,
+                attempted_warped_he_image,
+                roi_definitions,
+                radius=96,
+            )
+            image_tab.pyplot(roi_comparison_figure, clear_figure=False)
+
+            local_metrics_table = pd.DataFrame(
+                fine_result.metrics.get("local_region_metrics", [])
+                if isinstance(fine_result.metrics, dict)
+                else []
+            )
+            if not local_metrics_table.empty:
+                image_tab.subheader(tr("局所validation", "Local validation"))
+                image_tab.dataframe(local_metrics_table, use_container_width=True, hide_index=True)
+                image_tab.json(fine_result.metrics.get("local_region_summary", {}))
+                local_improvement_figure = visualize_local_improvement_heatmap(local_metrics_table)
+                image_tab.pyplot(local_improvement_figure, clear_figure=False)
+
+            if density_flow_qc_gain > 1:
+                qc_amplified_image = warp_affine_image_with_density_flow(
+                    affine_warped_he_image,
+                    affine_warped_he_metadata,
+                    attempted_displacement_x * density_flow_qc_gain,
+                    attempted_displacement_y * density_flow_qc_gain,
+                    field_bounds=fine_result.bounds,
+                    field_spacing=fine_result.grid_spacing,
+                    inverse_iterations=int(density_flow_inverse_iterations),
+                    inverse_convergence_tolerance_pixels=density_flow_inverse_tolerance_pixels,
+                )
+                image_tab.error(
+                    "EXAGGERATED QC PREVIEW — NOT AN APPLIED REGISTRATION RESULT"
+                )
+                image_tab.image(
+                    qc_amplified_image,
+                    caption=f"EXAGGERATED QC PREVIEW — NOT AN APPLIED REGISTRATION RESULT ({density_flow_qc_gain}x)",
+                )
         warped_image_height, warped_image_width = warped_he_image.shape[:2]
         geojson_pixels = world_points_to_warped_image_pixels(geojson_array, warped_he_metadata)
         he_pixels = world_points_to_warped_image_pixels(final_points, warped_he_metadata)
@@ -3190,6 +3484,7 @@ def show_he_geojson_preparation() -> None:
         "fine_applied": fine_applied,
         "applied_result_label": applied_result_label,
         "density_flow_experimental_raster_warp": density_flow_mode,
+        "density_flow_preset": density_flow_preset,
         "density_flow_pixel_size_um": density_flow_pixel_size,
         "density_flow_blur_scales_px": density_flow_blur_scales_text,
         "density_flow_optimization_levels": density_flow_levels,
@@ -3207,6 +3502,21 @@ def show_he_geojson_preparation() -> None:
         "density_flow_point_metric_patience": density_flow_point_metric_patience,
         "density_flow_max_backtracking_steps": density_flow_max_backtracking_steps,
         "density_flow_detect_axis_reversal": density_flow_detect_axis_reversal,
+        "density_flow_inverse_max_iterations": density_flow_inverse_iterations,
+        "density_flow_inverse_tolerance_output_pixels": density_flow_inverse_tolerance_pixels,
+        "density_flow_qc_display_gain": density_flow_qc_gain,
+        "density_flow_qc_gain_used": density_flow_qc_gain > 1,
+        "density_flow_minimum_absolute_median_improvement_um": density_flow_min_absolute_improvement,
+        "density_flow_minimum_relative_median_improvement": density_flow_min_relative_improvement,
+        "density_flow_maximum_mutual_nearest_decrease": density_flow_max_mutual_decrease,
+        "density_flow_maximum_within_fraction_decrease": density_flow_max_within_decrease,
+        "density_flow_minimum_jacobian_p05": density_flow_min_jacobian_p05,
+        "density_flow_maximum_jacobian_p95": density_flow_max_jacobian_p95,
+        "density_flow_local_region_size_um": density_flow_local_region_size,
+        "joint_density_weight": joint_density_weight,
+        "joint_tissue_support_weight": joint_support_weight,
+        "joint_structure_weight": joint_structure_weight,
+        "joint_soft_jacobian_weight": joint_soft_jacobian_weight,
         "local_translation_preset": local_preset,
         "he_coordinate_order": he_coordinate_order,
         "similarity_trim_quantile": similarity_trim,
@@ -3404,6 +3714,16 @@ def show_he_geojson_preparation() -> None:
         "best_checkpoint_median": density_flow_metadata.get("best_attempted_symmetric_median"),
         "best_checkpoint_mutual_fraction": density_flow_metadata.get("mutual_nearest_fraction_best"),
         "runtime_seconds": runtime_seconds,
+        "raster_warp_metrics": raster_warp_metrics_values,
+        "inverse_solver_diagnostics": (
+            {key: value for key, value in inverse_solver_diagnostics.items() if key != "history"}
+            if inverse_solver_diagnostics is not None else None
+        ),
+        "true_displacement_pixel_summary": displacement_pixel_summary,
+        "local_region_summary": (
+            fine_result.metrics.get("local_region_summary")
+            if isinstance(fine_result.metrics, dict) else None
+        ),
     }
     parameters["include_original_uploaded_inputs"] = include_original_inputs
     parameters["comparison_run_id"] = previous_entry.get("run_id") if previous_entry else None
@@ -3446,6 +3766,41 @@ def show_he_geojson_preparation() -> None:
             figure_to_png_bytes(applied_grid_figure) if applied_grid_figure is not None else None
         ),
         "images/distance_histogram.png": figure_to_png_bytes(hist_figure),
+        "raster_warp_metrics.json": (
+            json.dumps(raster_warp_metrics_values, indent=2).encode("utf-8")
+            if raster_warp_metrics_values is not None else None
+        ),
+        "raster_warp_metrics.csv": (
+            pd.DataFrame([
+                {"region": region, **values}
+                for region, values in raster_warp_metrics_values.items()
+            ]).to_csv(index=False).encode("utf-8")
+            if raster_warp_metrics_values is not None else None
+        ),
+        "inverse_solver_history.csv": (
+            pd.DataFrame(inverse_solver_diagnostics.get("history", [])).to_csv(index=False).encode("utf-8")
+            if inverse_solver_diagnostics is not None else None
+        ),
+        "local_region_metrics.csv": (
+            local_metrics_table.to_csv(index=False).encode("utf-8")
+            if local_metrics_table is not None and not local_metrics_table.empty else None
+        ),
+        "true_displacement_pixel_summary.json": (
+            json.dumps(displacement_pixel_summary, indent=2).encode("utf-8")
+            if displacement_pixel_summary is not None else None
+        ),
+        "images/affine_vs_warped_difference.png": (
+            figure_to_png_bytes(difference_figure) if difference_figure is not None else None
+        ),
+        "images/checkerboard_comparison.png": (
+            array_to_png_bytes(checkerboard_image) if checkerboard_image is not None else None
+        ),
+        "images/edge_overlay.png": (
+            array_to_png_bytes(edge_overlay_image) if edge_overlay_image is not None else None
+        ),
+        "images/roi_comparisons.png": (
+            figure_to_png_bytes(roi_comparison_figure) if roi_comparison_figure is not None else None
+        ),
     }
     uploaded_input_records = []
     for uploaded in (he_centers_file, geojson_file, he_image_file):

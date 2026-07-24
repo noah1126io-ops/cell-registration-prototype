@@ -160,3 +160,24 @@ def test_git_provenance_fails_gracefully_outside_repository(tmp_path):
     provenance = git_provenance(tmp_path)
 
     assert provenance == {"git_commit_sha": None, "git_dirty": None}
+
+
+def test_raster_qc_artifacts_are_exported_without_amplified_preview():
+    artifacts = {
+        "raster_warp_metrics.json": b"{}",
+        "raster_warp_metrics.csv": b"region,value\nfull,1\n",
+        "inverse_solver_history.csv": b"iteration,max_residual\n1,0.1\n",
+        "local_region_metrics.csv": b"region_id,delta_median\n0,-0.2\n",
+        "true_displacement_pixel_summary.json": b"{}",
+        "images/affine_vs_warped_difference.png": b"difference",
+        "images/checkerboard_comparison.png": b"checkerboard",
+        "images/edge_overlay.png": b"edges",
+        "images/roi_comparisons.png": b"rois",
+    }
+    bundle, _ = _bundle(artifacts=artifacts)
+
+    with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+        names = set(archive.namelist())
+
+    assert set(artifacts) <= names
+    assert not any("amplified" in name or "exaggerated" in name for name in names)

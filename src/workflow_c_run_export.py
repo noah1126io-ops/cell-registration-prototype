@@ -36,6 +36,15 @@ EXPECTED_ARTIFACTS = (
     "images/attempted_warp_grid.png",
     "images/applied_warp_grid.png",
     "images/distance_histogram.png",
+    "raster_warp_metrics.json",
+    "raster_warp_metrics.csv",
+    "inverse_solver_history.csv",
+    "local_region_metrics.csv",
+    "true_displacement_pixel_summary.json",
+    "images/affine_vs_warped_difference.png",
+    "images/checkerboard_comparison.png",
+    "images/edge_overlay.png",
+    "images/roi_comparisons.png",
 )
 
 

@@ -9,6 +9,7 @@ from scipy.signal import fftconvolve
 from scipy.spatial import cKDTree
 
 from src.pointset_registration import FineWarpResult, point_bidirectional_distance_metrics
+from src.raster_deformation_qc import local_region_metrics, soft_jacobian_log_penalty
 
 
 def _validate_points(points: np.ndarray, name: str) -> np.ndarray:
@@ -182,6 +183,59 @@ def _world_to_affine_image_rows_cols(world_points: np.ndarray, warp_metadata: di
     return np.column_stack([rows, columns])
 
 
+def _resample_raster_to_world_grid(
+    image: np.ndarray,
+    warp_metadata: dict,
+    grid_x: np.ndarray,
+    grid_y: np.ndarray,
+    *,
+    order: int,
+) -> np.ndarray:
+    values = np.asarray(image, dtype=float)
+    if values.ndim == 3:
+        values = np.mean(values[..., :3], axis=2)
+    world_points = np.column_stack([grid_x.ravel(), grid_y.ravel()])
+    rows_cols = _world_to_affine_image_rows_cols(world_points, warp_metadata)
+    sampled = map_coordinates(
+        values,
+        [rows_cols[:, 0], rows_cols[:, 1]],
+        order=order,
+        mode="constant",
+        cval=0.0,
+    )
+    return sampled.reshape(grid_x.shape)
+
+
+def _warp_scalar_grid_with_field(
+    source: np.ndarray,
+    field_x: np.ndarray,
+    field_y: np.ndarray,
+    pixel_size: float,
+    *,
+    inverse_iterations: int = 8,
+) -> np.ndarray:
+    rows, cols = np.indices(source.shape, dtype=float)
+    source_rows = rows.copy()
+    source_cols = cols.copy()
+    for _ in range(inverse_iterations):
+        sampled_x = map_coordinates(field_x, [source_rows, source_cols], order=1, mode="nearest")
+        sampled_y = map_coordinates(field_y, [source_rows, source_cols], order=1, mode="nearest")
+        source_cols = cols - sampled_x / pixel_size
+        source_rows = rows - sampled_y / pixel_size
+    return map_coordinates(source, [source_rows, source_cols], order=1, mode="constant", cval=0.0)
+
+
+def _normalized_feature(values: np.ndarray) -> np.ndarray:
+    array = np.asarray(values, dtype=float)
+    finite = array[np.isfinite(array)]
+    if finite.size == 0:
+        return np.zeros_like(array)
+    low, high = np.percentile(finite, [1, 99])
+    if high <= low:
+        return np.zeros_like(array)
+    return np.clip((array - low) / (high - low), 0.0, 1.0)
+
+
 def warp_affine_image_with_density_flow(
     affine_image: np.ndarray,
     warp_metadata: dict,
@@ -191,7 +245,9 @@ def warp_affine_image_with_density_flow(
     field_bounds: tuple[float, float, float, float],
     field_spacing: float,
     inverse_iterations: int = 12,
-) -> np.ndarray:
+    inverse_convergence_tolerance_pixels: float = 0.05,
+    return_diagnostics: bool = False,
+) -> np.ndarray | tuple[np.ndarray, dict]:
     """Inverse-map an affine world image through a forward density-flow field."""
     image = np.asarray(affine_image)
     if image.ndim not in {2, 3}:
@@ -206,10 +262,22 @@ def warp_affine_image_with_density_flow(
         raise ValueError("field_spacing must be positive and finite.")
     if inverse_iterations < 1:
         raise ValueError("inverse_iterations must be at least 1.")
+    if inverse_convergence_tolerance_pixels <= 0 or not np.isfinite(inverse_convergence_tolerance_pixels):
+        raise ValueError("inverse_convergence_tolerance_pixels must be positive and finite.")
+    min_x, min_y, max_x, max_y = map(float, field_bounds)
+    expected_width = int(np.ceil((max_x - min_x) / field_spacing)) + 1
+    expected_height = int(np.ceil((max_y - min_y) / field_spacing)) + 1
+    if expected_width != field_x.shape[1] or expected_height != field_x.shape[0]:
+        raise ValueError(
+            "Density-flow field shape is inconsistent with field_bounds and field_spacing."
+        )
 
     output_world_points = _output_world_grid_from_metadata(image.shape, warp_metadata)
     source_world_points = output_world_points.copy()
-    for _ in range(int(inverse_iterations)):
+    output_pixel_size = float(warp_metadata["output_pixel_size_um"])
+    inverse_history = []
+    converged = False
+    for iteration in range(int(inverse_iterations)):
         sampled_displacement = _sample_field(
             source_world_points,
             field_x,
@@ -219,6 +287,28 @@ def warp_affine_image_with_density_flow(
             mode="nearest",
         )
         source_world_points = output_world_points - sampled_displacement
+        verification_displacement = _sample_field(
+            source_world_points,
+            field_x,
+            field_y,
+            field_bounds,
+            field_spacing,
+            mode="nearest",
+        )
+        inverse_residual_pixels = np.linalg.norm(
+            source_world_points + verification_displacement - output_world_points,
+            axis=1,
+        ) / output_pixel_size
+        history_row = {
+            "iteration": iteration + 1,
+            "median_residual_pixels": float(np.median(inverse_residual_pixels)),
+            "p95_residual_pixels": float(np.percentile(inverse_residual_pixels, 95)),
+            "max_residual_pixels": float(np.max(inverse_residual_pixels)),
+        }
+        inverse_history.append(history_row)
+        if history_row["max_residual_pixels"] <= inverse_convergence_tolerance_pixels:
+            converged = True
+            break
 
     source_rows_cols = _world_to_affine_image_rows_cols(source_world_points, warp_metadata)
     rows = source_rows_cols[:, 0]
@@ -246,8 +336,26 @@ def warp_affine_image_with_density_flow(
 
     if np.issubdtype(image.dtype, np.integer):
         limits = np.iinfo(image.dtype)
-        return np.clip(sampled, limits.min, limits.max).astype(image.dtype)
-    return sampled.astype(image.dtype, copy=False)
+        warped = np.clip(sampled, limits.min, limits.max).astype(image.dtype)
+    else:
+        warped = sampled.astype(image.dtype, copy=False)
+
+    final_residual = inverse_residual_pixels
+    diagnostics = {
+        "requested_max_iterations": int(inverse_iterations),
+        "iterations_used": len(inverse_history),
+        "convergence_tolerance_pixels": float(inverse_convergence_tolerance_pixels),
+        "converged": converged,
+        "median_residual_pixels": float(np.median(final_residual)),
+        "p95_residual_pixels": float(np.percentile(final_residual, 95)),
+        "max_residual_pixels": float(np.max(final_residual)),
+        "fraction_above_0_1_pixel": float(np.mean(final_residual > 0.1)),
+        "fraction_above_0_25_pixel": float(np.mean(final_residual > 0.25)),
+        "fraction_above_0_5_pixel": float(np.mean(final_residual > 0.5)),
+        "fraction_above_1_pixel": float(np.mean(final_residual > 1.0)),
+        "history": inverse_history,
+    }
+    return (warped, diagnostics) if return_diagnostics else warped
 
 
 def density_flow_image_outputs(
@@ -256,7 +364,8 @@ def density_flow_image_outputs(
     fine_result: FineWarpResult,
     *,
     inverse_iterations: int = 12,
-) -> dict[str, np.ndarray]:
+    inverse_convergence_tolerance_pixels: float = 0.05,
+) -> dict:
     """Return affine, attempted, and safety-gated final density-flow images."""
     affine_output = np.asarray(affine_image).copy()
     attempted_x = getattr(fine_result, "attempted_displacement_x", None)
@@ -264,7 +373,7 @@ def density_flow_image_outputs(
     if attempted_x is None or attempted_y is None:
         attempted_x = np.zeros_like(fine_result.displacement_x, dtype=float)
         attempted_y = np.zeros_like(fine_result.displacement_y, dtype=float)
-    attempted_output = warp_affine_image_with_density_flow(
+    attempted_output, attempted_inverse = warp_affine_image_with_density_flow(
         affine_output,
         warp_metadata,
         attempted_x,
@@ -272,23 +381,37 @@ def density_flow_image_outputs(
         field_bounds=fine_result.bounds,
         field_spacing=fine_result.grid_spacing,
         inverse_iterations=inverse_iterations,
+        inverse_convergence_tolerance_pixels=inverse_convergence_tolerance_pixels,
+        return_diagnostics=True,
     )
-    if bool(getattr(fine_result, "applied", False)):
-        final_output = warp_affine_image_with_density_flow(
-            affine_output,
-            warp_metadata,
-            fine_result.displacement_x,
-            fine_result.displacement_y,
-            field_bounds=fine_result.bounds,
-            field_spacing=fine_result.grid_spacing,
-            inverse_iterations=inverse_iterations,
-        )
+    point_field_applied = bool(getattr(fine_result, "applied", False))
+    raster_applied = bool(point_field_applied and attempted_inverse["converged"])
+    if raster_applied:
+        final_output = attempted_output.copy()
+        final_inverse = dict(attempted_inverse)
     else:
         final_output = affine_output.copy()
+        final_inverse = {
+            **attempted_inverse,
+            "converged": True,
+            "uses_affine_fallback": True,
+        }
     return {
         "affine": affine_output,
         "attempted": attempted_output,
         "final": final_output,
+        "attempted_inverse_diagnostics": attempted_inverse,
+        "final_inverse_diagnostics": final_inverse,
+        "raster_applied": raster_applied,
+        "raster_rejection_reason": (
+            None
+            if raster_applied
+            else (
+                "point_field_not_applied"
+                if not point_field_applied
+                else "inverse_solver_not_converged"
+            )
+        ),
     }
 
 
@@ -424,6 +547,14 @@ def _field_objective(
     jacobian_min_threshold: float,
     jacobian_max_threshold: float,
     pixel_size: float,
+    fixed_support: np.ndarray | None = None,
+    moving_support: np.ndarray | None = None,
+    fixed_structure: np.ndarray | None = None,
+    moving_structure: np.ndarray | None = None,
+    density_weight: float = 1.0,
+    support_weight: float = 0.0,
+    structure_weight: float = 0.0,
+    soft_jacobian_weight: float = 0.0,
 ) -> dict[str, float]:
     residual = fixed_density - moving_density
     density_energy = float(np.mean(tissue_weight * fixed_density**2))
@@ -447,22 +578,39 @@ def _field_objective(
     mapped_x = map_coordinates(field_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
     mapped_y = map_coordinates(field_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
     inverse_term = float(np.mean((field_x - mapped_x) ** 2 + (field_y - mapped_y) ** 2))
+    support_term = (
+        float(np.mean((fixed_support - moving_support) ** 2))
+        if fixed_support is not None and moving_support is not None
+        else 0.0
+    )
+    structure_term = (
+        float(np.mean((fixed_structure - moving_structure) ** 2))
+        if fixed_structure is not None and moving_structure is not None
+        else 0.0
+    )
+    soft_jacobian_term = soft_jacobian_log_penalty(jacobian)
     total = (
-        density_term
+        density_weight * density_term
+        + support_weight * support_term
+        + structure_weight * structure_term
         + smoothness_weight * smoothness_term
         + magnitude_weight * magnitude_term
         + jacobian_weight * jacobian_term
         + boundary_weight * boundary_term
         + inverse_consistency_weight * inverse_term
+        + soft_jacobian_weight * soft_jacobian_term
     )
     return {
         "total": float(total),
         "density": density_term,
+        "support": support_term,
+        "structure": structure_term,
         "smoothness": smoothness_term,
         "magnitude": magnitude_term,
         "jacobian_barrier": jacobian_term,
         "tissue_boundary": boundary_term,
         "inverse_consistency": inverse_term,
+        "soft_jacobian": soft_jacobian_term,
     }
 
 
@@ -484,6 +632,14 @@ def _evaluate_density_flow_state(
     inverse_consistency_weight: float,
     jacobian_min_threshold: float,
     jacobian_max_threshold: float,
+    fixed_support: np.ndarray | None = None,
+    moving_support_source: np.ndarray | None = None,
+    fixed_structure: np.ndarray | None = None,
+    moving_structure_source: np.ndarray | None = None,
+    density_weight: float = 1.0,
+    support_weight: float = 0.0,
+    structure_weight: float = 0.0,
+    soft_jacobian_weight: float = 0.0,
 ) -> dict[str, object]:
     """Evaluate density and field penalties from one internally consistent field."""
     transformed_points = moving_points + _sample_field(
@@ -493,6 +649,16 @@ def _evaluate_density_flow_state(
     moving_density = _normalized_density(moving_impulses, density_sigma)
     jacobian = _jacobian(field_x, field_y, pixel_size)
     displacement = np.hypot(field_x, field_y)
+    warped_support = (
+        _warp_scalar_grid_with_field(moving_support_source, field_x, field_y, pixel_size)
+        if moving_support_source is not None
+        else None
+    )
+    warped_structure = (
+        _warp_scalar_grid_with_field(moving_structure_source, field_x, field_y, pixel_size)
+        if moving_structure_source is not None
+        else None
+    )
     objective = _field_objective(
         fixed_density,
         moving_density,
@@ -508,10 +674,20 @@ def _evaluate_density_flow_state(
         jacobian_min_threshold=jacobian_min_threshold,
         jacobian_max_threshold=jacobian_max_threshold,
         pixel_size=pixel_size,
+        fixed_support=fixed_support,
+        moving_support=warped_support,
+        fixed_structure=fixed_structure,
+        moving_structure=warped_structure,
+        density_weight=density_weight,
+        support_weight=support_weight,
+        structure_weight=structure_weight,
+        soft_jacobian_weight=soft_jacobian_weight,
     )
     return {
         "transformed_points": transformed_points,
         "moving_density": moving_density,
+        "moving_support": warped_support,
+        "moving_structure": warped_structure,
         "jacobian": jacobian,
         "displacement": displacement,
         "objective": objective,
@@ -523,6 +699,8 @@ def _evaluate_density_flow_state(
             and np.isfinite(jacobian).all()
             and np.isfinite(displacement).all()
             and np.isfinite(float(objective["total"]))
+            and (warped_support is None or np.isfinite(warped_support).all())
+            and (warped_structure is None or np.isfinite(warped_structure).all())
         ),
         "jacobian_min": float(np.min(jacobian)),
         "jacobian_max": float(np.max(jacobian)),
@@ -588,12 +766,30 @@ def _checkpoint_improves_affine(
     *,
     affine_median: float,
     affine_mutual_fraction: float,
+    minimum_absolute_improvement: float = 0.10,
+    minimum_relative_improvement: float = 0.005,
+    maximum_mutual_decrease: float = 0.005,
+    maximum_within_fraction_decrease: float = 0.01,
+    affine_metrics: dict | None = None,
 ) -> bool:
     median = float(metrics["symmetric_median_distance"])
     mutual = float(metrics["mutual_nearest_fraction"])
+    absolute_improvement = affine_median - median
+    relative_improvement = absolute_improvement / max(abs(affine_median), np.finfo(float).eps)
+    sufficient_median_improvement = bool(
+        absolute_improvement >= minimum_absolute_improvement
+        or relative_improvement >= minimum_relative_improvement
+    )
+    within_ok = True
+    if affine_metrics is not None:
+        for threshold in (3, 5, 10):
+            key = f"symmetric_within_{threshold}"
+            if key in affine_metrics and key in metrics:
+                within_ok &= float(metrics[key]) >= float(affine_metrics[key]) - maximum_within_fraction_decrease
     return bool(
-        median <= affine_median + 1e-12
-        and (median < affine_median - 1e-12 or mutual > affine_mutual_fraction + 1e-12)
+        sufficient_median_improvement
+        and mutual >= affine_mutual_fraction - maximum_mutual_decrease
+        and within_ok
     )
 
 
@@ -645,6 +841,20 @@ def tissue_aware_density_flow_registration(
     early_stopping_patience: int = 3,
     point_metric_patience: int = 6,
     max_backtracking_steps: int = 8,
+    minimum_absolute_median_improvement: float = 0.10,
+    minimum_relative_median_improvement: float = 0.005,
+    maximum_mutual_nearest_decrease: float = 0.005,
+    maximum_within_fraction_decrease: float = 0.01,
+    minimum_jacobian_p05: float = 0.8,
+    maximum_jacobian_p95: float = 1.25,
+    local_region_block_size: float = 100.0,
+    moving_tissue_mask: np.ndarray | None = None,
+    moving_tissue_metadata: dict | None = None,
+    moving_structure_image: np.ndarray | None = None,
+    density_channel_weight: float = 1.0,
+    tissue_support_channel_weight: float = 0.0,
+    structure_channel_weight: float = 0.0,
+    soft_jacobian_weight: float = 0.0,
     detect_axis_reversal: bool = True,
     max_grid_side: int = 1024,
 ) -> FineWarpResult:
@@ -666,6 +876,12 @@ def tissue_aware_density_flow_registration(
         raise ValueError("objective_tolerance must be finite and non-negative.")
     if early_stopping_patience < 1 or point_metric_patience < 1 or max_backtracking_steps < 1:
         raise ValueError("Density-flow patience and backtracking values must be at least 1.")
+    if minimum_absolute_median_improvement < 0 or minimum_relative_median_improvement < 0:
+        raise ValueError("Checkpoint improvement thresholds must be non-negative.")
+    if maximum_mutual_nearest_decrease < 0 or maximum_within_fraction_decrease < 0:
+        raise ValueError("Checkpoint degradation tolerances must be non-negative.")
+    if not (minimum_jacobian_p05 > 0 and maximum_jacobian_p95 >= minimum_jacobian_p05):
+        raise ValueError("Checkpoint Jacobian percentile limits are invalid.")
     global_initialization = str(global_translation_initialization).strip().lower()
     if global_initialization not in {"off", "auto"}:
         raise ValueError("global_translation_initialization must be 'off' or 'auto'.")
@@ -729,6 +945,49 @@ def tissue_aware_density_flow_registration(
     boundary_confidence = np.clip(boundary_distance / max(max(active_scales), 1.0), 0.0, 1.0)
     tissue_weight_map = tissue_mask.astype(float) * (0.2 + 0.8 * boundary_confidence)
 
+    fixed_support_map = None
+    moving_support_map = None
+    fixed_structure_map = None
+    moving_structure_map = None
+    if moving_tissue_mask is not None:
+        if moving_tissue_metadata is None:
+            raise ValueError("moving_tissue_metadata is required with moving_tissue_mask.")
+        fixed_support_map = tissue_mask.astype(float)
+        moving_support_map = _resample_raster_to_world_grid(
+            np.asarray(moving_tissue_mask, dtype=float),
+            moving_tissue_metadata,
+            grid_x,
+            grid_y,
+            order=0,
+        )
+        fixed_signed_distance = distance_transform_edt(tissue_mask) - distance_transform_edt(~tissue_mask)
+        fixed_grad_y, fixed_grad_x = np.gradient(_normalized_density(fixed_impulses, active_scales[-1]))
+        fixed_structure_map = _normalized_feature(
+            np.hypot(fixed_grad_x, fixed_grad_y) + 0.25 * _normalized_feature(fixed_signed_distance)
+        )
+        if moving_structure_image is None:
+            moving_structure_image = np.asarray(moving_tissue_mask, dtype=float)
+        moving_gray = np.asarray(moving_structure_image, dtype=float)
+        if moving_gray.ndim == 3:
+            moving_gray = np.mean(moving_gray[..., :3], axis=2)
+        moving_gray = gaussian_filter(_normalized_feature(moving_gray), sigma=2.0, mode="nearest")
+        moving_grad_y, moving_grad_x = np.gradient(moving_gray)
+        moving_signed_distance = (
+            distance_transform_edt(np.asarray(moving_tissue_mask, dtype=bool))
+            - distance_transform_edt(~np.asarray(moving_tissue_mask, dtype=bool))
+        )
+        moving_feature_image = _normalized_feature(
+            np.hypot(moving_grad_x, moving_grad_y)
+            + 0.25 * _normalized_feature(moving_signed_distance)
+        )
+        moving_structure_map = _resample_raster_to_world_grid(
+            moving_feature_image,
+            moving_tissue_metadata,
+            grid_x,
+            grid_y,
+            order=1,
+        )
+
     field_x = zeros.copy()
     field_y = zeros.copy()
     original_moving = moving.copy()
@@ -777,6 +1036,14 @@ def tissue_aware_density_flow_registration(
             inverse_consistency_weight=inverse_consistency_weight,
             jacobian_min_threshold=jacobian_min_threshold,
             jacobian_max_threshold=jacobian_max_threshold,
+            fixed_support=fixed_support_map,
+            moving_support_source=moving_support_map,
+            fixed_structure=fixed_structure_map,
+            moving_structure_source=moving_structure_map,
+            density_weight=density_channel_weight,
+            support_weight=tissue_support_channel_weight,
+            structure_weight=structure_channel_weight,
+            soft_jacobian_weight=soft_jacobian_weight,
         )
 
     def point_metrics_for_field(current_x: np.ndarray, current_y: np.ndarray) -> tuple[dict, np.ndarray]:
@@ -787,11 +1054,22 @@ def tissue_aware_density_flow_registration(
         values["mutual_nearest_fraction"] = _mutual_nearest_fraction(metric_fixed, transformed)
         return values, transformed
 
-    def improves_affine(values: dict) -> bool:
-        return _checkpoint_improves_affine(
+    def improves_affine(values: dict, state: dict[str, object]) -> bool:
+        jacobian_values = np.asarray(state["jacobian"], dtype=float)
+        topology_safe = bool(
+            np.mean(jacobian_values <= 0.0) == 0.0
+            and np.percentile(jacobian_values, 5) >= minimum_jacobian_p05
+            and np.percentile(jacobian_values, 95) <= maximum_jacobian_p95
+        )
+        return topology_safe and _checkpoint_improves_affine(
             values,
             affine_median=float(before_metrics["symmetric_median_distance"]),
             affine_mutual_fraction=before_mutual,
+            minimum_absolute_improvement=minimum_absolute_median_improvement,
+            minimum_relative_improvement=minimum_relative_median_improvement,
+            maximum_mutual_decrease=maximum_mutual_nearest_decrease,
+            maximum_within_fraction_decrease=maximum_within_fraction_decrease,
+            affine_metrics=before_metrics,
         )
 
     attempted_steps = 0
@@ -808,19 +1086,20 @@ def tissue_aware_density_flow_registration(
     point_stall_count = 0
 
     initial_metric_values, _ = point_metrics_for_field(field_x, field_y)
-    if improves_affine(initial_metric_values):
-        best_checkpoint = {
-            "field_x": field_x.copy(),
-            "field_y": field_y.copy(),
-            "metrics": initial_metric_values,
-            "iteration": -1,
-        }
 
     for level, sigma_px in enumerate(active_scales):
         fixed_density = _normalized_density(fixed_impulses, sigma_px)
         current_state = evaluate_state(field_x, field_y, sigma_px)
         if initial_objective is None:
             initial_objective = float(current_state["objective"]["total"])
+            if improves_affine(initial_metric_values, current_state):
+                best_checkpoint = {
+                    "field_x": field_x.copy(),
+                    "field_y": field_y.copy(),
+                    "metrics": initial_metric_values,
+                    "iteration": -1,
+                    "objective": initial_objective,
+                }
         objective_stall_count = 0
         consecutive_failed_updates = 0
         for iteration in range(int(iterations_per_level)):
@@ -833,8 +1112,37 @@ def tissue_aware_density_flow_registration(
             grad_x = fixed_grad_x + moving_grad_x
             grad_y = fixed_grad_y + moving_grad_y
             denominator = grad_x**2 + grad_y**2 + 0.1 * residual**2 + 1e-15
-            update_x = -learning_rate * density_pixel_size * residual * grad_x / denominator
-            update_y = -learning_rate * density_pixel_size * residual * grad_y / denominator
+            update_x = (
+                -learning_rate * density_pixel_size * density_channel_weight
+                * residual * grad_x / denominator
+            )
+            update_y = (
+                -learning_rate * density_pixel_size * density_channel_weight
+                * residual * grad_y / denominator
+            )
+            for fixed_channel, moving_channel, channel_weight in (
+                (fixed_support_map, current_state.get("moving_support"), tissue_support_channel_weight),
+                (fixed_structure_map, current_state.get("moving_structure"), structure_channel_weight),
+            ):
+                if fixed_channel is None or moving_channel is None or channel_weight <= 0:
+                    continue
+                channel_residual = fixed_channel - np.asarray(moving_channel)
+                fixed_channel_grad_y, fixed_channel_grad_x = np.gradient(fixed_channel)
+                moving_channel_grad_y, moving_channel_grad_x = np.gradient(moving_channel)
+                channel_grad_x = fixed_channel_grad_x + moving_channel_grad_x
+                channel_grad_y = fixed_channel_grad_y + moving_channel_grad_y
+                channel_denominator = (
+                    channel_grad_x**2 + channel_grad_y**2
+                    + 0.1 * channel_residual**2 + 1e-12
+                )
+                update_x += (
+                    -learning_rate * density_pixel_size * channel_weight
+                    * channel_residual * channel_grad_x / channel_denominator
+                )
+                update_y += (
+                    -learning_rate * density_pixel_size * channel_weight
+                    * channel_residual * channel_grad_y / channel_denominator
+                )
             update_x *= tissue_weight_map
             update_y *= tissue_weight_map
             update_x += learning_rate * smoothness_weight * laplace(field_x, mode="nearest")
@@ -945,7 +1253,7 @@ def tissue_aware_density_flow_registration(
             }
             if _better_density_flow_checkpoint(checkpoint, best_attempted):
                 best_attempted = checkpoint
-            if improves_affine(metric_values) and _better_density_flow_checkpoint(
+            if improves_affine(metric_values, current_state) and _better_density_flow_checkpoint(
                 checkpoint, best_checkpoint
             ):
                 best_checkpoint = checkpoint
@@ -1065,6 +1373,17 @@ def tissue_aware_density_flow_registration(
         "mutual_nearest_fraction_before": before_mutual,
         "mutual_nearest_fraction_attempted": attempted_metrics["mutual_nearest_fraction"],
     }
+    local_table, local_summary = local_region_metrics(
+        metric_fixed,
+        metric_moving,
+        attempted_metric_points,
+        field_x,
+        field_y,
+        jacobian,
+        bounds=resolved_bounds,
+        field_spacing=density_pixel_size,
+        block_size_um=local_region_block_size,
+    )
     applied_points = attempted_points if success else moving.copy()
     applied_metrics = attempted_metrics if success else before_metrics
     if not success:
@@ -1102,6 +1421,8 @@ def tissue_aware_density_flow_registration(
             "applied": applied_metrics,
             "safety": safety,
             "optimization_history": pd.DataFrame(history).to_dict(orient="records"),
+            "local_region_metrics": local_table.to_dict(orient="records"),
+            "local_region_summary": local_summary,
             "density_flow": {
                 "density_pixel_size": float(density_pixel_size),
                 "density_blur_scales_px": list(active_scales),
@@ -1127,6 +1448,18 @@ def tissue_aware_density_flow_registration(
                 "early_stopping_patience": int(early_stopping_patience),
                 "point_metric_patience": int(point_metric_patience),
                 "max_backtracking_steps": int(max_backtracking_steps),
+                "minimum_absolute_median_improvement": float(minimum_absolute_median_improvement),
+                "minimum_relative_median_improvement": float(minimum_relative_median_improvement),
+                "maximum_mutual_nearest_decrease": float(maximum_mutual_nearest_decrease),
+                "maximum_within_fraction_decrease": float(maximum_within_fraction_decrease),
+                "minimum_jacobian_p05": float(minimum_jacobian_p05),
+                "maximum_jacobian_p95": float(maximum_jacobian_p95),
+                "local_region_block_size": float(local_region_block_size),
+                "density_channel_weight": float(density_channel_weight),
+                "tissue_support_channel_weight": float(tissue_support_channel_weight),
+                "structure_channel_weight": float(structure_channel_weight),
+                "soft_jacobian_weight": float(soft_jacobian_weight),
+                "uses_actual_he_tissue_mask": moving_tissue_mask is not None,
                 "global_density_shift_x": float(global_shift[0]),
                 "global_density_shift_y": float(global_shift[1]),
                 "global_translation_initialization": global_initialization,
@@ -1138,3 +1471,34 @@ def tissue_aware_density_flow_registration(
             },
         },
     )
+
+
+def joint_density_tissue_structure_registration(
+    fixed_points: np.ndarray,
+    moving_points: np.ndarray,
+    *,
+    affine_he_image: np.ndarray,
+    affine_he_tissue_mask: np.ndarray,
+    affine_he_metadata: dict,
+    density_weight: float = 1.0,
+    support_weight: float = 0.25,
+    structure_weight: float = 0.15,
+    soft_jacobian_weight: float = 0.05,
+    **kwargs,
+) -> FineWarpResult:
+    """Experimental multimodal flow using density plus HE support/structure features."""
+    result = tissue_aware_density_flow_registration(
+        fixed_points,
+        moving_points,
+        moving_tissue_mask=affine_he_tissue_mask,
+        moving_tissue_metadata=affine_he_metadata,
+        moving_structure_image=affine_he_image,
+        density_channel_weight=density_weight,
+        tissue_support_channel_weight=support_weight,
+        structure_channel_weight=structure_weight,
+        soft_jacobian_weight=soft_jacobian_weight,
+        **kwargs,
+    )
+    if isinstance(result.metrics, dict):
+        result.metrics.setdefault("density_flow", {})["method"] = "joint density + tissue-structure flow"
+    return result

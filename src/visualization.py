@@ -558,6 +558,63 @@ def visualize_absolute_image_difference(
     return fig
 
 
+def visualize_roi_comparisons(
+    affine_image,
+    warped_image,
+    rois: list[dict],
+    *,
+    radius: int = 96,
+    title: str = "Affine vs density-flow ROI comparisons",
+):
+    """Show paired, same-coordinate crops for selected raster QC locations."""
+    affine = np.asarray(affine_image)
+    warped = np.asarray(warped_image)
+    if affine.shape != warped.shape:
+        raise ValueError("ROI comparison images must have matching shapes.")
+    if not rois:
+        rois = [{"label": "center", "row": affine.shape[0] // 2, "col": affine.shape[1] // 2}]
+    fig, axes = plt.subplots(len(rois), 2, figsize=(10, max(3, 4 * len(rois))), squeeze=False)
+    for row_index, roi in enumerate(rois):
+        center_row = int(round(roi["row"]))
+        center_col = int(round(roi["col"]))
+        row0, row1 = max(0, center_row - radius), min(affine.shape[0], center_row + radius)
+        col0, col1 = max(0, center_col - radius), min(affine.shape[1], center_col + radius)
+        for column_index, (image, stage) in enumerate(((affine, "Affine"), (warped, "Warped"))):
+            axes[row_index, column_index].imshow(image[row0:row1, col0:col1], cmap="gray" if image.ndim == 2 else None)
+            axes[row_index, column_index].set_title(f"{roi['label']} - {stage}")
+            axes[row_index, column_index].axis("off")
+    fig.suptitle(title)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_local_improvement_heatmap(local_metrics, *, title: str = "Local median-distance change"):
+    """Plot local validation blocks, where positive delta means degradation."""
+    fig, ax = plt.subplots(figsize=(8, 8))
+    if local_metrics is None or len(local_metrics) == 0:
+        ax.set_title(title)
+        ax.set_aspect("equal", adjustable="box")
+        fig.tight_layout()
+        return fig
+    scatter = ax.scatter(
+        local_metrics["center_x"],
+        local_metrics["center_y"],
+        c=local_metrics["delta_median"],
+        cmap="coolwarm",
+        s=100,
+        edgecolors="black",
+        linewidths=0.3,
+    )
+    fig.colorbar(scatter, ax=ax, label="warped - affine median distance (um)")
+    ax.set_title(title)
+    ax.set_xlabel("world x (um)")
+    ax.set_ylabel("world y (um)")
+    ax.set_aspect("equal", adjustable="box")
+    ax.invert_yaxis()
+    fig.tight_layout()
+    return fig
+
+
 def visualize_jacobian_heatmap(grid_x, grid_y, jacobian, *, title: str):
     """Show expansion/compression/fold-over from a displacement-field Jacobian."""
     fig, ax = plt.subplots(figsize=(8, 8))
