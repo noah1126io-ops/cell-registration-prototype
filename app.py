@@ -1234,13 +1234,13 @@ def show_he_geojson_preparation() -> None:
     density_flow_pixel_size = 2.0
     density_flow_blur_scales_text = "8, 4, 2"
     density_flow_levels = 3
-    density_flow_iterations = 12
-    density_flow_learning_rate = 0.2
-    density_flow_update_smoothing = 3.0
-    density_flow_smoothness_weight = 0.05
-    density_flow_magnitude_weight = 0.0005
+    density_flow_iterations = 8
+    density_flow_learning_rate = 0.08
+    density_flow_update_smoothing = 4.0
+    density_flow_smoothness_weight = 0.10
+    density_flow_magnitude_weight = 0.002
     density_flow_jacobian_weight = 1.0
-    density_flow_boundary_weight = 0.02
+    density_flow_boundary_weight = 0.05
     density_flow_inverse_weight = 0.0
     density_flow_detect_axis_reversal = True
     density_flow_global_initialization = "off"
@@ -1310,7 +1310,7 @@ def show_he_geojson_preparation() -> None:
             density_flow_iterations = st.number_input(
                 tr("各levelの反復回数", "Iterations per level"),
                 min_value=1,
-                value=12,
+                value=8,
                 step=1,
                 key="workflow-c-density-flow-iterations",
             )
@@ -1318,14 +1318,14 @@ def show_he_geojson_preparation() -> None:
             density_flow_learning_rate = st.number_input(
                 tr("更新率", "Learning rate"),
                 min_value=0.01,
-                value=0.2,
-                step=0.05,
+                value=0.08,
+                step=0.01,
                 key="workflow-c-density-flow-learning-rate",
             )
             density_flow_update_smoothing = st.number_input(
                 tr("更新場の平滑化sigma (pixel)", "Update smoothing sigma (pixels)"),
                 min_value=0.1,
-                value=3.0,
+                value=4.0,
                 step=0.5,
                 key="workflow-c-density-flow-update-smoothing",
             )
@@ -1337,9 +1337,9 @@ def show_he_geojson_preparation() -> None:
         with st.expander(tr("Density-flow正則化", "Density-flow regularization"), expanded=False):
             regularization_left, regularization_right = st.columns(2)
             with regularization_left:
-                density_flow_smoothness_weight = st.number_input(tr("平滑性penalty", "Smoothness penalty"), min_value=0.0, value=0.05, step=0.01, key="workflow-c-density-flow-smoothness")
-                density_flow_magnitude_weight = st.number_input(tr("変位量penalty", "Field-magnitude penalty"), min_value=0.0, value=0.0005, step=0.0005, format="%.4f", key="workflow-c-density-flow-magnitude")
-                density_flow_boundary_weight = st.number_input(tr("組織境界penalty", "Tissue-boundary penalty"), min_value=0.0, value=0.02, step=0.01, key="workflow-c-density-flow-boundary")
+                density_flow_smoothness_weight = st.number_input(tr("平滑性penalty", "Smoothness penalty"), min_value=0.0, value=0.10, step=0.01, key="workflow-c-density-flow-smoothness")
+                density_flow_magnitude_weight = st.number_input(tr("変位量penalty", "Field-magnitude penalty"), min_value=0.0, value=0.002, step=0.0005, format="%.4f", key="workflow-c-density-flow-magnitude")
+                density_flow_boundary_weight = st.number_input(tr("組織境界penalty", "Tissue-boundary penalty"), min_value=0.0, value=0.05, step=0.01, key="workflow-c-density-flow-boundary")
             with regularization_right:
                 density_flow_jacobian_weight = st.number_input(tr("Jacobian barrier重み", "Jacobian barrier weight"), min_value=0.0, value=1.0, step=0.25, key="workflow-c-density-flow-jacobian")
                 density_flow_inverse_weight = st.number_input(tr("逆整合性penalty（任意）", "Inverse-consistency penalty (optional)"), min_value=0.0, value=0.0, step=0.01, key="workflow-c-density-flow-inverse")
