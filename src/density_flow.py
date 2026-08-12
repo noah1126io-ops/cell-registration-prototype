@@ -851,6 +851,10 @@ def tissue_aware_density_flow_registration(
     moving_tissue_mask: np.ndarray | None = None,
     moving_tissue_metadata: dict | None = None,
     moving_structure_image: np.ndarray | None = None,
+    fixed_structure_feature_grid: np.ndarray | None = None,
+    moving_structure_feature_grid: np.ndarray | None = None,
+    fixed_support_feature_grid: np.ndarray | None = None,
+    moving_support_feature_grid: np.ndarray | None = None,
     density_channel_weight: float = 1.0,
     tissue_support_channel_weight: float = 0.0,
     structure_channel_weight: float = 0.0,
@@ -960,33 +964,51 @@ def tissue_aware_density_flow_registration(
             grid_y,
             order=0,
         )
-        fixed_signed_distance = distance_transform_edt(tissue_mask) - distance_transform_edt(~tissue_mask)
-        fixed_grad_y, fixed_grad_x = np.gradient(_normalized_density(fixed_impulses, active_scales[-1]))
-        fixed_structure_map = _normalized_feature(
-            np.hypot(fixed_grad_x, fixed_grad_y) + 0.25 * _normalized_feature(fixed_signed_distance)
-        )
-        if moving_structure_image is None:
-            moving_structure_image = np.asarray(moving_tissue_mask, dtype=float)
-        moving_gray = np.asarray(moving_structure_image, dtype=float)
-        if moving_gray.ndim == 3:
-            moving_gray = np.mean(moving_gray[..., :3], axis=2)
-        moving_gray = gaussian_filter(_normalized_feature(moving_gray), sigma=2.0, mode="nearest")
-        moving_grad_y, moving_grad_x = np.gradient(moving_gray)
-        moving_signed_distance = (
-            distance_transform_edt(np.asarray(moving_tissue_mask, dtype=bool))
-            - distance_transform_edt(~np.asarray(moving_tissue_mask, dtype=bool))
-        )
-        moving_feature_image = _normalized_feature(
-            np.hypot(moving_grad_x, moving_grad_y)
-            + 0.25 * _normalized_feature(moving_signed_distance)
-        )
-        moving_structure_map = _resample_raster_to_world_grid(
-            moving_feature_image,
-            moving_tissue_metadata,
-            grid_x,
-            grid_y,
-            order=1,
-        )
+        if fixed_support_feature_grid is not None:
+            fixed_support_map = np.asarray(fixed_support_feature_grid, dtype=float)
+            if fixed_support_map.shape != shape:
+                raise ValueError("fixed_support_feature_grid must match the density-flow grid shape.")
+        if moving_support_feature_grid is not None:
+            moving_support_map = np.asarray(moving_support_feature_grid, dtype=float)
+            if moving_support_map.shape != shape:
+                raise ValueError("moving_support_feature_grid must match the density-flow grid shape.")
+        if fixed_structure_feature_grid is not None:
+            fixed_structure_map = np.asarray(fixed_structure_feature_grid, dtype=float)
+            if fixed_structure_map.shape != shape:
+                raise ValueError("fixed_structure_feature_grid must match the density-flow grid shape.")
+        else:
+            fixed_signed_distance = distance_transform_edt(tissue_mask) - distance_transform_edt(~tissue_mask)
+            fixed_grad_y, fixed_grad_x = np.gradient(_normalized_density(fixed_impulses, active_scales[-1]))
+            fixed_structure_map = _normalized_feature(
+                np.hypot(fixed_grad_x, fixed_grad_y) + 0.25 * _normalized_feature(fixed_signed_distance)
+            )
+        if moving_structure_feature_grid is not None:
+            moving_structure_map = np.asarray(moving_structure_feature_grid, dtype=float)
+            if moving_structure_map.shape != shape:
+                raise ValueError("moving_structure_feature_grid must match the density-flow grid shape.")
+        else:
+            if moving_structure_image is None:
+                moving_structure_image = np.asarray(moving_tissue_mask, dtype=float)
+            moving_gray = np.asarray(moving_structure_image, dtype=float)
+            if moving_gray.ndim == 3:
+                moving_gray = np.mean(moving_gray[..., :3], axis=2)
+            moving_gray = gaussian_filter(_normalized_feature(moving_gray), sigma=2.0, mode="nearest")
+            moving_grad_y, moving_grad_x = np.gradient(moving_gray)
+            moving_signed_distance = (
+                distance_transform_edt(np.asarray(moving_tissue_mask, dtype=bool))
+                - distance_transform_edt(~np.asarray(moving_tissue_mask, dtype=bool))
+            )
+            moving_feature_image = _normalized_feature(
+                np.hypot(moving_grad_x, moving_grad_y)
+                + 0.25 * _normalized_feature(moving_signed_distance)
+            )
+            moving_structure_map = _resample_raster_to_world_grid(
+                moving_feature_image,
+                moving_tissue_metadata,
+                grid_x,
+                grid_y,
+                order=1,
+            )
 
     field_x = zeros.copy()
     field_y = zeros.copy()
@@ -1486,19 +1508,18 @@ def joint_density_tissue_structure_registration(
     soft_jacobian_weight: float = 0.05,
     **kwargs,
 ) -> FineWarpResult:
-    """Experimental multimodal flow using density plus HE support/structure features."""
-    result = tissue_aware_density_flow_registration(
+    """Run the dedicated two-stage experimental joint-flow implementation."""
+    from src.joint_flow import two_stage_joint_flow_registration
+
+    return two_stage_joint_flow_registration(
         fixed_points,
         moving_points,
-        moving_tissue_mask=affine_he_tissue_mask,
-        moving_tissue_metadata=affine_he_metadata,
-        moving_structure_image=affine_he_image,
-        density_channel_weight=density_weight,
-        tissue_support_channel_weight=support_weight,
-        structure_channel_weight=structure_weight,
+        affine_he_image=affine_he_image,
+        affine_he_tissue_mask=affine_he_tissue_mask,
+        affine_he_metadata=affine_he_metadata,
+        density_weight=density_weight,
+        support_weight=support_weight,
+        structure_weight=structure_weight,
         soft_jacobian_weight=soft_jacobian_weight,
         **kwargs,
     )
-    if isinstance(result.metrics, dict):
-        result.metrics.setdefault("density_flow", {})["method"] = "joint density + tissue-structure flow"
-    return result

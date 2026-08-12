@@ -1278,6 +1278,20 @@ def show_he_geojson_preparation() -> None:
     joint_support_weight = 0.25
     joint_structure_weight = 0.15
     joint_soft_jacobian_weight = 0.05
+    joint_preset = "Joint Safe"
+    joint_stage_a_scales_text = "32, 16, 8"
+    joint_stage_b_scales_text = "8, 4"
+    joint_stage_a_iterations = 8
+    joint_stage_b_iterations = 10
+    joint_stage_a_learning_rate = 0.10
+    joint_stage_b_learning_rate = 0.05
+    joint_stage_a_smoothing = 6.0
+    joint_stage_b_smoothing = 3.0
+    joint_stage_a_density_weight = 0.35
+    joint_exploratory_max_displacement = 50.0
+    joint_exploratory_p95_displacement = 35.0
+    joint_exploratory_jacobian_min = 0.02
+    joint_exploratory_jacobian_max = 6.0
 
     st.subheader(tr("3. 詳細位置合わせ", "3. Fine alignment"))
     fine_alignment_method = st.selectbox(
@@ -1480,10 +1494,36 @@ def show_he_geojson_preparation() -> None:
             help=tr("表示専用です。点群・最終画像・metricsは変更しません。", "Visual QC only. It never changes points, final images, or metrics."),
         )
         if fine_alignment_method == "joint density + tissue-structure flow":
+            joint_presets = {
+                "Joint Safe": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=8, b_iter=10, a_lr=0.10, b_lr=0.05, a_smooth=6.0, b_smooth=3.0, density=1.0, support=0.70, structure=0.35, explore_max=35.0, explore_p95=25.0),
+                "Joint Tissue-shape": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=12, b_iter=10, a_lr=0.14, b_lr=0.05, a_smooth=7.0, b_smooth=3.0, density=0.9, support=1.20, structure=0.30, explore_max=50.0, explore_p95=35.0),
+                "Joint Strong exploratory": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=16, b_iter=14, a_lr=0.20, b_lr=0.08, a_smooth=5.0, b_smooth=2.5, density=1.0, support=1.40, structure=0.50, explore_max=70.0, explore_p95=50.0),
+                "Custom": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=8, b_iter=10, a_lr=0.10, b_lr=0.05, a_smooth=6.0, b_smooth=3.0, density=1.0, support=0.70, structure=0.35, explore_max=50.0, explore_p95=35.0),
+            }
+            joint_preset = st.selectbox("Joint Flow preset", list(joint_presets), key="workflow-c-joint-preset", help="Experimental starting values, not biologically validated. Final application uses the common strict safety gate.")
+            joint_default = joint_presets[joint_preset]
+            joint_custom = joint_preset == "Custom"
+            if joint_preset == "Joint Strong exploratory":
+                st.warning("Explores stronger attempted deformation. Unsafe candidates remain QC-only and final output falls back to affine.")
+            with st.expander("Joint two-stage optimizer", expanded=True):
+                joint_left, joint_right = st.columns(2)
+                with joint_left:
+                    joint_stage_a_scales_text = st.text_input("Stage A physical scales (um)", value=joint_default["a_scales"], disabled=not joint_custom, key=f"workflow-c-joint-a-scales-{joint_preset}")
+                    joint_stage_a_iterations = st.number_input("Stage A iterations per level", min_value=1, value=joint_default["a_iter"], disabled=not joint_custom, key=f"workflow-c-joint-a-iterations-{joint_preset}")
+                    joint_stage_a_learning_rate = st.number_input("Stage A learning rate", min_value=0.01, value=joint_default["a_lr"], step=0.01, disabled=not joint_custom, key=f"workflow-c-joint-a-lr-{joint_preset}")
+                    joint_stage_a_smoothing = st.number_input("Stage A update smoothing", min_value=0.1, value=joint_default["a_smooth"], step=0.5, disabled=not joint_custom, key=f"workflow-c-joint-a-smoothing-{joint_preset}")
+                    joint_stage_a_density_weight = st.number_input("Stage A coarse-density weight", min_value=0.0, value=0.35, step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-a-density-{joint_preset}")
+                with joint_right:
+                    joint_stage_b_scales_text = st.text_input("Stage B physical scales (um)", value=joint_default["b_scales"], disabled=not joint_custom, key=f"workflow-c-joint-b-scales-{joint_preset}")
+                    joint_stage_b_iterations = st.number_input("Stage B iterations per level", min_value=1, value=joint_default["b_iter"], disabled=not joint_custom, key=f"workflow-c-joint-b-iterations-{joint_preset}")
+                    joint_stage_b_learning_rate = st.number_input("Stage B learning rate", min_value=0.01, value=joint_default["b_lr"], step=0.01, disabled=not joint_custom, key=f"workflow-c-joint-b-lr-{joint_preset}")
+                    joint_stage_b_smoothing = st.number_input("Stage B update smoothing", min_value=0.1, value=joint_default["b_smooth"], step=0.5, disabled=not joint_custom, key=f"workflow-c-joint-b-smoothing-{joint_preset}")
+                    joint_exploratory_max_displacement = st.number_input("Exploratory max displacement (um)", min_value=1.0, value=joint_default["explore_max"], step=5.0, disabled=not joint_custom, key=f"workflow-c-joint-explore-max-{joint_preset}")
+                    joint_exploratory_p95_displacement = st.number_input("Exploratory p95 displacement (um)", min_value=1.0, value=joint_default["explore_p95"], step=5.0, disabled=not joint_custom, key=f"workflow-c-joint-explore-p95-{joint_preset}")
             with st.expander(tr("Joint objective重み", "Joint objective weights"), expanded=True):
-                joint_density_weight = st.number_input("Point-density weight", min_value=0.0, value=1.0, step=0.1, key="workflow-c-joint-density-weight")
-                joint_support_weight = st.number_input("HE tissue-support weight", min_value=0.0, value=0.25, step=0.05, key="workflow-c-joint-support-weight")
-                joint_structure_weight = st.number_input("HE structural-feature weight", min_value=0.0, value=0.15, step=0.05, key="workflow-c-joint-structure-weight")
+                joint_density_weight = st.number_input("Stage B point-density weight", min_value=0.0, value=joint_default["density"], step=0.1, disabled=not joint_custom, key=f"workflow-c-joint-density-weight-{joint_preset}")
+                joint_support_weight = st.number_input("Stage A HE tissue-support weight", min_value=0.0, value=joint_default["support"], step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-support-weight-{joint_preset}")
+                joint_structure_weight = st.number_input("Stage B nuclear-structure weight", min_value=0.0, value=joint_default["structure"], step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-structure-weight-{joint_preset}")
                 joint_soft_jacobian_weight = st.number_input("Soft log-Jacobian weight", min_value=0.0, value=0.05, step=0.01, key="workflow-c-joint-soft-jacobian-weight")
 
     elif fine_alignment_method == "matched nuclei RBF":
@@ -1978,6 +2018,13 @@ def show_he_geojson_preparation() -> None:
                         "Joint density + tissue-structure flow requires an uploaded HE image and tissue mask.",
                     )
                 else:
+                    try:
+                        joint_stage_a_scales = tuple(float(value.strip()) for value in joint_stage_a_scales_text.split(",") if value.strip())
+                        joint_stage_b_scales = tuple(float(value.strip()) for value in joint_stage_b_scales_text.split(",") if value.strip())
+                    except ValueError as exc:
+                        raise ValueError("Joint Flow physical scales must be comma-separated numbers.") from exc
+                    if not joint_stage_a_scales or not joint_stage_b_scales:
+                        raise ValueError("Joint Flow requires at least one physical scale in each stage.")
                     fine_result = joint_density_tissue_structure_registration(
                         density_flow_fixed_points,
                         affine_result.transformed_points,
@@ -1988,6 +2035,20 @@ def show_he_geojson_preparation() -> None:
                         support_weight=joint_support_weight,
                         structure_weight=joint_structure_weight,
                         soft_jacobian_weight=joint_soft_jacobian_weight,
+                        stage_a_scales_um=joint_stage_a_scales,
+                        stage_b_scales_um=joint_stage_b_scales,
+                        stage_a_iterations=int(joint_stage_a_iterations),
+                        stage_b_iterations=int(joint_stage_b_iterations),
+                        stage_a_learning_rate=joint_stage_a_learning_rate,
+                        stage_b_learning_rate=joint_stage_b_learning_rate,
+                        stage_a_update_smoothing=joint_stage_a_smoothing,
+                        stage_b_update_smoothing=joint_stage_b_smoothing,
+                        stage_a_density_weight=joint_stage_a_density_weight,
+                        exploratory_max_displacement=joint_exploratory_max_displacement,
+                        exploratory_p95_displacement=joint_exploratory_p95_displacement,
+                        exploratory_jacobian_min=joint_exploratory_jacobian_min,
+                        exploratory_jacobian_max=joint_exploratory_jacobian_max,
+                        joint_preset=joint_preset,
                         **density_flow_kwargs,
                     )
             else:
@@ -2269,6 +2330,14 @@ def show_he_geojson_preparation() -> None:
 
     flow_magnitude_figure = None
     flow_local_figure = None
+    joint_stage_a_displacement_figure = None
+    joint_stage_b_displacement_figure = None
+    joint_final_displacement_figure = None
+    joint_stage_a_grid_figure = None
+    joint_stage_b_grid_figure = None
+    joint_final_grid_figure = None
+    joint_stage_a_he_image = None
+    joint_stage_b_he_image = None
     overview_tab, point_tab, image_tab, tissue_tab, safety_tab, anchor_tab, downloads_tab = st.tabs(
         [
             tr("概要", "Overview"),
@@ -2383,6 +2452,48 @@ def show_he_geojson_preparation() -> None:
             safety_tab.line_chart(flow_history[["total", "density"]])
             with safety_tab.expander(tr("最適化履歴", "Optimization history"), expanded=False):
                 st.dataframe(flow_history, use_container_width=True, hide_index=True)
+        if fine_alignment_method == "joint density + tissue-structure flow":
+            joint_metrics = fine_result.metrics.get("joint_flow", {})
+            stage_a_metrics = joint_metrics.get("stage_a", {})
+            stage_b_metrics = joint_metrics.get("stage_b", {})
+            final_joint_metrics = joint_metrics.get("final", {})
+            safety_tab.subheader("Joint Flow two-stage diagnostics")
+            safety_tab.caption(
+                f"HE nuclear feature mode: {flow_metadata.get('he_feature_extraction_mode', 'unknown')}. "
+                "TRUE DEFORMATION fields are shown below; QC display gain is not applied here."
+            )
+            safety_tab.dataframe(
+                pd.DataFrame([
+                    {"stage": "Stage A: coarse tissue shape", **stage_a_metrics},
+                    {"stage": "Stage B: incremental nuclear refinement", **stage_b_metrics},
+                    {"stage": "Final attempted composition", **final_joint_metrics},
+                ]),
+                use_container_width=True, hide_index=True,
+            )
+            stage_a_x = np.asarray(joint_metrics.get("stage_a_displacement_x"), dtype=float)
+            stage_a_y = np.asarray(joint_metrics.get("stage_a_displacement_y"), dtype=float)
+            stage_b_x = np.asarray(joint_metrics.get("stage_b_incremental_x"), dtype=float)
+            stage_b_y = np.asarray(joint_metrics.get("stage_b_incremental_y"), dtype=float)
+            if stage_a_x.shape == fine_result.grid_x.shape and stage_b_x.shape == fine_result.grid_x.shape:
+                joint_stage_a_displacement_figure = visualize_displacement_magnitude_heatmap(
+                    fine_result.grid_x, fine_result.grid_y, stage_a_x, stage_a_y,
+                    title="TRUE DEFORMATION: Stage A displacement magnitude",
+                )
+                joint_stage_b_displacement_figure = visualize_displacement_magnitude_heatmap(
+                    fine_result.grid_x, fine_result.grid_y, stage_b_x, stage_b_y,
+                    title="TRUE DEFORMATION: Stage B incremental displacement magnitude",
+                )
+                joint_final_displacement_figure = visualize_displacement_magnitude_heatmap(
+                    fine_result.grid_x, fine_result.grid_y, attempted_displacement_x, attempted_displacement_y,
+                    title="TRUE DEFORMATION: final Joint Flow displacement magnitude",
+                )
+                joint_cols = safety_tab.columns(3)
+                for column, figure in zip(
+                    joint_cols,
+                    [joint_stage_a_displacement_figure, joint_stage_b_displacement_figure, joint_final_displacement_figure],
+                ):
+                    with column:
+                        st.pyplot(figure, clear_figure=False)
 
     overview_tab.subheader(tr("座標診断", "Coordinate diagnostics"))
     overview_tab.caption(
@@ -2952,6 +3063,27 @@ def show_he_geojson_preparation() -> None:
                 output_origin=warped_he_output_origin,
                 bounds=fine_result.bounds,
             )
+            if fine_alignment_method == "joint density + tissue-structure flow":
+                joint_result_metrics = fine_result.metrics.get("joint_flow", {}) if isinstance(fine_result.metrics, dict) else {}
+                joint_stage_a_x = np.asarray(joint_result_metrics.get("stage_a_displacement_x"), dtype=float)
+                joint_stage_a_y = np.asarray(joint_result_metrics.get("stage_a_displacement_y"), dtype=float)
+                joint_stage_b_x = np.asarray(joint_result_metrics.get("stage_b_incremental_x"), dtype=float)
+                joint_stage_b_y = np.asarray(joint_result_metrics.get("stage_b_incremental_y"), dtype=float)
+                if joint_stage_a_x.shape == fine_result.grid_x.shape and joint_stage_b_x.shape == fine_result.grid_x.shape:
+                    joint_stage_a_he_image = warp_affine_image_with_density_flow(
+                        affine_warped_he_image, affine_warped_he_metadata,
+                        joint_stage_a_x, joint_stage_a_y,
+                        field_bounds=fine_result.bounds, field_spacing=fine_result.grid_spacing,
+                        inverse_iterations=int(density_flow_inverse_iterations),
+                        inverse_convergence_tolerance_pixels=density_flow_inverse_tolerance_pixels,
+                    )
+                    joint_stage_b_he_image = warp_affine_image_with_density_flow(
+                        joint_stage_a_he_image, affine_warped_he_metadata,
+                        joint_stage_b_x, joint_stage_b_y,
+                        field_bounds=fine_result.bounds, field_spacing=fine_result.grid_spacing,
+                        inverse_iterations=int(density_flow_inverse_iterations),
+                        inverse_convergence_tolerance_pixels=density_flow_inverse_tolerance_pixels,
+                    )
             if density_flow_mode:
                 density_flow_images = density_flow_image_outputs(
                     affine_warped_he_image,
@@ -3099,6 +3231,15 @@ def show_he_geojson_preparation() -> None:
                 st.image(affine_warped_he_image, caption="Affine-only HE image")
             with true_right:
                 st.image(attempted_warped_he_image, caption="True density-flow warped HE image")
+            if fine_alignment_method == "joint density + tissue-structure flow" and joint_stage_a_he_image is not None:
+                image_tab.subheader("Joint Flow stage images - TRUE DEFORMATION")
+                joint_image_columns = image_tab.columns(3)
+                with joint_image_columns[0]:
+                    st.image(affine_warped_he_image, caption="Affine HE")
+                with joint_image_columns[1]:
+                    st.image(joint_stage_a_he_image, caption="Stage A coarse tissue-shape warp")
+                with joint_image_columns[2]:
+                    st.image(joint_stage_b_he_image, caption="Stage A + Stage B attempted Joint Flow")
             checkerboard_image = checkerboard_comparison(
                 affine_warped_he_image,
                 attempted_warped_he_image,
@@ -3365,6 +3506,33 @@ def show_he_geojson_preparation() -> None:
                 file_name="attempted_warp_grid_qc.png",
                 mime="image/png",
             )
+            if fine_alignment_method == "joint density + tissue-structure flow" and joint_stage_a_he_image is not None:
+                stage_a_grid_result = replace(fine_result, displacement_x=joint_stage_a_x, displacement_y=joint_stage_a_y)
+                stage_b_grid_result = replace(fine_result, displacement_x=joint_stage_b_x, displacement_y=joint_stage_b_y)
+                stage_a_grid_lines = _warp_grid_lines_pixels(
+                    fine_result.bounds, max(cluster_grid_spacing, 1.0),
+                    attempted_warped_he_metadata, fine_result=stage_a_grid_result,
+                )
+                stage_b_grid_lines = _warp_grid_lines_pixels(
+                    fine_result.bounds, max(cluster_grid_spacing, 1.0),
+                    attempted_warped_he_metadata, fine_result=stage_b_grid_result,
+                )
+                joint_stage_a_grid_figure = visualize_warp_grid_overlay(
+                    joint_stage_a_he_image, before_grid_lines, stage_a_grid_lines,
+                    title="TRUE DEFORMATION: Stage A warp grid",
+                )
+                joint_stage_b_grid_figure = visualize_warp_grid_overlay(
+                    joint_stage_b_he_image, before_grid_lines, stage_b_grid_lines,
+                    title="TRUE DEFORMATION: Stage B incremental warp grid",
+                )
+                joint_final_grid_figure = attempted_grid_figure
+                joint_grid_columns = safety_tab.columns(3)
+                for column, figure in zip(
+                    joint_grid_columns,
+                    [joint_stage_a_grid_figure, joint_stage_b_grid_figure, joint_final_grid_figure],
+                ):
+                    with column:
+                        st.pyplot(figure, clear_figure=False)
 
         with overlay_col:
             boundary_pin_pixels = (
@@ -3517,6 +3685,26 @@ def show_he_geojson_preparation() -> None:
         "joint_tissue_support_weight": joint_support_weight,
         "joint_structure_weight": joint_structure_weight,
         "joint_soft_jacobian_weight": joint_soft_jacobian_weight,
+        "joint_preset": joint_preset,
+        "joint_stage_a_scales_um": joint_stage_a_scales_text,
+        "joint_stage_b_scales_um": joint_stage_b_scales_text,
+        "joint_stage_a_iterations_per_level": joint_stage_a_iterations,
+        "joint_stage_b_iterations_per_level": joint_stage_b_iterations,
+        "joint_stage_a_learning_rate": joint_stage_a_learning_rate,
+        "joint_stage_b_learning_rate": joint_stage_b_learning_rate,
+        "joint_stage_a_update_smoothing": joint_stage_a_smoothing,
+        "joint_stage_b_update_smoothing": joint_stage_b_smoothing,
+        "joint_stage_a_density_weight": joint_stage_a_density_weight,
+        "joint_exploratory_max_displacement_um": joint_exploratory_max_displacement,
+        "joint_exploratory_p95_displacement_um": joint_exploratory_p95_displacement,
+        "joint_exploratory_jacobian_min": joint_exploratory_jacobian_min,
+        "joint_exploratory_jacobian_max": joint_exploratory_jacobian_max,
+        "joint_final_max_displacement_um": max_final_displacement_um,
+        "joint_final_displacement_p95_limit_um": displacement_p95_limit_um if enable_displacement_p95_limit else None,
+        "joint_he_feature_extraction_mode": (
+            fine_result.metrics.get("density_flow", {}).get("he_feature_extraction_mode")
+            if isinstance(fine_result.metrics, dict) else None
+        ),
         "local_translation_preset": local_preset,
         "he_coordinate_order": he_coordinate_order,
         "similarity_trim_quantile": similarity_trim,
@@ -3801,6 +3989,46 @@ def show_he_geojson_preparation() -> None:
         "images/roi_comparisons.png": (
             figure_to_png_bytes(roi_comparison_figure) if roi_comparison_figure is not None else None
         ),
+        "joint_flow_stage_a_metrics.csv": (
+            pd.DataFrame([fine_result.metrics.get("joint_flow", {}).get("stage_a", {})]).to_csv(index=False).encode("utf-8")
+            if fine_alignment_method == "joint density + tissue-structure flow" else None
+        ),
+        "joint_flow_stage_b_metrics.csv": (
+            pd.DataFrame([fine_result.metrics.get("joint_flow", {}).get("stage_b", {})]).to_csv(index=False).encode("utf-8")
+            if fine_alignment_method == "joint density + tissue-structure flow" else None
+        ),
+        "joint_flow_objective_history.csv": (
+            pd.DataFrame(fine_result.metrics.get("joint_flow", {}).get("objective_history", [])).to_csv(index=False).encode("utf-8")
+            if fine_alignment_method == "joint density + tissue-structure flow" else None
+        ),
+        "fields/stage_a_displacement_field.npz": (
+            _displacement_field_npz_bytes(
+                np.asarray(fine_result.metrics["joint_flow"]["stage_a_displacement_x"]),
+                np.asarray(fine_result.metrics["joint_flow"]["stage_a_displacement_y"]),
+                bounds=fine_result.bounds, grid_spacing=fine_result.grid_spacing,
+            ) if fine_alignment_method == "joint density + tissue-structure flow" else None
+        ),
+        "fields/stage_b_incremental_field.npz": (
+            _displacement_field_npz_bytes(
+                np.asarray(fine_result.metrics["joint_flow"]["stage_b_incremental_x"]),
+                np.asarray(fine_result.metrics["joint_flow"]["stage_b_incremental_y"]),
+                bounds=fine_result.bounds, grid_spacing=fine_result.grid_spacing,
+            ) if fine_alignment_method == "joint density + tissue-structure flow" else None
+        ),
+        "fields/final_joint_displacement_field.npz": (
+            _displacement_field_npz_bytes(
+                attempted_displacement_x, attempted_displacement_y,
+                bounds=fine_result.bounds, grid_spacing=fine_result.grid_spacing,
+            ) if fine_alignment_method == "joint density + tissue-structure flow" else None
+        ),
+        "images/stage_a_warp_grid.png": figure_to_png_bytes(joint_stage_a_grid_figure) if joint_stage_a_grid_figure is not None else None,
+        "images/stage_b_warp_grid.png": figure_to_png_bytes(joint_stage_b_grid_figure) if joint_stage_b_grid_figure is not None else None,
+        "images/final_joint_warp_grid.png": figure_to_png_bytes(joint_final_grid_figure) if joint_final_grid_figure is not None else None,
+        "images/stage_a_displacement.png": figure_to_png_bytes(joint_stage_a_displacement_figure) if joint_stage_a_displacement_figure is not None else None,
+        "images/stage_b_displacement.png": figure_to_png_bytes(joint_stage_b_displacement_figure) if joint_stage_b_displacement_figure is not None else None,
+        "images/final_joint_displacement.png": figure_to_png_bytes(joint_final_displacement_figure) if joint_final_displacement_figure is not None else None,
+        "images/stage_a_he.png": array_to_png_bytes(joint_stage_a_he_image) if joint_stage_a_he_image is not None else None,
+        "images/final_joint_he.png": array_to_png_bytes(joint_stage_b_he_image) if joint_stage_b_he_image is not None else None,
     }
     uploaded_input_records = []
     for uploaded in (he_centers_file, geojson_file, he_image_file):

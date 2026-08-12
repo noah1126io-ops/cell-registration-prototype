@@ -45,6 +45,20 @@ EXPECTED_ARTIFACTS = (
     "images/checkerboard_comparison.png",
     "images/edge_overlay.png",
     "images/roi_comparisons.png",
+    "joint_flow_stage_a_metrics.csv",
+    "joint_flow_stage_b_metrics.csv",
+    "joint_flow_objective_history.csv",
+    "fields/stage_a_displacement_field.npz",
+    "fields/stage_b_incremental_field.npz",
+    "fields/final_joint_displacement_field.npz",
+    "images/stage_a_warp_grid.png",
+    "images/stage_b_warp_grid.png",
+    "images/final_joint_warp_grid.png",
+    "images/stage_a_displacement.png",
+    "images/stage_b_displacement.png",
+    "images/final_joint_displacement.png",
+    "images/stage_a_he.png",
+    "images/final_joint_he.png",
 )
 
 
