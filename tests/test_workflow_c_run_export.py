@@ -181,3 +181,31 @@ def test_raster_qc_artifacts_are_exported_without_amplified_preview():
 
     assert set(artifacts) <= names
     assert not any("amplified" in name or "exaggerated" in name for name in names)
+
+
+def test_evaluation_artifacts_and_manifest_metadata_are_exported():
+    artifacts = {
+        "evaluation/evaluation_summary.json": b'{"tre":null,"count":3}',
+        "evaluation/evaluation_summary.csv": b"domain,status\nIndependent,NOT AVAILABLE\n",
+        "evaluation/pointset_metrics.csv": b"stage,value\naffine,1.2\n",
+        "evaluation/deformation_metrics.csv": b"field,jacobian_min\napplied,1.0\n",
+    }
+    metadata = {
+        "landmark_file_name": None,
+        "landmark_file_sha256": None,
+        "landmark_count": 0,
+        "independent_validation_available": False,
+        "evaluation_version": "test-v1",
+        "local_block_size_um": 100.0,
+        "metric_definitions_version": "test-definitions",
+    }
+    bundle, manifest = _bundle(artifacts=artifacts, evaluation_metadata=metadata)
+
+    with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+        names = set(archive.namelist())
+        evaluation_json = json.loads(archive.read("evaluation/evaluation_summary.json"))
+
+    assert set(artifacts) <= names
+    assert manifest["evaluation"] == metadata
+    assert evaluation_json["tre"] is None
+    assert isinstance(evaluation_json["count"], int)

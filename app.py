@@ -52,6 +52,17 @@ from src.raster_deformation_qc import (
     point_displacement_pixel_summary,
     raster_difference_metrics,
 )
+from src.registration_evaluation import (
+    EVALUATION_VERSION,
+    METRIC_DEFINITIONS_VERSION,
+    deformation_validity_metrics,
+    generate_method_scorecard,
+    landmark_tre_metrics,
+    local_region_evaluation,
+    pointset_scorecard,
+    raster_fidelity_summary,
+    transform_validation_landmarks,
+)
 from src.visualization import (
     colorize_label_image,
     visualize_cell_matches,
@@ -63,11 +74,13 @@ from src.visualization import (
     visualize_distance_histogram,
     visualize_geojson_classification_overlay,
     visualize_jacobian_heatmap,
+    visualize_landmark_tre_change,
     visualize_local_residual_map,
     visualize_local_improvement_heatmap,
     visualize_point_sets,
     visualize_roi_comparisons,
     visualize_translation_anchors,
+    visualize_tre_before_after,
     visualize_warp_grid_overlay,
     visualize_warped_he_point_overlay,
     visualize_warped_pixel_point_scatter,
@@ -1171,6 +1184,33 @@ def show_he_geojson_preparation() -> None:
             help=tr("固定側の核重心または核ポリゴンを含むGeoJSONです。", "GeoJSON containing fixed nuclei centroids or polygons."),
         )
 
+    landmark_file = None
+    landmark_input_table = None
+    with st.expander(tr("独立validation（任意）", "Independent validation (optional)"), expanded=False):
+        st.caption("Validation landmarks are not used to optimize registration.")
+        landmark_file = st.file_uploader(
+            "Corresponding validation landmarks CSV",
+            type=["csv"], key="workflow-c-validation-landmarks",
+            help="Required columns: landmark_id, fixed_x_um, fixed_y_um, moving_x_um, moving_y_um",
+        )
+        if landmark_file is not None:
+            try:
+                landmark_input_table = pd.read_csv(landmark_file)
+                required_landmark_columns = {
+                    "landmark_id", "fixed_x_um", "fixed_y_um", "moving_x_um", "moving_y_um"
+                }
+                missing_landmark_columns = required_landmark_columns - set(landmark_input_table.columns)
+                if missing_landmark_columns:
+                    raise ValueError(f"Missing landmark columns: {sorted(missing_landmark_columns)}")
+                coordinate_columns = ["fixed_x_um", "fixed_y_um", "moving_x_um", "moving_y_um"]
+                landmark_input_table[coordinate_columns] = landmark_input_table[coordinate_columns].apply(pd.to_numeric, errors="raise")
+                if landmark_input_table.empty or not np.isfinite(landmark_input_table[coordinate_columns].to_numpy(dtype=float)).all():
+                    raise ValueError("Landmark coordinates must be non-empty and finite.")
+                st.dataframe(landmark_input_table.head(20), use_container_width=True, hide_index=True)
+            except (ValueError, pd.errors.ParserError) as exc:
+                st.error(f"Invalid landmark CSV: {exc}")
+                landmark_input_table = None
+
     local_preset = st.session_state.get("workflow-c-local-preset", "balanced")
     local_presets = {
         "conservative": {
@@ -2239,6 +2279,91 @@ def show_he_geojson_preparation() -> None:
     safety_metrics = (fine_result.metrics or {}).get("safety", {}) if isinstance(fine_result.metrics, dict) else {}
     status = "applied" if fine_applied else ("disabled" if fine_alignment_method == "off" else "rejected")
 
+    evaluation_pointset_table = pointset_scorecard(
+        metric_fixed_points,
+        {
+            "affine": metric_moving_affine_points,
+            "attempted fine": metric_moving_attempted_points,
+            "applied final": metric_moving_applied_points,
+        },
+    )
+    evaluation_deformation_table = pd.DataFrame([
+        {
+            "field": "attempted",
+            **deformation_validity_metrics(
+                attempted_displacement_x, attempted_displacement_y, spacing=fine_result.grid_spacing
+            ),
+        },
+        {
+            "field": "applied",
+            **deformation_validity_metrics(
+                final_displacement_x, final_displacement_y, spacing=fine_result.grid_spacing
+            ),
+        },
+    ])
+    evaluation_local_table, evaluation_local_summary = local_region_evaluation(
+        metric_fixed_points,
+        metric_moving_affine_points,
+        metric_moving_attempted_points,
+        metric_moving_applied_points,
+        attempted_displacement_x,
+        attempted_displacement_y,
+        final_displacement_x,
+        final_displacement_y,
+        bounds=fine_result.bounds,
+        spacing=fine_result.grid_spacing,
+        block_size_um=density_flow_local_region_size,
+        min_points=5,
+    )
+    validation_landmark_table = None
+    validation_landmark_summaries = None
+    validation_landmark_final_summary = None
+    tre_before_after_figure = None
+    tre_change_figure = None
+    if landmark_input_table is not None:
+        fixed_validation_landmarks = landmark_input_table[["fixed_x_um", "fixed_y_um"]].to_numpy(dtype=float)
+        moving_validation_landmarks = landmark_input_table[["moving_x_um", "moving_y_um"]].to_numpy(dtype=float)
+        validation_transforms = transform_validation_landmarks(
+            moving_validation_landmarks,
+            affine_matrix=affine_result.affine_matrix,
+            translation=affine_result.translation,
+            flip_x=affine_result.flip_x,
+            flip_y=affine_result.flip_y,
+            image_width=affine_result.image_width,
+            image_height=affine_result.image_height,
+            attempted_displacement_x=attempted_displacement_x,
+            attempted_displacement_y=attempted_displacement_y,
+            applied_displacement_x=final_displacement_x,
+            applied_displacement_y=final_displacement_y,
+            field_bounds=fine_result.bounds,
+            field_spacing=fine_result.grid_spacing,
+        )
+        validation_landmark_summaries = {}
+        stage_tables = {}
+        for stage_name, stage_points in validation_transforms.items():
+            stage_table, stage_summary = landmark_tre_metrics(
+                fixed_validation_landmarks,
+                moving_validation_landmarks,
+                stage_points,
+                landmark_ids=landmark_input_table["landmark_id"].to_numpy(),
+            )
+            stage_tables[stage_name] = stage_table
+            validation_landmark_summaries[stage_name] = stage_summary
+        validation_landmark_final_summary = validation_landmark_summaries["applied"]
+        validation_landmark_table = stage_tables["applied"].copy()
+        validation_landmark_table["tre_raw_um"] = stage_tables["raw"]["tre_after_um"]
+        validation_landmark_table["tre_affine_um"] = stage_tables["affine"]["tre_after_um"]
+        validation_landmark_table["tre_attempted_um"] = stage_tables["attempted"]["tre_after_um"]
+        validation_landmark_table["tre_final_applied_um"] = stage_tables["applied"]["tre_after_um"]
+        validation_landmark_table["tre_before_um"] = validation_landmark_table["tre_affine_um"]
+        validation_landmark_table["tre_after_um"] = validation_landmark_table["tre_final_applied_um"]
+        validation_landmark_table["delta_tre_um"] = (
+            validation_landmark_table["tre_final_applied_um"] - validation_landmark_table["tre_affine_um"]
+        )
+        validation_landmark_table["improved"] = validation_landmark_table["delta_tre_um"] < 0
+        tre_before_after_figure = visualize_tre_before_after(validation_landmark_table)
+        tre_change_figure = visualize_landmark_tre_change(validation_landmark_table)
+
     accepted_anchor_count = fine_result.n_pairs
     total_anchor_count = fine_result.n_candidate_pairs
     rejected_anchor_count = fine_result.n_filtered_pairs
@@ -2338,7 +2463,7 @@ def show_he_geojson_preparation() -> None:
     joint_final_grid_figure = None
     joint_stage_a_he_image = None
     joint_stage_b_he_image = None
-    overview_tab, point_tab, image_tab, tissue_tab, safety_tab, anchor_tab, downloads_tab = st.tabs(
+    overview_tab, point_tab, image_tab, tissue_tab, safety_tab, anchor_tab, downloads_tab, evaluation_tab = st.tabs(
         [
             tr("概要", "Overview"),
             tr("点群位置合わせ", "Point alignment"),
@@ -2351,7 +2476,7 @@ def show_he_geojson_preparation() -> None:
                 else tr("アンカー診断", "Anchor diagnostics")
             ),
             tr("ダウンロード", "Downloads"),
-        ]
+        ] + [tr("評価", "Evaluation")]
     )
 
     if density_flow_mode and isinstance(fine_result.metrics, dict):
@@ -3584,6 +3709,107 @@ def show_he_geojson_preparation() -> None:
             mime="image/png",
         )
 
+    evaluation_raster_fidelity = raster_fidelity_summary(inverse_solver_diagnostics)
+    affine_evaluation_metrics = evaluation_pointset_table.loc[
+        evaluation_pointset_table["stage"] == "affine"
+    ].iloc[0].to_dict()
+    applied_evaluation_metrics = evaluation_pointset_table.loc[
+        evaluation_pointset_table["stage"] == "applied final"
+    ].iloc[0].to_dict()
+    applied_deformation_evaluation = evaluation_deformation_table.loc[
+        evaluation_deformation_table["field"] == "applied"
+    ].iloc[0].to_dict()
+    evaluation_scorecard, evaluation_summary = generate_method_scorecard(
+        landmark_summary=validation_landmark_final_summary,
+        affine_internal_metrics=affine_evaluation_metrics,
+        applied_internal_metrics=applied_evaluation_metrics,
+        local_summary=evaluation_local_summary,
+        applied_deformation_metrics=applied_deformation_evaluation,
+        raster_fidelity=evaluation_raster_fidelity,
+        fine_applied=fine_applied,
+        fine_rejected=status == "rejected",
+    )
+    evaluation_export_summary = {
+        **evaluation_summary,
+        "scorecard": evaluation_scorecard.to_dict(orient="records"),
+        "local_region_summary": evaluation_local_summary,
+        "independent_landmark_summary": validation_landmark_final_summary,
+    }
+
+    evaluation_tab.header(tr("Registration評価", "Registration evaluation"))
+    evaluation_tab.caption(
+        tr(
+            "各評価領域を分けて表示します。内部最近傍指標の改善は、独立した正解データによる精度検証ではありません。",
+            "Domains are reported separately. Internal nearest-neighbor improvement is not ground-truth accuracy validation.",
+        )
+    )
+    evaluation_tab.subheader(tr("A. 独立ランドマーク検証", "A. Independent landmark validation"))
+    evaluation_tab.caption("Validation landmarks are not used to optimize registration.")
+    if validation_landmark_table is None:
+        evaluation_tab.info(
+            "No independent landmarks supplied. Registration accuracy cannot be ground-truth validated in this run."
+        )
+    else:
+        landmark_summary_table = pd.DataFrame([
+            {"stage": stage_name, **stage_summary}
+            for stage_name, stage_summary in validation_landmark_summaries.items()
+        ])
+        evaluation_tab.dataframe(landmark_summary_table, use_container_width=True, hide_index=True)
+        landmark_plot_left, landmark_plot_right = evaluation_tab.columns(2)
+        landmark_plot_left.pyplot(tre_before_after_figure, clear_figure=False)
+        landmark_plot_right.pyplot(tre_change_figure, clear_figure=False)
+        evaluation_tab.dataframe(validation_landmark_table, use_container_width=True, hide_index=True)
+
+    evaluation_tab.subheader(tr("B. 内部点群指標", "B. Internal point-set metrics"))
+    evaluation_tab.caption(
+        tr(
+            "核点群の最近傍距離による内部指標です。ground-truth accuracyではありません。",
+            "Nearest-neighbor nuclei metrics are internal alignment metrics, not ground-truth accuracy.",
+        )
+    )
+    evaluation_tab.dataframe(evaluation_pointset_table, use_container_width=True, hide_index=True)
+
+    evaluation_tab.subheader(tr("C. 局所性能", "C. Local performance"))
+    evaluation_tab.json(evaluation_local_summary)
+    if evaluation_local_table.empty:
+        evaluation_tab.info(tr("最小点数を満たす局所領域がありません。", "No local region met the minimum point-count threshold."))
+    else:
+        local_evaluation_figure = visualize_local_improvement_heatmap(
+            evaluation_local_table,
+            title="Applied - affine local median distance (positive = worse)",
+        )
+        evaluation_tab.pyplot(local_evaluation_figure, clear_figure=False)
+        evaluation_tab.dataframe(evaluation_local_table, use_container_width=True, hide_index=True)
+
+    evaluation_tab.subheader(tr("D. 変形安全性", "D. Deformation safety"))
+    evaluation_tab.caption(
+        tr(
+            "Jacobianと変位量は変形の妥当性・安全性指標であり、生物学的精度スコアではありません。",
+            "Jacobian and displacement values describe deformation plausibility and safety, not biological accuracy.",
+        )
+    )
+    evaluation_tab.dataframe(evaluation_deformation_table, use_container_width=True, hide_index=True)
+
+    evaluation_tab.subheader(tr("E. ラスタwarp実装忠実度", "E. Raster warp fidelity"))
+    evaluation_tab.json(evaluation_raster_fidelity)
+    evaluation_tab.caption(
+        tr(
+            "実HE画像の画素差はwarpで画像がどれだけ変化したかを示すQCであり、registration精度ではありません。",
+            "Pixel difference on real HE is a QC measure of raster change, not registration accuracy.",
+        )
+    )
+
+    evaluation_tab.subheader(tr("F. 研究用スコアカード", "F. Overall research scorecard"))
+    evaluation_tab.dataframe(evaluation_scorecard, use_container_width=True, hide_index=True)
+    overall_status = evaluation_summary["overall_status"]
+    if overall_status in {"VALIDATED IMPROVEMENT", "INTERNAL IMPROVEMENT ONLY"}:
+        evaluation_tab.success(overall_status)
+    elif overall_status == "UNSAFE / REJECTED":
+        evaluation_tab.error(overall_status)
+    else:
+        evaluation_tab.warning(overall_status)
+    evaluation_tab.caption(evaluation_summary["warning"])
+
     if he_image is None:
         image_tab.info(tr("HE画像が未入力のため、画像warpは表示しません。点群結果は他のタブで確認できます。", "No HE image was uploaded. Point results remain available in the other tabs."))
     elif warped_he_image is None:
@@ -3912,6 +4138,7 @@ def show_he_geojson_preparation() -> None:
             fine_result.metrics.get("local_region_summary")
             if isinstance(fine_result.metrics, dict) else None
         ),
+        "registration_evaluation": evaluation_export_summary,
     }
     parameters["include_original_uploaded_inputs"] = include_original_inputs
     parameters["comparison_run_id"] = previous_entry.get("run_id") if previous_entry else None
@@ -4029,9 +4256,33 @@ def show_he_geojson_preparation() -> None:
         "images/final_joint_displacement.png": figure_to_png_bytes(joint_final_displacement_figure) if joint_final_displacement_figure is not None else None,
         "images/stage_a_he.png": array_to_png_bytes(joint_stage_a_he_image) if joint_stage_a_he_image is not None else None,
         "images/final_joint_he.png": array_to_png_bytes(joint_stage_b_he_image) if joint_stage_b_he_image is not None else None,
+        "evaluation/evaluation_summary.json": json.dumps(
+            evaluation_export_summary, indent=2, allow_nan=False
+        ).encode("utf-8"),
+        "evaluation/evaluation_summary.csv": pd.DataFrame(
+            evaluation_scorecard.to_dict(orient="records")
+            + [{"domain": "Overall", "status": evaluation_summary["overall_status"]}]
+        ).to_csv(index=False).encode("utf-8"),
+        "evaluation/pointset_metrics.csv": evaluation_pointset_table.to_csv(index=False).encode("utf-8"),
+        "evaluation/deformation_metrics.csv": evaluation_deformation_table.to_csv(index=False).encode("utf-8"),
+        "evaluation/local_region_evaluation.csv": (
+            evaluation_local_table.to_csv(index=False).encode("utf-8")
+            if not evaluation_local_table.empty else None
+        ),
+        "evaluation/landmark_tre.csv": (
+            validation_landmark_table.to_csv(index=False).encode("utf-8")
+            if validation_landmark_table is not None else None
+        ),
+        "evaluation/landmark_tre_summary.json": (
+            json.dumps(validation_landmark_summaries, indent=2, allow_nan=False).encode("utf-8")
+            if validation_landmark_summaries is not None else None
+        ),
+        "evaluation/raster_fidelity.json": json.dumps(
+            evaluation_raster_fidelity, indent=2, allow_nan=False
+        ).encode("utf-8"),
     }
     uploaded_input_records = []
-    for uploaded in (he_centers_file, geojson_file, he_image_file):
+    for uploaded in (he_centers_file, geojson_file, he_image_file, landmark_file):
         if uploaded is not None:
             uploaded_input_records.append(input_file_record(uploaded.name, uploaded.getvalue()))
 
@@ -4078,6 +4329,18 @@ def show_he_geojson_preparation() -> None:
         optimization_history=optimization_history,
         previous_parameters=previous_parameters,
         provenance=provenance,
+        evaluation_metadata={
+            "landmark_file_name": landmark_file.name if landmark_file is not None else None,
+            "landmark_file_sha256": (
+                input_file_record(landmark_file.name, landmark_file.getvalue())["sha256"]
+                if landmark_file is not None else None
+            ),
+            "landmark_count": int(len(landmark_input_table)) if landmark_input_table is not None else 0,
+            "independent_validation_available": landmark_input_table is not None,
+            "evaluation_version": EVALUATION_VERSION,
+            "local_block_size_um": density_flow_local_region_size,
+            "metric_definitions_version": METRIC_DEFINITIONS_VERSION,
+        },
         input_files=uploaded_input_records,
         include_original_inputs=include_original_inputs,
     )

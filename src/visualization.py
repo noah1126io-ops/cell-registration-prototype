@@ -23,6 +23,69 @@ def colorize_label_image(label_image: np.ndarray) -> np.ndarray:
     return rgb
 
 
+def visualize_tre_before_after(landmark_table: pd.DataFrame, *, title: str = "Independent landmark TRE"):
+    figure, axis = plt.subplots(figsize=(7, 4))
+    positions = np.arange(len(landmark_table))
+    axis.plot(positions, landmark_table["tre_before_um"], "o-", label="Before", color="#6b7280")
+    axis.plot(positions, landmark_table["tre_after_um"], "o-", label="After", color="#0891b2")
+    axis.set_xlabel("Landmark")
+    axis.set_ylabel("TRE (um)")
+    axis.set_title(title)
+    axis.legend()
+    axis.grid(alpha=0.2)
+    figure.tight_layout()
+    return figure
+
+
+def visualize_landmark_tre_change(landmark_table: pd.DataFrame):
+    figure, axis = plt.subplots(figsize=(7, 4))
+    values = landmark_table["delta_tre_um"].to_numpy(dtype=float)
+    colors = np.where(values <= 0, "#0891b2", "#dc2626")
+    axis.bar(np.arange(len(values)), values, color=colors)
+    axis.axhline(0.0, color="black", linewidth=1)
+    axis.set_xlabel("Landmark")
+    axis.set_ylabel("TRE after - before (um)")
+    axis.set_title("Per-landmark TRE change")
+    axis.grid(axis="y", alpha=0.2)
+    figure.tight_layout()
+    return figure
+
+
+def visualize_displacement_epe_heatmap(grid_x: np.ndarray, grid_y: np.ndarray, epe: np.ndarray):
+    figure, axis = plt.subplots(figsize=(6, 5))
+    image = axis.pcolormesh(grid_x, grid_y, epe, shading="auto", cmap="magma")
+    figure.colorbar(image, ax=axis, label="EPE (um)")
+    axis.set_title("Synthetic displacement endpoint error")
+    axis.set_xlabel("x (um)")
+    axis.set_ylabel("y (um)")
+    axis.set_aspect("equal")
+    figure.tight_layout()
+    return figure
+
+
+def visualize_estimated_true_displacement_magnitude(
+    grid_x: np.ndarray,
+    grid_y: np.ndarray,
+    estimated_x: np.ndarray,
+    estimated_y: np.ndarray,
+    true_x: np.ndarray,
+    true_y: np.ndarray,
+):
+    estimated = np.hypot(estimated_x, estimated_y)
+    truth = np.hypot(true_x, true_y)
+    upper = max(float(np.max(estimated)), float(np.max(truth)), 1e-9)
+    figure, axes = plt.subplots(1, 2, figsize=(11, 4.5), sharex=True, sharey=True)
+    for axis, values, title in zip(axes, [truth, estimated], ["Ground truth", "Estimated"]):
+        image = axis.pcolormesh(grid_x, grid_y, values, shading="auto", cmap="viridis", vmin=0, vmax=upper)
+        axis.set_title(title)
+        axis.set_aspect("equal")
+        axis.set_xlabel("x (um)")
+    axes[0].set_ylabel("y (um)")
+    figure.colorbar(image, ax=axes, label="displacement (um)")
+    figure.tight_layout()
+    return figure
+
+
 def _to_grayscale_preview(image: np.ndarray) -> np.ndarray:
     image = np.asarray(image)
     if image.ndim == 3:
@@ -129,6 +192,48 @@ def visualize_cell_matches(
         ax.invert_yaxis()
     ax.set_title(f"Cell match overlay ({len(display_matches)} displayed rows)")
     ax.legend(loc="lower right", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
+def visualize_ground_truth_recovered_warp_grid(
+    grid_x,
+    grid_y,
+    true_displacement_x,
+    true_displacement_y,
+    estimated_displacement_x,
+    estimated_displacement_y,
+    *,
+    stride: int = 8,
+    title: str = "Synthetic ground truth vs recovered warp grid",
+):
+    """Compare synthetic ground-truth and recovered displacement on identical axes."""
+    x = np.asarray(grid_x, dtype=float)
+    y = np.asarray(grid_y, dtype=float)
+    true_x = np.asarray(true_displacement_x, dtype=float)
+    true_y = np.asarray(true_displacement_y, dtype=float)
+    estimated_x = np.asarray(estimated_displacement_x, dtype=float)
+    estimated_y = np.asarray(estimated_displacement_y, dtype=float)
+    arrays = (x, y, true_x, true_y, estimated_x, estimated_y)
+    if len({array.shape for array in arrays}) != 1:
+        raise ValueError("Grid and displacement arrays must share one shape.")
+    step = max(1, int(stride))
+    sample = np.s_[::step, ::step]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True)
+    for ax, dx, dy, label in (
+        (axes[0], true_x, true_y, "Ground truth"),
+        (axes[1], estimated_x, estimated_y, "Recovered"),
+    ):
+        ax.quiver(
+            x[sample], y[sample], dx[sample], dy[sample],
+            angles="xy", scale_units="xy", scale=1.0, width=0.003,
+        )
+        ax.set_title(label)
+        ax.set_aspect("equal", adjustable="box")
+        ax.invert_yaxis()
+        ax.set_xlabel("world x (um)")
+    axes[0].set_ylabel("world y (um)")
+    fig.suptitle(title)
     fig.tight_layout()
     return fig
 
@@ -596,10 +701,15 @@ def visualize_local_improvement_heatmap(local_metrics, *, title: str = "Local me
         ax.set_aspect("equal", adjustable="box")
         fig.tight_layout()
         return fig
+    color_column = (
+        "delta_median"
+        if "delta_median" in local_metrics
+        else "delta_affine_to_applied"
+    )
     scatter = ax.scatter(
         local_metrics["center_x"],
         local_metrics["center_y"],
-        c=local_metrics["delta_median"],
+        c=local_metrics[color_column],
         cmap="coolwarm",
         s=100,
         edgecolors="black",

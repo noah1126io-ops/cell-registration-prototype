@@ -59,6 +59,16 @@ EXPECTED_ARTIFACTS = (
     "images/final_joint_displacement.png",
     "images/stage_a_he.png",
     "images/final_joint_he.png",
+    "evaluation/evaluation_summary.json",
+    "evaluation/evaluation_summary.csv",
+    "evaluation/pointset_metrics.csv",
+    "evaluation/deformation_metrics.csv",
+    "evaluation/local_region_evaluation.csv",
+    "evaluation/landmark_tre.csv",
+    "evaluation/landmark_tre_summary.json",
+    "evaluation/raster_fidelity.json",
+    "evaluation/ground_truth_metrics.json",
+    "evaluation/displacement_epe.csv",
 )
 
 
@@ -302,6 +312,7 @@ def build_workflow_c_run_bundle(
     optimization_history: list[Mapping[str, Any]] | None = None,
     previous_parameters: Mapping[str, Any] | None = None,
     provenance: Mapping[str, Any] | None = None,
+    evaluation_metadata: Mapping[str, Any] | None = None,
     input_files: list[Mapping[str, Any]] | None = None,
     include_original_inputs: bool = False,
     now_utc: datetime | None = None,
@@ -371,6 +382,7 @@ def build_workflow_c_run_bundle(
         "local_timestamp": local_timestamp.isoformat(),
         **provenance_values,
         "input_files": sanitized_inputs,
+        "evaluation": json_safe(evaluation_metadata or {}),
         "include_original_inputs": bool(include_original_inputs),
         "included_files": sorted([*files, "manifest.json"]),
         "skipped_unavailable_files": sorted(expected - set(files)),
