@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import io
 import time
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 
@@ -1030,6 +1031,30 @@ def _warp_grid_lines_pixels(bounds, spacing: float, warp_metadata: dict, fine_re
     return lines
 
 
+def _json_summary_safe(value):
+    """Convert summary values to strict JSON without embedding scientific arrays."""
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        return value if np.isfinite(value) else None
+    if isinstance(value, np.ndarray):
+        return {
+            "type": "ndarray",
+            "shape": list(value.shape),
+            "dtype": str(value.dtype),
+            "omitted_from_summary_json": True,
+        }
+    if isinstance(value, np.generic):
+        return _json_summary_safe(value.item())
+    if isinstance(value, Mapping):
+        return {str(key): _json_summary_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_summary_safe(item) for item in value]
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"Unsupported summary JSON value: {type(value).__name__}")
+
+
 def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict, warp_metadata: dict | None = None) -> bytes:
     fine_applied_value = getattr(fine_result, "applied", None)
     fine_applied = fine_result.success if fine_applied_value is None else bool(fine_applied_value)
@@ -1077,7 +1102,8 @@ def _he_geojson_summary_to_json(affine_result, fine_result, parameters: dict, wa
         "parameters": parameters,
         "notes": "Research prototype only. Raster HE warp export is an MVP for QC and should be visually checked.",
     }
-    return json.dumps(summary, indent=2).encode("utf-8")
+    safe_summary = _json_summary_safe(summary)
+    return json.dumps(safe_summary, indent=2, allow_nan=False).encode("utf-8")
 
 
 def _numpy_array_bytes(array: np.ndarray) -> bytes:
