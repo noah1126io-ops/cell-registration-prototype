@@ -140,17 +140,22 @@ def _stage_metrics(result: FineWarpResult, field_x: np.ndarray, field_y: np.ndar
     density = (result.metrics or {}).get("density_flow", {})
     history = pd.DataFrame((result.metrics or {}).get("optimization_history", []))
     accepted = history[history.get("accepted", pd.Series(False, index=history.index)).astype(bool)] if not history.empty else history
-    first = history.iloc[0].to_dict() if not history.empty else {}
-    last = accepted.iloc[-1].to_dict() if not accepted.empty else first
     summary = {
         **_field_summary(field_x, field_y, result.grid_spacing),
         "attempted_steps": int(density.get("attempted_optimization_steps", 0)),
         "accepted_steps": int(density.get("accepted_update_steps", 0)),
         "rejected_steps": int(density.get("rejected_update_steps", 0)),
+        "checkpoint_policy": density.get("checkpoint_policy"),
+        "selected_checkpoint_type": density.get("selected_checkpoint_type"),
+        "canonical_evaluation_scale_um": density.get("canonical_evaluation_scale_um"),
+        "canonical_objective_initial": density.get("canonical_objective_initial"),
+        "canonical_objective_selected": density.get("canonical_objective_selected"),
+        "canonical_objective_final_accepted": density.get("canonical_objective_final_accepted"),
     }
-    for channel in ("density", "support", "structure", "smoothness", "magnitude", "soft_jacobian", "total"):
-        summary[f"{channel}_objective_before"] = first.get(channel)
-        summary[f"{channel}_objective_after"] = last.get(channel)
+    selected_snapshot = density.get("checkpoint_snapshots", {}).get(density.get("selected_checkpoint_type"))
+    if selected_snapshot is not None:
+        for channel in ("density", "support", "structure", "smoothness", "magnitude", "soft_jacobian", "total"):
+            summary[f"{channel}_objective_selected"] = selected_snapshot.get(f"{channel}_objective")
     return summary
 
 
@@ -204,6 +209,11 @@ def two_stage_joint_flow_registration(
     exploratory_p95_displacement: float | None = 35.0,
     exploratory_jacobian_min: float = 0.02,
     exploratory_jacobian_max: float = 6.0,
+    stage_a_checkpoint_policy: str = "stage_objective",
+    stage_a_max_absolute_median_worsening_um: float = 0.50,
+    stage_a_max_relative_median_worsening: float = 0.05,
+    stage_a_max_mutual_nearest_decrease: float = 0.02,
+    stage_a_max_within_fraction_decrease: float = 0.03,
     joint_preset: str = "Joint Safe",
     **kwargs,
 ) -> FineWarpResult:
@@ -242,6 +252,15 @@ def two_stage_joint_flow_registration(
         "density_blur_scales", "optimization_levels", "iterations_per_level", "learning_rate",
         "update_smoothing_sigma", "max_displacement", "displacement_p95_limit",
         "jacobian_min_threshold", "jacobian_max_threshold",
+        "checkpoint_policy",
+        "stage_a_max_absolute_median_worsening_um",
+        "stage_a_max_relative_median_worsening",
+        "stage_a_max_mutual_nearest_decrease",
+        "stage_a_max_within_fraction_decrease",
+        "checkpoint_strict_jacobian_min_threshold",
+        "checkpoint_strict_jacobian_max_threshold",
+        "checkpoint_strict_max_displacement",
+        "checkpoint_strict_displacement_p95_limit",
     ):
         shared.pop(key, None)
     shared.update(
@@ -270,10 +289,26 @@ def two_stage_joint_flow_registration(
         displacement_p95_limit=exploratory_p95_displacement,
         jacobian_min_threshold=float(exploratory_jacobian_min),
         jacobian_max_threshold=float(exploratory_jacobian_max),
+        checkpoint_policy=stage_a_checkpoint_policy,
+        stage_a_max_absolute_median_worsening_um=stage_a_max_absolute_median_worsening_um,
+        stage_a_max_relative_median_worsening=stage_a_max_relative_median_worsening,
+        stage_a_max_mutual_nearest_decrease=stage_a_max_mutual_nearest_decrease,
+        stage_a_max_within_fraction_decrease=stage_a_max_within_fraction_decrease,
+        checkpoint_strict_jacobian_min_threshold=float(kwargs.get("jacobian_min_threshold", 0.05)),
+        checkpoint_strict_jacobian_max_threshold=float(kwargs.get("jacobian_max_threshold", 4.0)),
+        checkpoint_strict_max_displacement=float(kwargs.get("max_displacement", 35.0)),
+        checkpoint_strict_displacement_p95_limit=kwargs.get("displacement_p95_limit", 30.0),
         **shared,
     )
     stage_a_x = np.asarray(stage_a.attempted_displacement_x, dtype=float)
     stage_a_y = np.asarray(stage_a.attempted_displacement_y, dtype=float)
+    stage_a_density_metadata = (stage_a.metrics or {}).get("density_flow", {})
+    stage_a_snapshots = stage_a_density_metadata.get("checkpoint_snapshots", {})
+    stage_a_selected_type = stage_a_density_metadata.get("selected_checkpoint_type")
+    selected_stage_a_snapshot = stage_a_snapshots.get(stage_a_selected_type)
+    if selected_stage_a_snapshot is not None:
+        np.testing.assert_allclose(stage_a_x, selected_stage_a_snapshot["field_x"])
+        np.testing.assert_allclose(stage_a_y, selected_stage_a_snapshot["field_y"])
     stage_a_points = moving + _sample_field(moving, stage_a_x, stage_a_y, resolved_bounds, pixel_size)
     stage_a_he = _warp_feature_image(
         affine_he_image, affine_he_metadata, stage_a_x, stage_a_y, resolved_bounds, pixel_size
@@ -322,6 +357,7 @@ def two_stage_joint_flow_registration(
         displacement_p95_limit=exploratory_p95_displacement,
         jacobian_min_threshold=float(exploratory_jacobian_min),
         jacobian_max_threshold=float(exploratory_jacobian_max),
+        checkpoint_policy="point_metric",
         **stage_b_shared,
     )
     stage_b_x = np.asarray(stage_b.attempted_displacement_x, dtype=float)
@@ -485,9 +521,9 @@ def two_stage_joint_flow_registration(
                 "rejected_update_steps": stage_a_summary["rejected_steps"] + stage_b_summary["rejected_steps"],
                 "rejected_or_backtracked_update_steps": 0,
                 "best_checkpoint_iteration": selected["label"] if selected else None,
-                "initial_objective": stage_a_summary.get("total_objective_before"),
-                "best_objective": stage_b_summary.get("total_objective_after"),
-                "final_objective": stage_b_summary.get("total_objective_after"),
+                "initial_objective": stage_a_summary.get("canonical_objective_initial"),
+                "best_objective": stage_b_summary.get("canonical_objective_selected"),
+                "final_objective": stage_b_summary.get("canonical_objective_final_accepted"),
                 "affine_symmetric_median": before_metrics["symmetric_median_distance"],
                 "best_attempted_symmetric_median": attempted_metrics["symmetric_median_distance"],
                 "mutual_nearest_fraction_before": before_mutual,
@@ -497,6 +533,9 @@ def two_stage_joint_flow_registration(
                 "exploratory_max_displacement": float(exploratory_max_displacement),
                 "exploratory_p95_displacement": exploratory_p95_displacement,
                 "uses_actual_he_tissue_mask": True,
+                "stage_a_checkpoint_policy": stage_a_checkpoint_policy,
+                "stage_a_selected_checkpoint": stage_a_selected_type,
+                "stage_a_selected_iteration": stage_a_density_metadata.get("selected_checkpoint_iteration"),
             },
             "joint_flow": {
                 "stage_a": stage_a_summary,
@@ -513,6 +552,17 @@ def two_stage_joint_flow_registration(
                 "stage_b_incremental_y": stage_b_y,
                 "objective_history": objective_history,
                 "selected_checkpoint": selected["label"] if selected else None,
+                "stage_a_checkpoint_policy": stage_a_checkpoint_policy,
+                "stage_a_selected_checkpoint": stage_a_selected_type,
+                "stage_a_selected_iteration": stage_a_density_metadata.get("selected_checkpoint_iteration"),
+                "stage_a_canonical_evaluation_scale_um": stage_a_density_metadata.get("canonical_evaluation_scale_um"),
+                "stage_a_checkpoint_snapshots": stage_a_snapshots,
+                "stage_b_input_consistency": {
+                    "points_field_matches_selected_stage_a": True,
+                    "he_field_matches_selected_stage_a": True,
+                    "mask_field_matches_selected_stage_a": True,
+                    "features_derived_from_selected_stage_a_raster": True,
+                },
                 "fixed_points_moved": False,
             },
         },

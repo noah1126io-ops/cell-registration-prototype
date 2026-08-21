@@ -1358,6 +1358,11 @@ def show_he_geojson_preparation() -> None:
     joint_exploratory_p95_displacement = 35.0
     joint_exploratory_jacobian_min = 0.02
     joint_exploratory_jacobian_max = 6.0
+    joint_stage_a_checkpoint_policy = "stage_objective"
+    joint_stage_a_max_absolute_worsening = 0.50
+    joint_stage_a_max_relative_worsening = 0.05
+    joint_stage_a_max_mutual_decrease = 0.02
+    joint_stage_a_max_within_decrease = 0.03
 
     st.subheader(tr("3. 詳細位置合わせ", "3. Fine alignment"))
     fine_alignment_method = st.selectbox(
@@ -1586,6 +1591,35 @@ def show_he_geojson_preparation() -> None:
                     joint_stage_b_smoothing = st.number_input("Stage B update smoothing", min_value=0.1, value=joint_default["b_smooth"], step=0.5, disabled=not joint_custom, key=f"workflow-c-joint-b-smoothing-{joint_preset}")
                     joint_exploratory_max_displacement = st.number_input("Exploratory max displacement (um)", min_value=1.0, value=joint_default["explore_max"], step=5.0, disabled=not joint_custom, key=f"workflow-c-joint-explore-max-{joint_preset}")
                     joint_exploratory_p95_displacement = st.number_input("Exploratory p95 displacement (um)", min_value=1.0, value=joint_default["explore_p95"], step=5.0, disabled=not joint_custom, key=f"workflow-c-joint-explore-p95-{joint_preset}")
+            with st.expander("Joint Stage A checkpoint policy", expanded=joint_custom):
+                joint_stage_a_checkpoint_policy = st.selectbox(
+                    "Stage A checkpoint policy",
+                    ["stage_objective", "point_metric"],
+                    index=0,
+                    disabled=not joint_custom,
+                    key=f"workflow-c-joint-stage-a-checkpoint-policy-{joint_preset}",
+                    help="Stage-objective selects coarse tissue-shape deformation using one canonical evaluation scale. Final Joint application remains strictly safety-gated.",
+                )
+                guard_left, guard_right = st.columns(2)
+                with guard_left:
+                    joint_stage_a_max_absolute_worsening = st.number_input(
+                        "Maximum temporary median worsening (um)", min_value=0.0, value=0.50, step=0.05,
+                        disabled=not joint_custom, key=f"workflow-c-joint-stage-a-absolute-guard-{joint_preset}",
+                    )
+                    joint_stage_a_max_relative_worsening = st.number_input(
+                        "Maximum temporary relative worsening", min_value=0.0, value=0.05, step=0.01, format="%.3f",
+                        disabled=not joint_custom, key=f"workflow-c-joint-stage-a-relative-guard-{joint_preset}",
+                    )
+                with guard_right:
+                    joint_stage_a_max_mutual_decrease = st.number_input(
+                        "Maximum temporary mutual-nearest decrease", min_value=0.0, value=0.02, step=0.005, format="%.3f",
+                        disabled=not joint_custom, key=f"workflow-c-joint-stage-a-mutual-guard-{joint_preset}",
+                    )
+                    joint_stage_a_max_within_decrease = st.number_input(
+                        "Maximum temporary within-fraction decrease", min_value=0.0, value=0.03, step=0.005, format="%.3f",
+                        disabled=not joint_custom, key=f"workflow-c-joint-stage-a-within-guard-{joint_preset}",
+                    )
+                st.caption("Experimental Stage A tolerances are not biologically validated. Stage B composition must still pass the unchanged strict final gate.")
             with st.expander(tr("Joint objective重み", "Joint objective weights"), expanded=True):
                 joint_density_weight = st.number_input("Stage B point-density weight", min_value=0.0, value=joint_default["density"], step=0.1, disabled=not joint_custom, key=f"workflow-c-joint-density-weight-{joint_preset}")
                 joint_support_weight = st.number_input("Stage A HE tissue-support weight", min_value=0.0, value=joint_default["support"], step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-support-weight-{joint_preset}")
@@ -2114,6 +2148,11 @@ def show_he_geojson_preparation() -> None:
                         exploratory_p95_displacement=joint_exploratory_p95_displacement,
                         exploratory_jacobian_min=joint_exploratory_jacobian_min,
                         exploratory_jacobian_max=joint_exploratory_jacobian_max,
+                        stage_a_checkpoint_policy=joint_stage_a_checkpoint_policy,
+                        stage_a_max_absolute_median_worsening_um=joint_stage_a_max_absolute_worsening,
+                        stage_a_max_relative_median_worsening=joint_stage_a_max_relative_worsening,
+                        stage_a_max_mutual_nearest_decrease=joint_stage_a_max_mutual_decrease,
+                        stage_a_max_within_fraction_decrease=joint_stage_a_max_within_decrease,
                         joint_preset=joint_preset,
                         **density_flow_kwargs,
                     )
@@ -2489,6 +2528,10 @@ def show_he_geojson_preparation() -> None:
     joint_final_grid_figure = None
     joint_stage_a_he_image = None
     joint_stage_b_he_image = None
+    joint_stage_a_checkpoint_table = pd.DataFrame()
+    joint_stage_a_checkpoint_displacement_figures = {}
+    joint_stage_a_checkpoint_grid_figures = {}
+    joint_stage_a_checkpoint_he_images = {}
     overview_tab, point_tab, image_tab, tissue_tab, safety_tab, anchor_tab, downloads_tab, evaluation_tab = st.tabs(
         [
             tr("概要", "Overview"),
@@ -2621,6 +2664,63 @@ def show_he_geojson_preparation() -> None:
                 ]),
                 use_container_width=True, hide_index=True,
             )
+            checkpoint_snapshots = joint_metrics.get("stage_a_checkpoint_snapshots", {})
+            selected_stage_a_checkpoint = joint_metrics.get("stage_a_selected_checkpoint")
+            checkpoint_labels = {
+                "point_metric_best": "point-metric best",
+                "canonical_objective_best": "canonical-objective best",
+                "strongest_exploratory_safe": "strongest exploratory safe (QC ONLY - NOT NECESSARILY APPLIED)",
+                "final_accepted_state": "final accepted state",
+            }
+            checkpoint_rows = []
+            for checkpoint_type, checkpoint_label in checkpoint_labels.items():
+                snapshot = checkpoint_snapshots.get(checkpoint_type)
+                if snapshot is None:
+                    continue
+                snapshot_metrics = snapshot.get("metrics", {})
+                checkpoint_rows.append({
+                    "checkpoint_type": checkpoint_label,
+                    "iteration": snapshot.get("iteration"),
+                    "physical_scale_um": snapshot.get("physical_scale_um"),
+                    "selected_for_stage_b": checkpoint_type == selected_stage_a_checkpoint,
+                    "symmetric_median_um": snapshot_metrics.get("symmetric_median_distance"),
+                    "delta_median_vs_affine_um": (
+                        snapshot_metrics.get("symmetric_median_distance", np.nan)
+                        - fine_result.metrics.get("before", {}).get("symmetric_median_distance", np.nan)
+                    ),
+                    "p90_point_distance_um": snapshot_metrics.get("bidirectional_p90_distance"),
+                    "p95_point_distance_um": snapshot_metrics.get("bidirectional_p95_distance"),
+                    "mutual_nearest": snapshot_metrics.get("mutual_nearest_fraction"),
+                    "canonical_density_objective": snapshot.get("canonical_density_objective"),
+                    "canonical_support_objective": snapshot.get("canonical_support_objective"),
+                    "canonical_total_objective": snapshot.get("canonical_total_objective"),
+                    "p95_displacement_um": snapshot.get("p95_displacement"),
+                    "max_displacement_um": snapshot.get("max_displacement"),
+                    "jacobian_p05": snapshot.get("jacobian_p05"),
+                    "jacobian_p95": snapshot.get("jacobian_p95"),
+                    "exploratory_safe": snapshot.get("exploratory_safe"),
+                    "strict_final_safe": snapshot.get("strict_final_safe"),
+                    "temporary_point_guard_pass": snapshot.get("temporary_point_guard_pass"),
+                })
+                snapshot_x = np.asarray(snapshot.get("field_x"), dtype=float)
+                snapshot_y = np.asarray(snapshot.get("field_y"), dtype=float)
+                if snapshot_x.shape == fine_result.grid_x.shape and snapshot_y.shape == fine_result.grid_y.shape:
+                    joint_stage_a_checkpoint_displacement_figures[checkpoint_type] = visualize_displacement_magnitude_heatmap(
+                        fine_result.grid_x, fine_result.grid_y, snapshot_x, snapshot_y,
+                        title=f"Stage A: {checkpoint_label}",
+                    )
+            joint_stage_a_checkpoint_table = pd.DataFrame(checkpoint_rows)
+            safety_tab.subheader("Stage A checkpoint analysis")
+            safety_tab.caption(
+                f"Policy: {joint_metrics.get('stage_a_checkpoint_policy')}; "
+                f"canonical scale: {joint_metrics.get('stage_a_canonical_evaluation_scale_um')} um. "
+                "Exploratory safety and strict final safety are intentionally separate."
+            )
+            if not joint_stage_a_checkpoint_table.empty:
+                safety_tab.dataframe(joint_stage_a_checkpoint_table, use_container_width=True, hide_index=True)
+                with safety_tab.expander("Stage A checkpoint displacement QC", expanded=False):
+                    for checkpoint_type, figure in joint_stage_a_checkpoint_displacement_figures.items():
+                        st.pyplot(figure, clear_figure=False)
             stage_a_x = np.asarray(joint_metrics.get("stage_a_displacement_x"), dtype=float)
             stage_a_y = np.asarray(joint_metrics.get("stage_a_displacement_y"), dtype=float)
             stage_b_x = np.asarray(joint_metrics.get("stage_b_incremental_x"), dtype=float)
@@ -3684,6 +3784,45 @@ def show_he_geojson_preparation() -> None:
                 ):
                     with column:
                         st.pyplot(figure, clear_figure=False)
+                checkpoint_snapshots = fine_result.metrics.get("joint_flow", {}).get("stage_a_checkpoint_snapshots", {})
+                for checkpoint_type, snapshot in checkpoint_snapshots.items():
+                    if snapshot is None:
+                        continue
+                    checkpoint_x = np.asarray(snapshot.get("field_x"), dtype=float)
+                    checkpoint_y = np.asarray(snapshot.get("field_y"), dtype=float)
+                    if checkpoint_x.shape != fine_result.grid_x.shape or checkpoint_y.shape != fine_result.grid_y.shape:
+                        continue
+                    checkpoint_he = warp_affine_image_with_density_flow(
+                        affine_warped_he_image,
+                        affine_warped_he_metadata,
+                        checkpoint_x,
+                        checkpoint_y,
+                        field_bounds=fine_result.bounds,
+                        field_spacing=fine_result.grid_spacing,
+                    )
+                    joint_stage_a_checkpoint_he_images[checkpoint_type] = checkpoint_he
+                    checkpoint_result = replace(
+                        fine_result, displacement_x=checkpoint_x, displacement_y=checkpoint_y
+                    )
+                    checkpoint_lines = _warp_grid_lines_pixels(
+                        fine_result.bounds,
+                        max(cluster_grid_spacing, 1.0),
+                        attempted_warped_he_metadata,
+                        fine_result=checkpoint_result,
+                    )
+                    joint_stage_a_checkpoint_grid_figures[checkpoint_type] = visualize_warp_grid_overlay(
+                        checkpoint_he,
+                        before_grid_lines,
+                        checkpoint_lines,
+                        title=(
+                            f"Stage A {checkpoint_type.replace('_', ' ')} warp grid"
+                            + (" - QC ONLY, NOT NECESSARILY APPLIED" if checkpoint_type == "strongest_exploratory_safe" else "")
+                        ),
+                    )
+                if joint_stage_a_checkpoint_grid_figures:
+                    with safety_tab.expander("Stage A checkpoint warp-grid QC", expanded=False):
+                        for checkpoint_type, figure in joint_stage_a_checkpoint_grid_figures.items():
+                            st.pyplot(figure, clear_figure=False)
 
         with overlay_col:
             boundary_pin_pixels = (
@@ -3947,6 +4086,11 @@ def show_he_geojson_preparation() -> None:
         "joint_stage_a_update_smoothing": joint_stage_a_smoothing,
         "joint_stage_b_update_smoothing": joint_stage_b_smoothing,
         "joint_stage_a_density_weight": joint_stage_a_density_weight,
+        "joint_stage_a_checkpoint_policy": joint_stage_a_checkpoint_policy,
+        "joint_stage_a_max_absolute_median_worsening_um": joint_stage_a_max_absolute_worsening,
+        "joint_stage_a_max_relative_median_worsening": joint_stage_a_max_relative_worsening,
+        "joint_stage_a_max_mutual_nearest_decrease": joint_stage_a_max_mutual_decrease,
+        "joint_stage_a_max_within_fraction_decrease": joint_stage_a_max_within_decrease,
         "joint_exploratory_max_displacement_um": joint_exploratory_max_displacement,
         "joint_exploratory_p95_displacement_um": joint_exploratory_p95_displacement,
         "joint_exploratory_jacobian_min": joint_exploratory_jacobian_min,
@@ -4246,6 +4390,10 @@ def show_he_geojson_preparation() -> None:
             pd.DataFrame([fine_result.metrics.get("joint_flow", {}).get("stage_a", {})]).to_csv(index=False).encode("utf-8")
             if fine_alignment_method == "joint density + tissue-structure flow" else None
         ),
+        "joint_flow_stage_a_checkpoint_analysis.csv": (
+            joint_stage_a_checkpoint_table.to_csv(index=False).encode("utf-8")
+            if not joint_stage_a_checkpoint_table.empty else None
+        ),
         "joint_flow_stage_b_metrics.csv": (
             pd.DataFrame([fine_result.metrics.get("joint_flow", {}).get("stage_b", {})]).to_csv(index=False).encode("utf-8")
             if fine_alignment_method == "joint density + tissue-structure flow" else None
@@ -4307,6 +4455,59 @@ def show_he_geojson_preparation() -> None:
             evaluation_raster_fidelity, indent=2, allow_nan=False
         ).encode("utf-8"),
     }
+    if fine_alignment_method == "joint density + tissue-structure flow":
+        stage_a_export_names = {
+            "point_metric_best": "point_metric_best",
+            "canonical_objective_best": "canonical_objective_best",
+            "strongest_exploratory_safe": "strongest_exploratory_safe",
+            "final_accepted_state": "final_accepted",
+        }
+        joint_metrics_for_export = fine_result.metrics.get("joint_flow", {})
+        checkpoint_snapshots_for_export = joint_metrics_for_export.get("stage_a_checkpoint_snapshots", {})
+        for checkpoint_type, export_name in stage_a_export_names.items():
+            snapshot = checkpoint_snapshots_for_export.get(checkpoint_type)
+            artifacts[f"fields/stage_a_{export_name}.npz"] = (
+                _displacement_field_npz_bytes(
+                    np.asarray(snapshot["field_x"]), np.asarray(snapshot["field_y"]),
+                    bounds=fine_result.bounds, grid_spacing=fine_result.grid_spacing,
+                ) if snapshot is not None else None
+            )
+            displacement_figure = joint_stage_a_checkpoint_displacement_figures.get(checkpoint_type)
+            grid_figure = joint_stage_a_checkpoint_grid_figures.get(checkpoint_type)
+            image_export_name = "objective_best" if checkpoint_type == "canonical_objective_best" else (
+                "strongest_safe" if checkpoint_type == "strongest_exploratory_safe" else export_name
+            )
+            artifacts[f"images/stage_a_{image_export_name}_displacement.png"] = (
+                figure_to_png_bytes(displacement_figure) if displacement_figure is not None else None
+            )
+            artifacts[f"images/stage_a_{image_export_name}_warp_grid.png"] = (
+                figure_to_png_bytes(grid_figure) if grid_figure is not None else None
+            )
+        selected_checkpoint_type = joint_metrics_for_export.get("stage_a_selected_checkpoint")
+        selected_snapshot = checkpoint_snapshots_for_export.get(selected_checkpoint_type)
+        artifacts["fields/stage_a_selected_for_stage_b.npz"] = (
+            _displacement_field_npz_bytes(
+                np.asarray(selected_snapshot["field_x"]), np.asarray(selected_snapshot["field_y"]),
+                bounds=fine_result.bounds, grid_spacing=fine_result.grid_spacing,
+            ) if selected_snapshot is not None else None
+        )
+        selected_grid = joint_stage_a_checkpoint_grid_figures.get(selected_checkpoint_type)
+        selected_displacement = joint_stage_a_checkpoint_displacement_figures.get(selected_checkpoint_type)
+        artifacts["images/stage_a_selected_warp_grid.png"] = (
+            figure_to_png_bytes(selected_grid) if selected_grid is not None else None
+        )
+        artifacts["images/stage_a_selected_displacement.png"] = (
+            figure_to_png_bytes(selected_displacement) if selected_displacement is not None else None
+        )
+        for checkpoint_type, output_name in (
+            ("canonical_objective_best", "stage_a_objective_best_he.png"),
+            ("strongest_exploratory_safe", "stage_a_strongest_safe_he.png"),
+            (selected_checkpoint_type, "stage_a_selected_he.png"),
+        ):
+            checkpoint_he = joint_stage_a_checkpoint_he_images.get(checkpoint_type)
+            artifacts[f"images/{output_name}"] = (
+                array_to_png_bytes(checkpoint_he) if checkpoint_he is not None else None
+            )
     uploaded_input_records = []
     for uploaded in (he_centers_file, geojson_file, he_image_file, landmark_file):
         if uploaded is not None:

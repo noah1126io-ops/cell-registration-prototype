@@ -859,6 +859,15 @@ def tissue_aware_density_flow_registration(
     tissue_support_channel_weight: float = 0.0,
     structure_channel_weight: float = 0.0,
     soft_jacobian_weight: float = 0.0,
+    checkpoint_policy: str = "point_metric",
+    stage_a_max_absolute_median_worsening_um: float = 0.50,
+    stage_a_max_relative_median_worsening: float = 0.05,
+    stage_a_max_mutual_nearest_decrease: float = 0.02,
+    stage_a_max_within_fraction_decrease: float = 0.03,
+    checkpoint_strict_jacobian_min_threshold: float | None = None,
+    checkpoint_strict_jacobian_max_threshold: float | None = None,
+    checkpoint_strict_max_displacement: float | None = None,
+    checkpoint_strict_displacement_p95_limit: float | None = None,
     detect_axis_reversal: bool = True,
     max_grid_side: int = 1024,
 ) -> FineWarpResult:
@@ -889,6 +898,33 @@ def tissue_aware_density_flow_registration(
     global_initialization = str(global_translation_initialization).strip().lower()
     if global_initialization not in {"off", "auto"}:
         raise ValueError("global_translation_initialization must be 'off' or 'auto'.")
+    checkpoint_policy = str(checkpoint_policy).strip().lower()
+    if checkpoint_policy not in {"point_metric", "stage_objective"}:
+        raise ValueError("checkpoint_policy must be 'point_metric' or 'stage_objective'.")
+    stage_a_guard_values = (
+        stage_a_max_absolute_median_worsening_um,
+        stage_a_max_relative_median_worsening,
+        stage_a_max_mutual_nearest_decrease,
+        stage_a_max_within_fraction_decrease,
+    )
+    if any(not np.isfinite(value) or value < 0 for value in stage_a_guard_values):
+        raise ValueError("Stage-A temporary point-degradation tolerances must be finite and non-negative.")
+    strict_checkpoint_jacobian_min = float(
+        jacobian_min_threshold if checkpoint_strict_jacobian_min_threshold is None
+        else checkpoint_strict_jacobian_min_threshold
+    )
+    strict_checkpoint_jacobian_max = float(
+        jacobian_max_threshold if checkpoint_strict_jacobian_max_threshold is None
+        else checkpoint_strict_jacobian_max_threshold
+    )
+    strict_checkpoint_max_displacement = float(
+        max_displacement if checkpoint_strict_max_displacement is None
+        else checkpoint_strict_max_displacement
+    )
+    strict_checkpoint_p95_limit = (
+        displacement_p95_limit if checkpoint_strict_displacement_p95_limit is None
+        else checkpoint_strict_displacement_p95_limit
+    )
 
     active_scales = tuple(sorted(scales, reverse=True)[: min(int(optimization_levels), len(scales))])
     padding = max(active_scales) * density_pixel_size * 3.0
@@ -1074,6 +1110,12 @@ def tissue_aware_density_flow_registration(
         )
         values = point_bidirectional_distance_metrics(metric_fixed, transformed)
         values["mutual_nearest_fraction"] = _mutual_nearest_fraction(metric_fixed, transformed)
+        bidirectional = np.concatenate([
+            cKDTree(metric_fixed).query(transformed, k=1)[0],
+            cKDTree(transformed).query(metric_fixed, k=1)[0],
+        ])
+        values["bidirectional_p90_distance"] = float(np.percentile(bidirectional, 90))
+        values["bidirectional_p95_distance"] = float(np.percentile(bidirectional, 95))
         return values, transformed
 
     def improves_affine(values: dict, state: dict[str, object]) -> bool:
@@ -1094,6 +1136,21 @@ def tissue_aware_density_flow_registration(
             affine_metrics=before_metrics,
         )
 
+    def temporary_stage_a_point_guard(values: dict) -> bool:
+        affine_median = float(before_metrics["symmetric_median_distance"])
+        allowed_median = max(
+            float(stage_a_max_absolute_median_worsening_um),
+            abs(affine_median) * float(stage_a_max_relative_median_worsening),
+        )
+        if float(values["symmetric_median_distance"]) > affine_median + allowed_median:
+            return False
+        if float(values["mutual_nearest_fraction"]) < before_mutual - float(stage_a_max_mutual_nearest_decrease):
+            return False
+        return all(
+            float(values[f"symmetric_within_{threshold}"])
+            >= float(before_metrics[f"symmetric_within_{threshold}"]) - float(stage_a_max_within_fraction_decrease)
+            for threshold in (3, 5, 10)
+        )
     attempted_steps = 0
     accepted_steps = 0
     backtracked_steps = 0
@@ -1101,6 +1158,12 @@ def tissue_aware_density_flow_registration(
     global_iteration = 0
     best_checkpoint: dict[str, object] | None = None
     best_attempted: dict[str, object] | None = None
+    stage_checkpoint_snapshots: dict[str, dict[str, object] | None] = {
+        "point_metric_best": None,
+        "canonical_objective_best": None,
+        "strongest_exploratory_safe": None,
+        "final_accepted_state": None,
+    }
     best_observed_median = float(before_metrics["symmetric_median_distance"])
     best_observed_mutual = before_mutual
     initial_objective: float | None = None
@@ -1108,6 +1171,74 @@ def tissue_aware_density_flow_registration(
     point_stall_count = 0
 
     initial_metric_values, _ = point_metrics_for_field(field_x, field_y)
+    canonical_sigma = active_scales[-1]
+    canonical_initial_state = evaluate_state(initial_field_x, initial_field_y, canonical_sigma)
+    canonical_objective_initial = float(canonical_initial_state["objective"]["total"])
+
+    def checkpoint_snapshot(
+        current_x: np.ndarray,
+        current_y: np.ndarray,
+        values: dict,
+        state: dict[str, object],
+        *,
+        iteration_value: int | None,
+        level_value: int,
+        sigma_value: float,
+    ) -> dict[str, object]:
+        canonical_state = evaluate_state(current_x, current_y, canonical_sigma)
+        jacobian_values = np.asarray(canonical_state["jacobian"], dtype=float)
+        displacement_values = np.hypot(current_x, current_y)
+        exploratory_safe, _ = _density_flow_trial_is_safe(
+            canonical_state,
+            jacobian_min_threshold=jacobian_min_threshold,
+            jacobian_max_threshold=jacobian_max_threshold,
+            max_displacement=max_displacement,
+            displacement_p95_limit=displacement_p95_limit,
+        )
+        strict_hard_safe, _ = _density_flow_trial_is_safe(
+            canonical_state,
+            jacobian_min_threshold=strict_checkpoint_jacobian_min,
+            jacobian_max_threshold=strict_checkpoint_jacobian_max,
+            max_displacement=strict_checkpoint_max_displacement,
+            displacement_p95_limit=strict_checkpoint_p95_limit,
+        )
+        strict_topology = bool(
+            np.mean(jacobian_values <= 0.0) == 0.0
+            and np.percentile(jacobian_values, 5) >= minimum_jacobian_p05
+            and np.percentile(jacobian_values, 95) <= maximum_jacobian_p95
+        )
+        strict_safe = bool(strict_hard_safe and strict_topology)
+        objective = state["objective"]
+        canonical_objective = canonical_state["objective"]
+        return {
+            "field_x": current_x.copy(), "field_y": current_y.copy(),
+            "metrics": dict(values), "iteration": iteration_value,
+            "level": int(level_value), "physical_scale_um": float(sigma_value * density_pixel_size),
+            "objective": float(objective["total"]),
+            "density_objective": float(objective["density"]),
+            "support_objective": float(objective["support"]),
+            "structure_objective": float(objective["structure"]),
+            "smoothness_objective": float(objective["smoothness"]),
+            "magnitude_objective": float(objective["magnitude"]),
+            "soft_jacobian_objective": float(objective["soft_jacobian"]),
+            "total_objective": float(objective["total"]),
+            "canonical_density_objective": float(canonical_objective["density"]),
+            "canonical_support_objective": float(canonical_objective["support"]),
+            "canonical_total_objective": float(canonical_objective["total"]),
+            "displacement_median": float(np.median(displacement_values)),
+            "p95_displacement": float(np.percentile(displacement_values, 95)),
+            "max_displacement": float(np.max(displacement_values)),
+            "jacobian_min": float(np.min(jacobian_values)),
+            "jacobian_p05": float(np.percentile(jacobian_values, 5)),
+            "jacobian_median": float(np.median(jacobian_values)),
+            "jacobian_p95": float(np.percentile(jacobian_values, 95)),
+            "jacobian_max": float(np.max(jacobian_values)),
+            "fold_over_fraction": float(np.mean(jacobian_values <= 0.0)),
+            "exploratory_safe": bool(exploratory_safe),
+            "strict_final_safe": strict_safe,
+            "temporary_point_guard_pass": temporary_stage_a_point_guard(values),
+            "final_point_improvement": improves_affine(values, canonical_state),
+        }
 
     for level, sigma_px in enumerate(active_scales):
         fixed_density = _normalized_density(fixed_impulses, sigma_px)
@@ -1266,19 +1397,38 @@ def tissue_aware_density_flow_registration(
             else:
                 point_stall_count += 1
 
-            checkpoint = {
-                "field_x": field_x.copy(),
-                "field_y": field_y.copy(),
-                "metrics": metric_values,
-                "iteration": global_iteration,
-                "objective": float(current_state["objective"]["total"]),
-            }
+            checkpoint = checkpoint_snapshot(
+                field_x, field_y, metric_values, current_state,
+                iteration_value=global_iteration,
+                level_value=level,
+                sigma_value=sigma_px,
+            )
             if _better_density_flow_checkpoint(checkpoint, best_attempted):
                 best_attempted = checkpoint
+                stage_checkpoint_snapshots["point_metric_best"] = checkpoint
             if improves_affine(metric_values, current_state) and _better_density_flow_checkpoint(
                 checkpoint, best_checkpoint
             ):
                 best_checkpoint = checkpoint
+            if (
+                checkpoint["exploratory_safe"]
+                and checkpoint["temporary_point_guard_pass"]
+                and float(checkpoint["canonical_total_objective"]) < canonical_objective_initial - max(objective_tolerance, 1e-12)
+            ):
+                current_canonical = stage_checkpoint_snapshots["canonical_objective_best"]
+                if (
+                    current_canonical is None
+                    or float(checkpoint["canonical_total_objective"])
+                    < float(current_canonical["canonical_total_objective"]) - 1e-12
+                ):
+                    stage_checkpoint_snapshots["canonical_objective_best"] = checkpoint
+            current_strongest = stage_checkpoint_snapshots["strongest_exploratory_safe"]
+            if checkpoint["exploratory_safe"] and (
+                current_strongest is None
+                or float(checkpoint["p95_displacement"]) > float(current_strongest["p95_displacement"]) + 1e-12
+            ):
+                stage_checkpoint_snapshots["strongest_exploratory_safe"] = checkpoint
+            stage_checkpoint_snapshots["final_accepted_state"] = checkpoint
             history.append(
                 {
                     "level": int(level),
@@ -1298,13 +1448,30 @@ def tissue_aware_density_flow_registration(
                     **current_state["objective"],
                 }
             )
-            if objective_stall_count >= early_stopping_patience or point_stall_count >= point_metric_patience:
+            if objective_stall_count >= early_stopping_patience or (
+                checkpoint_policy == "point_metric" and point_stall_count >= point_metric_patience
+            ):
                 break
 
     final_field_x = field_x.copy()
     final_field_y = field_y.copy()
     final_metric_values, _ = point_metrics_for_field(final_field_x, final_field_y)
-    selected = best_checkpoint if best_checkpoint is not None else best_attempted
+    if checkpoint_policy == "stage_objective":
+        selected = (
+            stage_checkpoint_snapshots["canonical_objective_best"]
+            or stage_checkpoint_snapshots["point_metric_best"]
+        )
+        selected_checkpoint_type = (
+            "canonical_objective_best"
+            if stage_checkpoint_snapshots["canonical_objective_best"] is not None
+            else "point_metric_best" if stage_checkpoint_snapshots["point_metric_best"] is not None
+            else "zero_affine"
+        )
+    else:
+        selected = best_checkpoint if best_checkpoint is not None else best_attempted
+        selected_checkpoint_type = (
+            "point_metric_best" if selected is not None else "zero_affine"
+        )
     if selected is None:
         selected = {
             "field_x": zeros.copy(),
@@ -1321,8 +1488,6 @@ def tissue_aware_density_flow_registration(
     attempted_metrics["possible_xy_reversal"] = False
     attempted_metrics["xy_reversal_diagnostics"] = reversal
 
-    canonical_sigma = active_scales[-1]
-    canonical_initial_state = evaluate_state(initial_field_x, initial_field_y, canonical_sigma)
     canonical_attempted_state = evaluate_state(field_x, field_y, canonical_sigma)
     canonical_final_state = evaluate_state(final_field_x, final_field_y, canonical_sigma)
     initial_objective = float(canonical_initial_state["objective"]["total"])
@@ -1360,12 +1525,21 @@ def tissue_aware_density_flow_registration(
         max_displacement=max_displacement,
         displacement_p95_limit=displacement_p95_limit,
     )
-    success = bool(best_checkpoint is not None and candidate_safe)
+    policy_checkpoint_exists = bool(
+        best_checkpoint is not None
+        if checkpoint_policy == "point_metric"
+        else selected_checkpoint_type != "zero_affine"
+    )
+    success = bool(policy_checkpoint_exists and candidate_safe)
     rejection_reason: str | None = None
     message = "Tissue-aware density-flow point registration completed."
-    if best_checkpoint is None:
+    if not policy_checkpoint_exists:
         rejection_reason = "no_improving_safe_checkpoint"
-        message = "Density-flow was rejected because no safe checkpoint improved the affine point metrics."
+        message = (
+            "Density-flow was rejected because no safe checkpoint improved the affine point metrics."
+            if checkpoint_policy == "point_metric"
+            else "Stage-objective flow found no canonical checkpoint passing exploratory safety and temporary point guards."
+        )
     elif not candidate_safe:
         success = False
         rejection_reason = candidate_safety_reason
@@ -1455,11 +1629,24 @@ def tissue_aware_density_flow_registration(
                 "rejected_update_steps": rejected_steps,
                 "rejected_or_backtracked_update_steps": backtracked_steps,
                 "best_checkpoint_iteration": (
-                    None if best_checkpoint is None else best_checkpoint.get("iteration")
+                    None if selected is None else selected.get("iteration")
                 ),
                 "initial_objective": initial_objective,
                 "best_objective": best_objective,
                 "final_objective": final_objective,
+                "canonical_objective_initial": canonical_objective_initial,
+                "canonical_objective_selected": best_objective,
+                "canonical_objective_final_accepted": final_objective,
+                "canonical_evaluation_sigma_px": float(canonical_sigma),
+                "canonical_evaluation_scale_um": float(canonical_sigma * density_pixel_size),
+                "checkpoint_policy": checkpoint_policy,
+                "selected_checkpoint_type": selected_checkpoint_type,
+                "selected_checkpoint_iteration": selected.get("iteration") if selected is not None else None,
+                "checkpoint_snapshots": stage_checkpoint_snapshots,
+                "stage_a_max_absolute_median_worsening_um": float(stage_a_max_absolute_median_worsening_um),
+                "stage_a_max_relative_median_worsening": float(stage_a_max_relative_median_worsening),
+                "stage_a_max_mutual_nearest_decrease": float(stage_a_max_mutual_nearest_decrease),
+                "stage_a_max_within_fraction_decrease": float(stage_a_max_within_fraction_decrease),
                 "affine_symmetric_median": float(before_metrics["symmetric_median_distance"]),
                 "best_attempted_symmetric_median": float(attempted_metrics["symmetric_median_distance"]),
                 "final_attempted_symmetric_median": float(final_metric_values["symmetric_median_distance"]),

@@ -24,7 +24,13 @@ def _metadata(size: int) -> dict:
     }
 
 
-def _joint_case(amplitude: float, *, strict_max: float = 12.0, intensity_pattern: bool = False):
+def _joint_case(
+    amplitude: float,
+    *,
+    strict_max: float = 12.0,
+    intensity_pattern: bool = False,
+    **joint_overrides,
+):
     size = 96
     yy, xx = np.indices((size, size), dtype=float)
     fixed = np.array([(x, y) for y in range(16, 81, 8) for x in range(16, 81, 8)], dtype=float)
@@ -73,6 +79,7 @@ def _joint_case(amplitude: float, *, strict_max: float = 12.0, intensity_pattern
         minimum_relative_median_improvement=0.001,
         minimum_jacobian_p05=0.5,
         maximum_jacobian_p95=1.5,
+        **joint_overrides,
     )
     return fixed, moving, result
 
@@ -167,3 +174,92 @@ def test_workflow_a_b_and_density_only_implementation_remain_separate():
     assert signature.parameters["density_channel_weight"].default == 1.0
     assert signature.parameters["tissue_support_channel_weight"].default == 0.0
     assert signature.parameters["structure_channel_weight"].default == 0.0
+    assert signature.parameters["checkpoint_policy"].default == "point_metric"
+
+
+def test_joint_checkpoint_ui_is_workflow_c_only_and_presets_use_stage_objective():
+    from app import show_he_geojson_preparation
+
+    source = inspect.getsource(show_he_geojson_preparation)
+    assert 'joint_stage_a_checkpoint_policy = "stage_objective"' in source
+    assert '"Stage A checkpoint analysis"' in source
+    assert '"Maximum temporary median worsening (um)"' in source
+    assert "joint_stage_a_checkpoint_policy" not in inspect.getsource(show_point_registration_workflow)
+    assert "joint_stage_a_checkpoint_policy" not in inspect.getsource(show_mask_to_mask_workflow)
+
+
+def test_joint_stage_a_uses_canonical_objective_policy_and_finest_scale():
+    _, _, result = _joint_case(4.0)
+    joint = result.metrics["joint_flow"]
+    snapshots = joint["stage_a_checkpoint_snapshots"]
+
+    assert joint["stage_a_checkpoint_policy"] == "stage_objective"
+    assert joint["stage_a_selected_checkpoint"] == "canonical_objective_best"
+    assert joint["stage_a_canonical_evaluation_scale_um"] == 8.0
+    assert snapshots["canonical_objective_best"]["canonical_total_objective"] < snapshots["final_accepted_state"]["canonical_total_objective"] + 1.0
+    assert all(
+        snapshot is None or "canonical_total_objective" in snapshot
+        for snapshot in snapshots.values()
+    )
+
+
+def test_stage_a_stronger_exploration_is_retained_for_qc_but_not_selected_when_guard_fails():
+    _, _, result = _joint_case(4.0)
+    joint = result.metrics["joint_flow"]
+    snapshots = joint["stage_a_checkpoint_snapshots"]
+    selected = snapshots[joint["stage_a_selected_checkpoint"]]
+    strongest = snapshots["strongest_exploratory_safe"]
+
+    assert strongest["p95_displacement"] >= selected["p95_displacement"]
+    assert strongest["exploratory_safe"] is True
+    assert strongest["temporary_point_guard_pass"] is False
+    assert joint["stage_b_input_consistency"] == {
+        "points_field_matches_selected_stage_a": True,
+        "he_field_matches_selected_stage_a": True,
+        "mask_field_matches_selected_stage_a": True,
+        "features_derived_from_selected_stage_a_raster": True,
+    }
+
+
+def test_joint_final_application_remains_strict_and_improves_known_point_tre_when_applied():
+    fixed, moving, result = _joint_case(4.0)
+    before_tre = np.median(np.linalg.norm(fixed - moving, axis=1))
+    attempted_tre = np.median(np.linalg.norm(fixed - result.attempted_transformed_points, axis=1))
+
+    assert result.applied is True
+    assert attempted_tre < before_tre
+    assert result.metrics["safety"]["fraction_jacobian_foldover_le_0"] == 0.0
+
+
+def test_stage_objective_can_select_deeper_safe_tissue_shape_than_point_metric_policy():
+    relaxed_stage_guard = {
+        "stage_a_max_absolute_median_worsening_um": 5.0,
+        "stage_a_max_relative_median_worsening": 2.0,
+        "stage_a_max_mutual_nearest_decrease": 1.0,
+        "stage_a_max_within_fraction_decrease": 1.0,
+    }
+    _, _, point_result = _joint_case(
+        4.0, stage_a_checkpoint_policy="point_metric", **relaxed_stage_guard
+    )
+    _, _, objective_result = _joint_case(
+        4.0, stage_a_checkpoint_policy="stage_objective", **relaxed_stage_guard
+    )
+    point_joint = point_result.metrics["joint_flow"]
+    objective_joint = objective_result.metrics["joint_flow"]
+    point_p95 = np.percentile(
+        np.hypot(point_joint["stage_a_displacement_x"], point_joint["stage_a_displacement_y"]), 95
+    )
+    objective_p95 = np.percentile(
+        np.hypot(objective_joint["stage_a_displacement_x"], objective_joint["stage_a_displacement_y"]), 95
+    )
+
+    assert point_joint["stage_a_selected_checkpoint"] == "point_metric_best"
+    assert objective_joint["stage_a_selected_checkpoint"] == "canonical_objective_best"
+    assert objective_p95 > point_p95 + 1.0
+    objective_checkpoint = objective_joint["stage_a_checkpoint_snapshots"]["canonical_objective_best"]
+    assert objective_checkpoint["exploratory_safe"] is True
+    assert objective_checkpoint["temporary_point_guard_pass"] is True
+    assert (
+        objective_checkpoint["metrics"]["symmetric_median_distance"]
+        > objective_result.metrics["before"]["symmetric_median_distance"]
+    )

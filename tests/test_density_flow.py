@@ -97,6 +97,7 @@ def test_density_flow_identity_transformation():
     assert result.success is False
     assert result.applied is False
     assert result.rejection_reason == "no_improving_safe_checkpoint"
+    np.testing.assert_allclose(result.transformed_points, points)
     np.testing.assert_allclose(result.transformed_points, points, atol=1e-8)
     np.testing.assert_allclose(result.attempted_displacement_x, 0.0, atol=1e-8)
     assert result.jacobian_min == 1.0
@@ -544,7 +545,20 @@ def test_no_improving_checkpoint_returns_affine_only():
 
     assert result.applied is False
     assert result.rejection_reason == "no_improving_safe_checkpoint"
-    np.testing.assert_allclose(result.transformed_points, points)
+
+
+def test_checkpoint_policy_default_matches_explicit_point_metric():
+    fixed = _grid_points()
+    moving = fixed + np.array([4.0, -3.0])
+    implicit = _run(fixed, moving)
+    explicit = _run(fixed, moving, checkpoint_policy="point_metric")
+
+    np.testing.assert_allclose(implicit.attempted_displacement_x, explicit.attempted_displacement_x)
+    np.testing.assert_allclose(implicit.attempted_displacement_y, explicit.attempted_displacement_y)
+    np.testing.assert_allclose(implicit.transformed_points, explicit.transformed_points)
+    assert implicit.success == explicit.success
+    assert implicit.rejection_reason == explicit.rejection_reason
+    assert implicit.metrics["density_flow"]["checkpoint_policy"] == "point_metric"
 
 
 def test_density_flow_ui_uses_optimization_terms_instead_of_anchor_counts():

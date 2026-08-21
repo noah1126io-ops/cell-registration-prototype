@@ -8,6 +8,7 @@ import numpy as np
 
 from app import show_mask_to_mask_workflow, show_point_registration_workflow
 from src.workflow_c_run_export import (
+    EXPECTED_ARTIFACTS,
     build_workflow_c_run_bundle,
     generate_run_id,
     git_provenance,
@@ -209,3 +210,18 @@ def test_evaluation_artifacts_and_manifest_metadata_are_exported():
     assert manifest["evaluation"] == metadata
     assert evaluation_json["tre"] is None
     assert isinstance(evaluation_json["count"], int)
+
+
+def test_joint_stage_a_checkpoint_artifacts_are_declared_as_npz_and_qc_images():
+    expected = set(EXPECTED_ARTIFACTS)
+    assert {
+        "fields/stage_a_point_metric_best.npz",
+        "fields/stage_a_canonical_objective_best.npz",
+        "fields/stage_a_strongest_exploratory_safe.npz",
+        "fields/stage_a_final_accepted.npz",
+        "fields/stage_a_selected_for_stage_b.npz",
+        "images/stage_a_objective_best_warp_grid.png",
+        "images/stage_a_strongest_safe_warp_grid.png",
+        "images/stage_a_selected_displacement.png",
+    } <= expected
+    assert not any(path.endswith(".json") and "displacement_field" in path for path in expected)
