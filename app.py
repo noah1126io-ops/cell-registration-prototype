@@ -1144,6 +1144,58 @@ def _mutual_nearest_fraction_for_export(fixed: np.ndarray, moving: np.ndarray) -
     return float(2.0 * mutual / max(len(fixed) + len(moving), 1))
 
 
+WORKFLOW_C_FINE_METHODS = (
+    "joint density + tissue-structure flow",
+    "tissue-aware density flow",
+    "off",
+    "cluster-anchor",
+    "matched nuclei RBF",
+    "local translation field",
+    "center-snap",
+)
+
+WORKFLOW_C_METHOD_GROUPS = {
+    "joint density + tissue-structure flow": "Recommended / current research",
+    "tissue-aware density flow": "Baseline",
+    "off": "Baseline",
+    "cluster-anchor": "Legacy / alternative",
+    "matched nuclei RBF": "Legacy / alternative",
+    "local translation field": "Legacy / alternative",
+    "center-snap": "Legacy / alternative",
+}
+
+
+def _workflow_c_joint_presets() -> dict[str, dict]:
+    """Return the established Joint Flow presets without mutating shared state."""
+    return {
+        "Joint Safe": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=8, b_iter=10, a_lr=0.10, b_lr=0.05, a_smooth=6.0, b_smooth=3.0, density=1.0, support=0.70, structure=0.35, explore_max=35.0, explore_p95=25.0),
+        "Joint Tissue-shape": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=12, b_iter=10, a_lr=0.14, b_lr=0.05, a_smooth=7.0, b_smooth=3.0, density=0.9, support=1.20, structure=0.30, explore_max=50.0, explore_p95=35.0),
+        "Joint Strong exploratory": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=16, b_iter=14, a_lr=0.20, b_lr=0.08, a_smooth=5.0, b_smooth=2.5, density=1.0, support=1.40, structure=0.50, explore_max=70.0, explore_p95=50.0),
+        "Custom": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=8, b_iter=10, a_lr=0.10, b_lr=0.05, a_smooth=6.0, b_smooth=3.0, density=1.0, support=0.70, structure=0.35, explore_max=50.0, explore_p95=35.0),
+    }
+
+
+def _workflow_c_method_description(method: str) -> str:
+    return {
+        "joint density + tissue-structure flow": "Coarse tissue-shape correction + fine nuclear refinement",
+        "tissue-aware density flow": "Nuclear-density-based local nonlinear refinement",
+        "off": "No nonlinear correction",
+        "cluster-anchor": "Local cluster translations fitted to a smooth field",
+        "matched nuclei RBF": "Matched nuclei anchors fitted with RBF interpolation",
+        "local translation field": "Patch-density translations fitted to a smooth field",
+        "center-snap": "Legacy confidence-weighted center correction",
+    }[method]
+
+
+def _workflow_c_preset_purpose(preset: str) -> str:
+    return {
+        "Joint Safe": "Uses conservative two-stage deformation settings.",
+        "Joint Tissue-shape": "Emphasizes smooth coarse tissue-shape correction before nuclear refinement.",
+        "Joint Strong exploratory": "Explores stronger deformation while retaining the common safety gate.",
+        "Custom": "Allows the exact optimizer values to be edited.",
+    }.get(preset, "Uses the selected method preset.")
+
+
 def show_he_geojson_preparation() -> None:
     workflow_c_started_at = time.perf_counter()
     language = st.selectbox(
@@ -1180,7 +1232,9 @@ def show_he_geojson_preparation() -> None:
             "Align HE nuclei points to fluorescence GeoJSON in world-um coordinates.",
         )
     )
-    st.subheader(tr("1. 入力ファイル", "1. Input files"))
+    with st.container(border=True):
+        st.subheader(tr("STEP 1 - 入力データ", "STEP 1 - Input data"))
+        st.caption(tr("HE核、GeoJSON、および任意のQC画像・検証点を指定します。", "Supply HE nuclei, GeoJSON, and optional QC image or validation landmarks."))
 
     input_left, input_right = st.columns(2)
     with input_left:
@@ -1237,6 +1291,19 @@ def show_he_geojson_preparation() -> None:
                 st.error(f"Invalid landmark CSV: {exc}")
                 landmark_input_table = None
 
+    input_status = pd.DataFrame(
+        {
+            tr("入力", "Input"): ["HE image", "HE nuclei", "GeoJSON", "Landmarks"],
+            tr("状態", "Status"): [
+                tr("準備済み", "Ready") if he_image_file is not None else tr("任意 / 未指定", "Optional / Not supplied"),
+                tr("準備済み", "Ready") if he_centers_file is not None else tr("未指定", "Not supplied"),
+                tr("準備済み", "Ready") if geojson_file is not None else tr("未指定", "Not supplied"),
+                tr("準備済み", "Ready") if landmark_file is not None else tr("任意 / 未指定", "Optional / Not supplied"),
+            ],
+        }
+    )
+    st.dataframe(input_status, use_container_width=True, hide_index=True)
+
     local_preset = st.session_state.get("workflow-c-local-preset", "balanced")
     local_presets = {
         "conservative": {
@@ -1281,7 +1348,9 @@ def show_he_geojson_preparation() -> None:
         },
     }
     local_default = local_presets[local_preset]
-    st.subheader(tr("2. 粗い位置合わせ", "2. Coarse alignment"))
+    with st.container(border=True):
+        st.subheader(tr("STEP 2 - Affine位置合わせ", "STEP 2 - Affine alignment"))
+        st.caption(tr("座標反転候補とICPの外れ値除去率を設定します。", "Configure coordinate flips and robust ICP trimming."))
     coarse_left, coarse_mid, coarse_right = st.columns(3)
     with coarse_left:
         flip_mode = st.selectbox(
@@ -1364,23 +1433,34 @@ def show_he_geojson_preparation() -> None:
     joint_stage_a_max_mutual_decrease = 0.02
     joint_stage_a_max_within_decrease = 0.03
 
-    st.subheader(tr("3. 詳細位置合わせ", "3. Fine alignment"))
-    fine_alignment_method = st.selectbox(
+    with st.container(border=True):
+        st.subheader(tr("STEP 3 - 詳細位置合わせ", "STEP 3 - Fine alignment"))
+        st.caption(tr("非線形補正方式を選び、必要な場合だけ詳細設定を確認します。", "Choose a nonlinear refinement method and inspect detailed settings only when needed."))
+    fine_alignment_method = st.radio(
         tr("詳細位置合わせ方式", "Fine alignment method"),
-        [
-            "cluster-anchor",
-            "tissue-aware density flow",
-            "joint density + tissue-structure flow",
-            "matched nuclei RBF",
-            "local translation field",
-            "center-snap",
-            "off",
-        ],
-        index=0,
+        WORKFLOW_C_FINE_METHODS,
+        index=WORKFLOW_C_FINE_METHODS.index("cluster-anchor"),
         key="workflow-c-fine-method",
-        format_func=lambda method: method_labels[method],
+        format_func=lambda method: f"{WORKFLOW_C_METHOD_GROUPS[method]} | {method_labels[method]}",
         help=tr("選択した方式に関係する設定だけを表示します。GeoJSON固定点は移動しません。", "Only settings for the selected method are shown. Fixed GeoJSON points are never moved."),
     )
+    st.caption(_workflow_c_method_description(fine_alignment_method))
+
+    joint_presets = _workflow_c_joint_presets()
+    joint_custom = False
+    if fine_alignment_method == "joint density + tissue-structure flow":
+        joint_preset = st.selectbox(
+            "Joint Flow preset",
+            list(joint_presets),
+            key="workflow-c-joint-preset",
+            help="Experimental starting values, not biologically validated. Final application uses the common strict safety gate.",
+        )
+        joint_default = joint_presets[joint_preset]
+        joint_custom = joint_preset == "Custom"
+        st.markdown(f"**Selected preset: {joint_preset.upper()}**")
+        st.caption(_workflow_c_preset_purpose(joint_preset))
+        if joint_preset == "Joint Strong exploratory":
+            st.warning("Explores stronger attempted deformation. Unsafe candidates remain QC-only and final output falls back to affine.")
 
     density_flow_method_selected = fine_alignment_method in {
         "tissue-aware density flow",
@@ -1413,14 +1493,21 @@ def show_he_geojson_preparation() -> None:
                 "global_initialization": "off",
             },
         }
-        density_flow_preset = st.selectbox(
-            tr("Density Flowプリセット", "Density Flow preset"),
-            list(density_flow_presets),
-            index=0,
-            key="workflow-c-density-flow-preset",
-        )
+        if fine_alignment_method == "tissue-aware density flow":
+            density_flow_preset = st.selectbox(
+                tr("Density Flowプリセット", "Density Flow preset"),
+                list(density_flow_presets),
+                index=0,
+                key="workflow-c-density-flow-preset",
+            )
+        else:
+            density_flow_preset = "Safe baseline"
         flow_default = density_flow_presets[density_flow_preset]
-        flow_controls_disabled = density_flow_preset != "Custom"
+        flow_controls_disabled = (
+            not joint_custom
+            if fine_alignment_method == "joint density + tissue-structure flow"
+            else density_flow_preset != "Custom"
+        )
         flow_key_suffix = density_flow_preset.lower().replace(" ", "-")
         if density_flow_preset == "Exploratory":
             st.warning(
@@ -1435,128 +1522,134 @@ def show_he_geojson_preparation() -> None:
                 "This is an independent experimental implementation. HE raster warps are shown separately before and after safety gating and require visual QC.",
             )
         )
-        flow_left, flow_right = st.columns(2)
-        with flow_left:
-            density_flow_global_initialization = st.selectbox(
-                tr("グローバル残差平行移動の初期化", "Global residual translation initialization"),
-                ["off", "auto"],
-                index=0 if flow_default["global_initialization"] == "off" else 1,
-                key=f"workflow-c-density-flow-global-initialization-{flow_key_suffix}",
-                disabled=flow_controls_disabled,
-                format_func=lambda value: "Off" if value == "off" else "Auto",
-                help=tr(
-                    "Offは変位場をゼロから開始します。Autoはaffine後に追加の全体平行移動候補を選びます。",
-                    "Off initializes the field at zero. Auto selects an additional post-affine global translation candidate.",
-                ),
-            )
-            density_flow_pixel_size = st.number_input(
-                tr("密度画素サイズ (um)", "Density pixel size (um)"),
-                min_value=0.1,
-                value=flow_default["pixel_size"],
-                step=0.5,
-                key=f"workflow-c-density-flow-pixel-size-{flow_key_suffix}",
-                disabled=flow_controls_disabled,
-                help=tr("共有world-xy密度グリッドの画素サイズです。", "Pixel size of the shared world-xy density grid."),
-            )
-            density_flow_blur_scales_text = st.text_input(
-                tr("密度blur scale (pixel)", "Density blur scales (pixels)"),
-                value=flow_default["blur_scales"],
-                key=f"workflow-c-density-flow-blur-scales-{flow_key_suffix}",
-                disabled=flow_controls_disabled,
-                help=tr("粗い順にカンマ区切りで指定します。", "Comma-separated Gaussian scales, ordered coarse to fine."),
-            )
-            density_flow_levels = st.number_input(
-                tr("最適化level数", "Number of optimization levels"),
-                min_value=1,
-                value=flow_default["levels"],
-                step=1,
-                key=f"workflow-c-density-flow-levels-{flow_key_suffix}",
-                disabled=flow_controls_disabled,
-            )
-            density_flow_iterations = st.number_input(
-                tr("各levelの反復回数", "Iterations per level"),
-                min_value=1,
-                value=flow_default["iterations"],
-                step=1,
-                key=f"workflow-c-density-flow-iterations-{flow_key_suffix}",
-                disabled=flow_controls_disabled,
-            )
-        with flow_right:
-            density_flow_learning_rate = st.number_input(
-                tr("更新率", "Learning rate"),
-                min_value=0.01,
-                value=flow_default["learning_rate"],
-                step=0.01,
-                key=f"workflow-c-density-flow-learning-rate-{flow_key_suffix}",
-                disabled=flow_controls_disabled,
-            )
-            density_flow_update_smoothing = st.number_input(
-                tr("更新場の平滑化sigma (pixel)", "Update smoothing sigma (pixels)"),
-                min_value=0.1,
-                value=flow_default["update_smoothing"],
-                step=0.5,
-                key=f"workflow-c-density-flow-update-smoothing-{flow_key_suffix}",
-                disabled=flow_controls_disabled,
-            )
+        with st.expander(tr("詳細optimizer設定", "Advanced parameters"), expanded=False):
+            flow_left, flow_right = st.columns(2)
+            with flow_left:
+                density_flow_global_initialization = st.selectbox(
+                    tr("グローバル残差平行移動の初期化", "Global residual translation initialization"),
+                    ["off", "auto"],
+                    index=0 if flow_default["global_initialization"] == "off" else 1,
+                    key=f"workflow-c-density-flow-global-initialization-{flow_key_suffix}",
+                    disabled=flow_controls_disabled,
+                    format_func=lambda value: "Off" if value == "off" else "Auto",
+                    help=tr(
+                        "Offは変位場をゼロから開始します。Autoはaffine後に追加の全体平行移動候補を選びます。",
+                        "Off initializes the field at zero. Auto selects an additional post-affine global translation candidate.",
+                    ),
+                )
+                density_flow_pixel_size = st.number_input(
+                    tr("密度画素サイズ (um)", "Density pixel size (um)"),
+                    min_value=0.1,
+                    value=flow_default["pixel_size"],
+                    step=0.5,
+                    key=f"workflow-c-density-flow-pixel-size-{flow_key_suffix}",
+                    disabled=flow_controls_disabled,
+                    help=tr("共有world-xy密度グリッドの画素サイズです。", "Pixel size of the shared world-xy density grid."),
+                )
+                density_flow_blur_scales_text = st.text_input(
+                    tr("密度blur scale (pixel)", "Density blur scales (pixels)"),
+                    value=flow_default["blur_scales"],
+                    key=f"workflow-c-density-flow-blur-scales-{flow_key_suffix}",
+                    disabled=flow_controls_disabled,
+                    help=tr("粗い順にカンマ区切りで指定します。", "Comma-separated Gaussian scales, ordered coarse to fine."),
+                )
+                density_flow_levels = st.number_input(
+                    tr("最適化level数", "Number of optimization levels"),
+                    min_value=1,
+                    value=flow_default["levels"],
+                    step=1,
+                    key=f"workflow-c-density-flow-levels-{flow_key_suffix}",
+                    disabled=flow_controls_disabled,
+                )
+                density_flow_iterations = st.number_input(
+                    tr("各levelの反復回数", "Iterations per level"),
+                    min_value=1,
+                    value=flow_default["iterations"],
+                    step=1,
+                    key=f"workflow-c-density-flow-iterations-{flow_key_suffix}",
+                    disabled=flow_controls_disabled,
+                )
+            with flow_right:
+                density_flow_learning_rate = st.number_input(
+                    tr("更新率", "Learning rate"),
+                    min_value=0.01,
+                    value=flow_default["learning_rate"],
+                    step=0.01,
+                    key=f"workflow-c-density-flow-learning-rate-{flow_key_suffix}",
+                    disabled=flow_controls_disabled,
+                )
+                density_flow_update_smoothing = st.number_input(
+                    tr("更新場の平滑化sigma (pixel)", "Update smoothing sigma (pixels)"),
+                    min_value=0.1,
+                    value=flow_default["update_smoothing"],
+                    step=0.5,
+                    key=f"workflow-c-density-flow-update-smoothing-{flow_key_suffix}",
+                    disabled=flow_controls_disabled,
+                )
             density_flow_detect_axis_reversal = st.checkbox(
                 tr("x/y逆転を検出して停止", "Detect x/y reversal and stop"),
                 value=True,
                 key="workflow-c-density-flow-detect-axis-reversal",
+                disabled=flow_controls_disabled,
             )
-        with st.expander(tr("Density-flow正則化", "Density-flow regularization"), expanded=False):
-            regularization_left, regularization_right = st.columns(2)
-            with regularization_left:
-                density_flow_smoothness_weight = st.number_input(tr("平滑性penalty", "Smoothness penalty"), min_value=0.0, value=flow_default["smoothness"], step=0.01, key=f"workflow-c-density-flow-smoothness-{flow_key_suffix}", disabled=flow_controls_disabled)
-                density_flow_magnitude_weight = st.number_input(tr("変位量penalty", "Field-magnitude penalty"), min_value=0.0, value=flow_default["magnitude"], step=0.0005, format="%.4f", key=f"workflow-c-density-flow-magnitude-{flow_key_suffix}", disabled=flow_controls_disabled)
-                density_flow_boundary_weight = st.number_input(tr("組織境界penalty", "Tissue-boundary penalty"), min_value=0.0, value=flow_default["boundary"], step=0.01, key=f"workflow-c-density-flow-boundary-{flow_key_suffix}", disabled=flow_controls_disabled)
-            with regularization_right:
-                density_flow_jacobian_weight = st.number_input(tr("Jacobian barrier重み", "Jacobian barrier weight"), min_value=0.0, value=1.0, step=0.25, key="workflow-c-density-flow-jacobian")
-                density_flow_inverse_weight = st.number_input(tr("逆整合性penalty（任意）", "Inverse-consistency penalty (optional)"), min_value=0.0, value=0.0, step=0.01, key="workflow-c-density-flow-inverse")
-        with st.expander(tr("Density-flow line searchと早期停止", "Density-flow line search and early stopping"), expanded=False):
-            stop_left, stop_right = st.columns(2)
-            with stop_left:
-                density_flow_objective_tolerance = st.number_input(
-                    tr("目的関数の最小減少量", "Minimum objective decrease"),
-                    min_value=0.0,
-                    value=1e-12,
-                    format="%.2e",
-                    key="workflow-c-density-flow-objective-tolerance",
-                )
-                density_flow_early_stopping_patience = st.number_input(
-                    tr("更新失敗patience", "Failed-update patience"),
-                    min_value=1,
-                    value=3,
-                    step=1,
-                    key="workflow-c-density-flow-failure-patience",
-                )
-            with stop_right:
-                density_flow_point_metric_patience = st.number_input(
-                    tr("点群指標patience", "Point-metric patience"),
-                    min_value=1,
-                    value=6,
-                    step=1,
-                    key="workflow-c-density-flow-point-patience",
-                )
-                density_flow_max_backtracking_steps = st.number_input(
-                    tr("最大backtracking回数", "Maximum backtracking attempts"),
-                    min_value=1,
-                    value=8,
-                    step=1,
-                    key="workflow-c-density-flow-backtracking",
-                )
-        with st.expander(tr("適用判定とraster inverse", "Application criteria and raster inverse"), expanded=False):
-            criteria_left, criteria_right = st.columns(2)
-            with criteria_left:
-                density_flow_min_absolute_improvement = st.number_input(tr("最小median改善 (um)", "Minimum median improvement (um)"), min_value=0.0, value=0.10, step=0.05, key="workflow-c-density-flow-min-absolute-improvement")
-                density_flow_min_relative_improvement = st.number_input(tr("最小相対median改善", "Minimum relative median improvement"), min_value=0.0, value=0.005, step=0.001, format="%.3f", key="workflow-c-density-flow-min-relative-improvement")
-                density_flow_max_mutual_decrease = st.number_input(tr("Mutual-nearest最大低下", "Maximum mutual-nearest decrease"), min_value=0.0, value=0.005, step=0.001, format="%.3f", key="workflow-c-density-flow-max-mutual-decrease")
-                density_flow_max_within_decrease = st.number_input(tr("Within率の最大低下", "Maximum within-fraction decrease"), min_value=0.0, value=0.01, step=0.005, format="%.3f", key="workflow-c-density-flow-max-within-decrease")
-            with criteria_right:
-                density_flow_min_jacobian_p05 = st.number_input("Minimum Jacobian p05", min_value=0.01, value=0.8, step=0.05, key="workflow-c-density-flow-min-jac-p05")
-                density_flow_max_jacobian_p95 = st.number_input("Maximum Jacobian p95", min_value=1.0, value=1.25, step=0.05, key="workflow-c-density-flow-max-jac-p95")
-                density_flow_inverse_iterations = st.number_input(tr("Inverse最大反復", "Inverse maximum iterations"), min_value=1, value=30, step=5, key="workflow-c-density-flow-inverse-iterations")
-                density_flow_inverse_tolerance_pixels = st.number_input(tr("Inverse収束許容値 (output pixel)", "Inverse convergence tolerance (output pixels)"), min_value=0.001, value=0.05, step=0.01, format="%.3f", key="workflow-c-density-flow-inverse-tolerance")
-                density_flow_local_region_size = st.number_input(tr("局所評価block size (um)", "Local validation block size (um)"), min_value=10.0, value=100.0, step=10.0, key="workflow-c-density-flow-local-region-size")
+            with st.expander(tr("Density-flow正則化", "Density-flow regularization"), expanded=False):
+                regularization_left, regularization_right = st.columns(2)
+                with regularization_left:
+                    density_flow_smoothness_weight = st.number_input(tr("平滑性penalty", "Smoothness penalty"), min_value=0.0, value=flow_default["smoothness"], step=0.01, key=f"workflow-c-density-flow-smoothness-{flow_key_suffix}", disabled=flow_controls_disabled)
+                    density_flow_magnitude_weight = st.number_input(tr("変位量penalty", "Field-magnitude penalty"), min_value=0.0, value=flow_default["magnitude"], step=0.0005, format="%.4f", key=f"workflow-c-density-flow-magnitude-{flow_key_suffix}", disabled=flow_controls_disabled)
+                    density_flow_boundary_weight = st.number_input(tr("組織境界penalty", "Tissue-boundary penalty"), min_value=0.0, value=flow_default["boundary"], step=0.01, key=f"workflow-c-density-flow-boundary-{flow_key_suffix}", disabled=flow_controls_disabled)
+                with regularization_right:
+                    density_flow_jacobian_weight = st.number_input(tr("Jacobian barrier重み", "Jacobian barrier weight"), min_value=0.0, value=1.0, step=0.25, key="workflow-c-density-flow-jacobian", disabled=flow_controls_disabled)
+                    density_flow_inverse_weight = st.number_input(tr("逆整合性penalty（任意）", "Inverse-consistency penalty (optional)"), min_value=0.0, value=0.0, step=0.01, key="workflow-c-density-flow-inverse", disabled=flow_controls_disabled)
+            with st.expander(tr("Density-flow line searchと早期停止", "Density-flow line search and early stopping"), expanded=False):
+                stop_left, stop_right = st.columns(2)
+                with stop_left:
+                    density_flow_objective_tolerance = st.number_input(
+                        tr("目的関数の最小減少量", "Minimum objective decrease"),
+                        min_value=0.0,
+                        value=1e-12,
+                        format="%.2e",
+                        key="workflow-c-density-flow-objective-tolerance",
+                        disabled=flow_controls_disabled,
+                    )
+                    density_flow_early_stopping_patience = st.number_input(
+                        tr("更新失敗patience", "Failed-update patience"),
+                        min_value=1,
+                        value=3,
+                        step=1,
+                        key="workflow-c-density-flow-failure-patience",
+                        disabled=flow_controls_disabled,
+                    )
+                with stop_right:
+                    density_flow_point_metric_patience = st.number_input(
+                        tr("点群指標patience", "Point-metric patience"),
+                        min_value=1,
+                        value=6,
+                        step=1,
+                        key="workflow-c-density-flow-point-patience",
+                        disabled=flow_controls_disabled,
+                    )
+                    density_flow_max_backtracking_steps = st.number_input(
+                        tr("最大backtracking回数", "Maximum backtracking attempts"),
+                        min_value=1,
+                        value=8,
+                        step=1,
+                        key="workflow-c-density-flow-backtracking",
+                        disabled=flow_controls_disabled,
+                    )
+            with st.expander(tr("適用判定とraster inverse", "Application criteria and raster inverse"), expanded=False):
+                criteria_left, criteria_right = st.columns(2)
+                with criteria_left:
+                    density_flow_min_absolute_improvement = st.number_input(tr("最小median改善 (um)", "Minimum median improvement (um)"), min_value=0.0, value=0.10, step=0.05, key="workflow-c-density-flow-min-absolute-improvement", disabled=flow_controls_disabled)
+                    density_flow_min_relative_improvement = st.number_input(tr("最小相対median改善", "Minimum relative median improvement"), min_value=0.0, value=0.005, step=0.001, format="%.3f", key="workflow-c-density-flow-min-relative-improvement", disabled=flow_controls_disabled)
+                    density_flow_max_mutual_decrease = st.number_input(tr("Mutual-nearest最大低下", "Maximum mutual-nearest decrease"), min_value=0.0, value=0.005, step=0.001, format="%.3f", key="workflow-c-density-flow-max-mutual-decrease", disabled=flow_controls_disabled)
+                    density_flow_max_within_decrease = st.number_input(tr("Within率の最大低下", "Maximum within-fraction decrease"), min_value=0.0, value=0.01, step=0.005, format="%.3f", key="workflow-c-density-flow-max-within-decrease", disabled=flow_controls_disabled)
+                with criteria_right:
+                    density_flow_min_jacobian_p05 = st.number_input("Minimum Jacobian p05", min_value=0.01, value=0.8, step=0.05, key="workflow-c-density-flow-min-jac-p05", disabled=flow_controls_disabled)
+                    density_flow_max_jacobian_p95 = st.number_input("Maximum Jacobian p95", min_value=1.0, value=1.25, step=0.05, key="workflow-c-density-flow-max-jac-p95", disabled=flow_controls_disabled)
+                    density_flow_inverse_iterations = st.number_input(tr("Inverse最大反復", "Inverse maximum iterations"), min_value=1, value=30, step=5, key="workflow-c-density-flow-inverse-iterations", disabled=flow_controls_disabled)
+                    density_flow_inverse_tolerance_pixels = st.number_input(tr("Inverse収束許容値 (output pixel)", "Inverse convergence tolerance (output pixels)"), min_value=0.001, value=0.05, step=0.01, format="%.3f", key="workflow-c-density-flow-inverse-tolerance", disabled=flow_controls_disabled)
+                    density_flow_local_region_size = st.number_input(tr("局所評価block size (um)", "Local validation block size (um)"), min_value=10.0, value=100.0, step=10.0, key="workflow-c-density-flow-local-region-size", disabled=flow_controls_disabled)
         density_flow_qc_gain = st.select_slider(
             tr("QC変形表示gain", "QC deformation display gain"),
             options=[1, 2, 5, 10],
@@ -1565,18 +1658,7 @@ def show_he_geojson_preparation() -> None:
             help=tr("表示専用です。点群・最終画像・metricsは変更しません。", "Visual QC only. It never changes points, final images, or metrics."),
         )
         if fine_alignment_method == "joint density + tissue-structure flow":
-            joint_presets = {
-                "Joint Safe": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=8, b_iter=10, a_lr=0.10, b_lr=0.05, a_smooth=6.0, b_smooth=3.0, density=1.0, support=0.70, structure=0.35, explore_max=35.0, explore_p95=25.0),
-                "Joint Tissue-shape": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=12, b_iter=10, a_lr=0.14, b_lr=0.05, a_smooth=7.0, b_smooth=3.0, density=0.9, support=1.20, structure=0.30, explore_max=50.0, explore_p95=35.0),
-                "Joint Strong exploratory": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=16, b_iter=14, a_lr=0.20, b_lr=0.08, a_smooth=5.0, b_smooth=2.5, density=1.0, support=1.40, structure=0.50, explore_max=70.0, explore_p95=50.0),
-                "Custom": dict(a_scales="32, 16, 8", b_scales="8, 4", a_iter=8, b_iter=10, a_lr=0.10, b_lr=0.05, a_smooth=6.0, b_smooth=3.0, density=1.0, support=0.70, structure=0.35, explore_max=50.0, explore_p95=35.0),
-            }
-            joint_preset = st.selectbox("Joint Flow preset", list(joint_presets), key="workflow-c-joint-preset", help="Experimental starting values, not biologically validated. Final application uses the common strict safety gate.")
-            joint_default = joint_presets[joint_preset]
-            joint_custom = joint_preset == "Custom"
-            if joint_preset == "Joint Strong exploratory":
-                st.warning("Explores stronger attempted deformation. Unsafe candidates remain QC-only and final output falls back to affine.")
-            with st.expander("Joint two-stage optimizer", expanded=True):
+            with st.expander("Advanced parameters - Joint two-stage optimizer", expanded=False):
                 joint_left, joint_right = st.columns(2)
                 with joint_left:
                     joint_stage_a_scales_text = st.text_input("Stage A physical scales (um)", value=joint_default["a_scales"], disabled=not joint_custom, key=f"workflow-c-joint-a-scales-{joint_preset}")
@@ -1624,7 +1706,7 @@ def show_he_geojson_preparation() -> None:
                 joint_density_weight = st.number_input("Stage B point-density weight", min_value=0.0, value=joint_default["density"], step=0.1, disabled=not joint_custom, key=f"workflow-c-joint-density-weight-{joint_preset}")
                 joint_support_weight = st.number_input("Stage A HE tissue-support weight", min_value=0.0, value=joint_default["support"], step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-support-weight-{joint_preset}")
                 joint_structure_weight = st.number_input("Stage B nuclear-structure weight", min_value=0.0, value=joint_default["structure"], step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-structure-weight-{joint_preset}")
-                joint_soft_jacobian_weight = st.number_input("Soft log-Jacobian weight", min_value=0.0, value=0.05, step=0.01, key="workflow-c-joint-soft-jacobian-weight")
+                joint_soft_jacobian_weight = st.number_input("Soft log-Jacobian weight", min_value=0.0, value=0.05, step=0.01, key="workflow-c-joint-soft-jacobian-weight", disabled=not joint_custom)
 
     elif fine_alignment_method == "matched nuclei RBF":
         rbf_left, rbf_right = st.columns(2)
@@ -1769,88 +1851,90 @@ def show_he_geojson_preparation() -> None:
         cluster_min_improvement, cluster_max_shift, cluster_min_anchors = 1.0, 35.0, 8
         cluster_interpolation, control_grid_spacing = "rbf", 35.0
         local_support_radius, cluster_regularization = 120.0, 3.0
-    st.subheader(tr("4. 組織領域と境界処理", "4. Tissue and boundary handling"))
-    tissue_left, tissue_mid, tissue_right = st.columns(3)
-    with tissue_left:
-        tissue_mask_threshold = st.slider(
-            tr("組織マスク閾値", "Tissue mask threshold"), 0.0, 1.0, 0.05, 0.01,
-            key="workflow-c-tissue-threshold", help=tr("Warp済みHE画像から背景を除く閾値です。", "Threshold used to separate tissue from background in the warped HE image."),
-        )
-        edge_margin = st.number_input(
-            tr("Fine warp組織端マージン (pixel)", "Fine-warp tissue edge margin (pixels)"), min_value=0.0, value=10.0, step=2.0,
-            key="workflow-c-edge-margin", help=tr("境界付近の点をvalidではなくedge candidateに分類する幅です。", "Points near tissue or image boundaries are classified as edge candidates rather than reliable valid targets."),
-        )
-    with tissue_mid:
-        use_edge_candidates_for_anchors = st.checkbox(
-            tr("Edge candidateをアンカーに使用", "Use edge candidates for anchors"), value=False,
-            key="workflow-c-use-edge-candidates", help=tr("OFFではvalid GeoJSON点だけをfine warpに使います。", "When off, only valid GeoJSON points are used for fine warp."),
-        )
-        valid_geojson_weight = st.number_input(tr("Valid GeoJSONの重み", "Valid GeoJSON weight"), min_value=0.1, max_value=2.0, value=1.0, step=0.1, key="workflow-c-valid-weight")
-        edge_candidate_weight = st.number_input(tr("Edge candidateの重み", "Edge candidate weight"), min_value=0.0, max_value=1.0, value=0.0, step=0.05, key="workflow-c-edge-weight", help=tr("使用する場合の相対的な寄与です。", "Relative contribution when edge candidates are enabled."))
-    with tissue_right:
-        enable_boundary_pinning = st.checkbox(tr("境界ピン留めを有効化", "Enable boundary pinning"), value=True, key="workflow-c-enable-boundary-pinning", help=tr("ゼロ変位アンカーで中央の変形が背景へ広がるのを抑えます。", "Zero-displacement anchors prevent central deformation from propagating into the background."))
-        boundary_anchor_spacing = st.number_input(tr("境界アンカー間隔 (pixel)", "Boundary anchor spacing (pixels)"), min_value=2.0, value=40.0, step=5.0, key="workflow-c-boundary-spacing")
-        boundary_anchor_weight = st.number_input(tr("境界アンカー重み", "Boundary anchor weight"), min_value=0.01, value=30.0, step=5.0, key="workflow-c-boundary-weight", help=tr("画像端への変形伝播を防ぐゼロ変位アンカーの強さです。", "Strength of zero-displacement anchors used to prevent central deformation from propagating into the image border."))
-        include_image_border_pins = st.checkbox(tr("画像枠ピンを含める", "Include image border pins"), value=True, key="workflow-c-image-border-pins")
-        include_tissue_boundary_pins = st.checkbox(tr("組織境界ピンを含める", "Include tissue boundary pins"), value=True, key="workflow-c-tissue-boundary-pins")
+    with st.expander(tr("共通の詳細パラメータ", "Advanced parameters - Common safety and tissue"), expanded=False):
+        st.markdown(tr("**組織領域・境界・安全条件**", "**Tissue, boundary, and safety controls**"))
+        tissue_left, tissue_mid, tissue_right = st.columns(3)
+        with tissue_left:
+            tissue_mask_threshold = st.slider(
+                tr("組織マスク閾値", "Tissue mask threshold"), 0.0, 1.0, 0.05, 0.01,
+                key="workflow-c-tissue-threshold", help=tr("Warp済みHE画像から背景を除く閾値です。", "Threshold used to separate tissue from background in the warped HE image."),
+            )
+            edge_margin = st.number_input(
+                tr("Fine warp組織端マージン (pixel)", "Fine-warp tissue edge margin (pixels)"), min_value=0.0, value=10.0, step=2.0,
+                key="workflow-c-edge-margin", help=tr("境界付近の点をvalidではなくedge candidateに分類する幅です。", "Points near tissue or image boundaries are classified as edge candidates rather than reliable valid targets."),
+            )
+        with tissue_mid:
+            use_edge_candidates_for_anchors = st.checkbox(
+                tr("Edge candidateをアンカーに使用", "Use edge candidates for anchors"), value=False,
+                key="workflow-c-use-edge-candidates", help=tr("OFFではvalid GeoJSON点だけをfine warpに使います。", "When off, only valid GeoJSON points are used for fine warp."),
+            )
+            valid_geojson_weight = st.number_input(tr("Valid GeoJSONの重み", "Valid GeoJSON weight"), min_value=0.1, max_value=2.0, value=1.0, step=0.1, key="workflow-c-valid-weight")
+            edge_candidate_weight = st.number_input(tr("Edge candidateの重み", "Edge candidate weight"), min_value=0.0, max_value=1.0, value=0.0, step=0.05, key="workflow-c-edge-weight", help=tr("使用する場合の相対的な寄与です。", "Relative contribution when edge candidates are enabled."))
+        with tissue_right:
+            enable_boundary_pinning = st.checkbox(tr("境界ピン留めを有効化", "Enable boundary pinning"), value=True, key="workflow-c-enable-boundary-pinning", help=tr("ゼロ変位アンカーで中央の変形が背景へ広がるのを抑えます。", "Zero-displacement anchors prevent central deformation from propagating into the background."))
+            boundary_anchor_spacing = st.number_input(tr("境界アンカー間隔 (pixel)", "Boundary anchor spacing (pixels)"), min_value=2.0, value=40.0, step=5.0, key="workflow-c-boundary-spacing")
+            boundary_anchor_weight = st.number_input(tr("境界アンカー重み", "Boundary anchor weight"), min_value=0.01, value=30.0, step=5.0, key="workflow-c-boundary-weight", help=tr("画像端への変形伝播を防ぐゼロ変位アンカーの強さです。", "Strength of zero-displacement anchors used to prevent central deformation from propagating into the image border."))
+            include_image_border_pins = st.checkbox(tr("画像枠ピンを含める", "Include image border pins"), value=True, key="workflow-c-image-border-pins")
+            include_tissue_boundary_pins = st.checkbox(tr("組織境界ピンを含める", "Include tissue boundary pins"), value=True, key="workflow-c-tissue-boundary-pins")
 
-    st.subheader(tr("5. Warp安全条件", "5. Warp safety"))
-    safety_left, safety_mid, safety_right = st.columns(3)
-    with safety_left:
-        max_final_displacement_um = st.number_input(
-            tr("最大最終変位 (um)", "Maximum final displacement (um)"),
+        st.markdown(tr("##### Advanced parameters: Warp安全条件", "##### Advanced parameters: Warp safety"))
+        safety_left, safety_mid, safety_right = st.columns(3)
+        with safety_left:
+            max_final_displacement_um = st.number_input(
+                tr("最大最終変位 (um)", "Maximum final displacement (um)"),
+                min_value=0.1,
+                value=35.0,
+                step=5.0,
+                key="workflow-c-max-final-displacement",
+                help=tr("補間後の最終変位場に対する安全上限です。最大クラスタ移動量とは別です。", "Safety limit for the final interpolated displacement field. This differs from maximum cluster shift."),
+            )
+        with safety_mid:
+            jacobian_min_limit = st.number_input(tr("Jacobian最小値", "Jacobian minimum limit"), min_value=-1.0, value=0.1, step=0.05, key="workflow-c-jacobian-min", help=tr("局所折り返しや過圧縮を検出する下限です。", "Lower limit used to detect fold-over or excessive compression."))
+            jacobian_max_limit = st.number_input(tr("Jacobian最大値", "Jacobian maximum limit"), min_value=1.0, value=3.0, step=0.5, key="workflow-c-jacobian-max", help=tr("過度な局所膨張を検出する上限です。", "Upper limit used to detect excessive local expansion."))
+        with safety_right:
+            enable_displacement_p95_limit = st.checkbox(tr("変位95分位上限を有効化", "Enable displacement p95 limit"), value=True, key="workflow-c-enable-p95-limit")
+            displacement_p95_limit_um = st.number_input(tr("変位95分位上限 (um)", "Displacement p95 limit (um)"), min_value=0.1, value=30.0, step=5.0, key="workflow-c-p95-limit", help=tr("大部分の領域で変位が大きすぎないか確認します。", "Checks that displacement is not excessive across most of the field."))
+
+    with st.expander(tr("出力・表示の詳細設定", "Advanced parameters - Output and display"), expanded=False):
+        st.markdown(tr("**出力方向とQC表示**", "**Output orientation and QC display**"))
+        registration_display_origin = st.selectbox(
+            tr("位置合わせQC表示の原点", "Registration QC display origin"),
+            ["lower-left", "upper-left", "upper-right"],
+            index=0,
+            key="workflow-c-registration-origin",
+            help=tr("散布図/QCの向きだけを変え、計算結果には影響しません。", "Controls scatter/QC orientation only and does not affect registration."),
+        )
+        warped_he_output_origin = st.selectbox(
+            tr("Warp済みHE出力の原点", "Warped HE output origin"),
+            ["lower-left", "upper-left", "upper-right"],
+            index=0,
+            key="workflow-c-output-origin",
+            help=tr("出力画像の向きだけを変え、位置合わせ品質には影響しません。", "Controls exported image orientation only, not registration quality."),
+        )
+        st.info(tr("出力原点は画像の表示方向だけを制御し、位置合わせ品質のパラメータではありません。", "Warped HE output origin controls exported image orientation, not registration quality."))
+        warped_he_pixel_size = st.number_input(
+            tr("Warp済みHEの画素サイズ (um)", "Warped HE output pixel size (um)"),
             min_value=0.1,
-            value=35.0,
-            step=5.0,
-            key="workflow-c-max-final-displacement",
-            help=tr("補間後の最終変位場に対する安全上限です。最大クラスタ移動量とは別です。", "Safety limit for the final interpolated displacement field. This differs from maximum cluster shift."),
+            value=1.0,
+            step=0.5,
+            key="workflow-c-output-pixel-size",
+            help=tr("小さいほど高解像度ですがPNGが大きくなります。", "Smaller values create higher-resolution, larger PNG files."),
         )
-    with safety_mid:
-        jacobian_min_limit = st.number_input(tr("Jacobian最小値", "Jacobian minimum limit"), min_value=-1.0, value=0.1, step=0.05, key="workflow-c-jacobian-min", help=tr("局所折り返しや過圧縮を検出する下限です。", "Lower limit used to detect fold-over or excessive compression."))
-        jacobian_max_limit = st.number_input(tr("Jacobian最大値", "Jacobian maximum limit"), min_value=1.0, value=3.0, step=0.5, key="workflow-c-jacobian-max", help=tr("過度な局所膨張を検出する上限です。", "Upper limit used to detect excessive local expansion."))
-    with safety_right:
-        enable_displacement_p95_limit = st.checkbox(tr("変位95分位上限を有効化", "Enable displacement p95 limit"), value=True, key="workflow-c-enable-p95-limit")
-        displacement_p95_limit_um = st.number_input(tr("変位95分位上限 (um)", "Displacement p95 limit (um)"), min_value=0.1, value=30.0, step=5.0, key="workflow-c-p95-limit", help=tr("大部分の領域で変位が大きすぎないか確認します。", "Checks that displacement is not excessive across most of the field."))
-
-    st.subheader(tr("6. 出力と表示", "6. Output and display"))
-    registration_display_origin = st.selectbox(
-        tr("位置合わせQC表示の原点", "Registration QC display origin"),
-        ["lower-left", "upper-left", "upper-right"],
-        index=0,
-        key="workflow-c-registration-origin",
-        help=tr("散布図/QCの向きだけを変え、計算結果には影響しません。", "Controls scatter/QC orientation only and does not affect registration."),
-    )
-    warped_he_output_origin = st.selectbox(
-        tr("Warp済みHE出力の原点", "Warped HE output origin"),
-        ["lower-left", "upper-left", "upper-right"],
-        index=0,
-        key="workflow-c-output-origin",
-        help=tr("出力画像の向きだけを変え、位置合わせ品質には影響しません。", "Controls exported image orientation only, not registration quality."),
-    )
-    st.info(tr("出力原点は画像の表示方向だけを制御し、位置合わせ品質のパラメータではありません。", "Warped HE output origin controls exported image orientation, not registration quality."))
-    warped_he_pixel_size = st.number_input(
-        tr("Warp済みHEの画素サイズ (um)", "Warped HE output pixel size (um)"),
-        min_value=0.1,
-        value=1.0,
-        step=0.5,
-        key="workflow-c-output-pixel-size",
-        help=tr("小さいほど高解像度ですがPNGが大きくなります。", "Smaller values create higher-resolution, larger PNG files."),
-    )
-    max_warped_overlay_points = st.number_input(
-        tr("オーバーレイ最大点数", "Maximum warped HE overlay points"),
-        min_value=100,
-        max_value=20000,
-        value=3000,
-        step=500,
-        key="workflow-c-max-overlay-points",
-        help=tr("表示負荷を抑えるため描画点数を制限します。", "Limits plotted points to keep QC rendering responsive."),
-    )
-    show_excluded_geojson_points = st.checkbox(tr("除外GeoJSON点を表示", "Show excluded GeoJSON points"), value=False, key="workflow-c-show-excluded")
-    show_edge_candidate_geojson_points = st.checkbox(tr("Edge candidateを表示", "Show edge candidates"), value=True, key="workflow-c-show-edge")
-    show_boundary_pin_anchors = st.checkbox(tr("境界ピンアンカーを重ねる", "Overlay boundary pin anchors"), value=True, key="workflow-c-show-boundary-pins")
+        max_warped_overlay_points = st.number_input(
+            tr("オーバーレイ最大点数", "Maximum warped HE overlay points"),
+            min_value=100,
+            max_value=20000,
+            value=3000,
+            step=500,
+            key="workflow-c-max-overlay-points",
+            help=tr("表示負荷を抑えるため描画点数を制限します。", "Limits plotted points to keep QC rendering responsive."),
+        )
+        show_excluded_geojson_points = st.checkbox(tr("除外GeoJSON点を表示", "Show excluded GeoJSON points"), value=False, key="workflow-c-show-excluded")
+        show_edge_candidate_geojson_points = st.checkbox(tr("Edge candidateを表示", "Show edge candidates"), value=True, key="workflow-c-show-edge")
+        show_boundary_pin_anchors = st.checkbox(tr("境界ピンアンカーを重ねる", "Overlay boundary pin anchors"), value=True, key="workflow-c-show-boundary-pins")
 
     if density_flow_method_selected:
-        selected_preset = density_flow_preset
+        selected_preset = joint_preset if fine_alignment_method == "joint density + tissue-structure flow" else density_flow_preset
         search_radius_summary = "density objective"
         local_shift_summary = max_final_displacement_um
         interpolation_summary = "composed smooth updates"
@@ -1871,7 +1955,26 @@ def show_he_geojson_preparation() -> None:
         "jacobian_max_limit": jacobian_max_limit,
         "boundary_pinning": enable_boundary_pinning,
     }
-    st.subheader(tr("7. 実行設定の要約", "7. Run summary"))
+    with st.container(border=True):
+        st.subheader(tr("STEP 4 - Registration実行", "STEP 4 - Run registration"))
+        st.caption(tr("設定を確認してから一度だけ実行します。", "Review the compact configuration, then start registration."))
+    st.markdown(f"**{tr('Registration設定', 'Registration configuration')}**")
+    summary_method_col, summary_preset_col = st.columns(2)
+    summary_method_col.markdown(f"**{tr('方式', 'Method')}**  \n{method_labels[fine_alignment_method]}")
+    summary_preset_col.markdown(f"**{tr('プリセット', 'Preset')}**  \n{selected_preset}")
+    if fine_alignment_method == "joint density + tissue-structure flow":
+        stage_a_col, stage_b_col, checkpoint_col = st.columns(3)
+        stage_a_col.markdown(
+            f"**Stage A**  \n{joint_stage_a_scales_text} um  \n"
+            f"{joint_stage_a_iterations} iterations  \nLR {joint_stage_a_learning_rate:g}"
+        )
+        stage_b_col.markdown(
+            f"**Stage B**  \n{joint_stage_b_scales_text} um  \n"
+            f"{joint_stage_b_iterations} iterations  \nLR {joint_stage_b_learning_rate:g}"
+        )
+        checkpoint_col.markdown(
+            f"**Checkpoint policy**  \n{joint_stage_a_checkpoint_policy.replace('_', ' ').title()}"
+        )
     compact_summary = pd.DataFrame(
         {
             tr("項目", "Parameter"): [
@@ -1894,7 +1997,25 @@ def show_he_geojson_preparation() -> None:
     with st.expander(tr("全パラメータ要約", "Full parameter summary"), expanded=False):
         st.json(ui_parameter_summary)
 
-    st.subheader(tr("8. 結果と診断", "8. Results and diagnostics"))
+    required_inputs_ready = he_centers_file is not None and geojson_file is not None
+    run_registration = st.button(
+        tr("REGISTRATIONを実行", "RUN REGISTRATION"),
+        type="primary",
+        use_container_width=True,
+        disabled=not required_inputs_ready,
+        key="workflow-c-run-registration",
+    )
+    if not required_inputs_ready:
+        st.info(tr("HE核.npyとGeoJSONを指定すると実行できます。", "Ready after HE nuclei .npy and GeoJSON are supplied."))
+        return
+    if not run_registration:
+        st.info(tr("状態: 実行準備完了", "Status: Ready"))
+        return
+    st.info(tr("状態: 実行中", "Status: Running"))
+
+    with st.container(border=True):
+        st.subheader(tr("STEP 5 - 結果", "STEP 5 - Results"))
+        st.caption(tr("主要結果、評価、変形QC、再現可能な出力を確認します。", "Review the main result, evaluation, deformation QC, and reproducible exports."))
 
     he_image = show_uploaded_image("Optional HE image", he_image_file) if he_image_file else None
 
@@ -2451,22 +2572,48 @@ def show_he_geojson_preparation() -> None:
     if rejection_reason:
         st.caption(f"{tr('Reject理由', 'Rejection reason')}: {rejection_reason}")
 
-    result_a, result_b, result_c, result_d = st.columns(4)
-    result_a.metric("Applied result type", applied_result_label)
-    result_b.metric("Affine median distance", f"{before_metrics['symmetric_median_distance']:.2f} um")
-    result_c.metric("Attempted fine median", f"{attempted_metrics['symmetric_median_distance']:.2f} um")
-    result_d.metric("Final applied median", f"{applied_metrics['symmetric_median_distance']:.2f} um")
-    attempted_qc_a, attempted_qc_b, attempted_qc_c = st.columns(3)
-    attempted_qc_a.metric(
-        "Attempted Jacobian min / max",
-        f"{safety_metrics.get('attempted_jacobian_min', fine_result.jacobian_min):.3f} / "
-        f"{safety_metrics.get('attempted_jacobian_max', fine_result.jacobian_max):.3f}",
+    joint_result_context = (
+        fine_result.metrics.get("joint_flow", {})
+        if fine_alignment_method == "joint density + tissue-structure flow"
+        and isinstance(fine_result.metrics, dict)
+        else {}
     )
-    attempted_qc_b.metric(
-        "Attempted max displacement",
-        f"{safety_metrics.get('attempted_max_displacement', fine_result.max_displacement):.2f} um",
+    applied_checkpoint = joint_result_context.get("stage_a_selected_checkpoint", "-")
+    context_left, context_right = st.columns(2)
+    context_left.caption(
+        f"Method: {method_labels[fine_alignment_method]}  |  Preset: {selected_preset}"
     )
-    attempted_qc_c.metric("Final applied Jacobian", "fine field" if fine_applied else "1.000 (affine only)")
+    context_right.caption(
+        f"Stage-A checkpoint policy: {joint_stage_a_checkpoint_policy if joint_result_context else '-'}  |  "
+        f"Applied checkpoint: {applied_checkpoint}  |  Fine status: {status}"
+    )
+
+    applied_deformation = evaluation_deformation_table.iloc[1]
+    alignment_before = before_metrics["symmetric_median_distance"]
+    alignment_after = applied_metrics["symmetric_median_distance"]
+    alignment_delta = alignment_after - alignment_before
+    local_improved_fraction = evaluation_local_summary.get("fraction_improved")
+    local_improved_text = (
+        f"{100.0 * local_improved_fraction:.1f} %"
+        if local_improved_fraction is not None
+        else "N/A"
+    )
+    score_a, score_b, score_c = st.columns(3)
+    score_a.metric("STATUS", status.upper())
+    score_b.metric(
+        "ALIGNMENT MEDIAN",
+        f"{alignment_before:.2f} -> {alignment_after:.2f} um",
+        delta=f"{alignment_delta:+.2f} um",
+        delta_color="inverse",
+    )
+    score_c.metric("LOCAL REGIONS IMPROVED", local_improved_text)
+    score_d, score_e, score_f = st.columns(3)
+    score_d.metric("DISPLACEMENT P95", f"{applied_deformation['displacement_p95_um']:.2f} um")
+    score_e.metric(
+        "JACOBIAN P05-P95",
+        f"{applied_deformation['jacobian_p05']:.2f} - {applied_deformation['jacobian_p95']:.2f}",
+    )
+    score_f.metric("FOLD-OVER", f"{100.0 * applied_deformation['fold_over_fraction']:.2f} %")
 
     st.subheader(tr("Fine alignment診断", "Fine alignment diagnostics"))
     diag_a, diag_b, diag_c, diag_d = st.columns(4)
@@ -2532,21 +2679,23 @@ def show_he_geojson_preparation() -> None:
     joint_stage_a_checkpoint_displacement_figures = {}
     joint_stage_a_checkpoint_grid_figures = {}
     joint_stage_a_checkpoint_he_images = {}
-    overview_tab, point_tab, image_tab, tissue_tab, safety_tab, anchor_tab, downloads_tab, evaluation_tab = st.tabs(
+    overview_tab, alignment_tab, deformation_tab, evaluation_tab, diagnostics_tab, export_tab = st.tabs(
         [
             tr("概要", "Overview"),
-            tr("点群位置合わせ", "Point alignment"),
-            tr("Warp済みHE画像", "Warped HE image"),
-            tr("組織分類", "Tissue classification"),
-            tr("Warp安全性", "Warp safety"),
-            (
-                tr("最適化診断", "Optimization diagnostics")
-                if density_flow_mode
-                else tr("アンカー診断", "Anchor diagnostics")
-            ),
-            tr("ダウンロード", "Downloads"),
-        ] + [tr("評価", "Evaluation")]
+            tr("位置合わせ", "Alignment"),
+            tr("変形", "Deformation"),
+            tr("評価", "Evaluation"),
+            tr("診断", "Diagnostics"),
+            tr("出力", "Export"),
+        ]
     )
+    # Backward-compatible container aliases keep result generation and exports unchanged.
+    point_tab = alignment_tab
+    image_tab = deformation_tab
+    tissue_tab = deformation_tab
+    safety_tab = diagnostics_tab
+    anchor_tab = diagnostics_tab
+    downloads_tab = export_tab
 
     if density_flow_mode and isinstance(fine_result.metrics, dict):
         flow_metadata = fine_result.metrics.get("density_flow", {})
