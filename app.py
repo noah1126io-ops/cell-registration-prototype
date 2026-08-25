@@ -1147,24 +1147,39 @@ def _mutual_nearest_fraction_for_export(fixed: np.ndarray, moving: np.ndarray) -
     return float(2.0 * mutual / max(len(fixed) + len(moving), 1))
 
 
-WORKFLOW_C_FINE_METHODS = (
+WORKFLOW_C_PRIMARY_FINE_METHODS = (
     "joint density + tissue-structure flow",
     "tissue-aware density flow",
     "off",
     "cluster-anchor",
+)
+
+WORKFLOW_C_LEGACY_FINE_METHODS = (
     "matched nuclei RBF",
     "local translation field",
     "center-snap",
 )
 
+WORKFLOW_C_FINE_METHODS = WORKFLOW_C_PRIMARY_FINE_METHODS + WORKFLOW_C_LEGACY_FINE_METHODS
+
 WORKFLOW_C_METHOD_GROUPS = {
-    "joint density + tissue-structure flow": "Recommended / current research",
-    "tissue-aware density flow": "Baseline",
-    "off": "Baseline",
-    "cluster-anchor": "Legacy / alternative",
-    "matched nuclei RBF": "Legacy / alternative",
-    "local translation field": "Legacy / alternative",
-    "center-snap": "Legacy / alternative",
+    "joint density + tissue-structure flow": "Recommended",
+    "tissue-aware density flow": "Baselines",
+    "off": "Baselines",
+    "cluster-anchor": "Alternative",
+    "matched nuclei RBF": "Legacy / development methods",
+    "local translation field": "Legacy / development methods",
+    "center-snap": "Legacy / development methods",
+}
+
+WORKFLOW_C_SHORT_METHOD_NAMES = {
+    "joint density + tissue-structure flow": "Joint Flow",
+    "tissue-aware density flow": "Density Flow",
+    "off": "Affine only",
+    "cluster-anchor": "Cluster-anchor",
+    "matched nuclei RBF": "Matched nuclei RBF",
+    "local translation field": "Local translation field",
+    "center-snap": "Center-snap",
 }
 
 
@@ -1211,22 +1226,6 @@ def show_he_geojson_preparation() -> None:
 
     def tr(ja: str, en: str) -> str:
         return ja if is_ja else en
-
-    method_labels = {
-        "tissue-aware density flow": tr(
-            "組織考慮density flow［実験的］",
-            "Tissue-aware density flow [Experimental]",
-        ),
-        "joint density + tissue-structure flow": tr(
-            "密度＋組織構造joint flow［実験的］",
-            "Joint density + tissue-structure flow [Experimental]",
-        ),
-        "cluster-anchor": tr("クラスターアンカー", "Cluster-anchor"),
-        "matched nuclei RBF": tr("対応核RBF", "Matched nuclei RBF"),
-        "local translation field": tr("局所平行移動場", "Local translation field"),
-        "center-snap": tr("中心スナップ", "Center-snap"),
-        "off": tr("なし（アフィンのみ）", "Off (affine only)"),
-    }
 
     st.header(tr("Workflow C: HE-GeoJSON位置合わせ", "Workflow C: HE-GeoJSON alignment"))
     st.caption(
@@ -1439,14 +1438,57 @@ def show_he_geojson_preparation() -> None:
     with st.container(border=True):
         st.subheader(tr("STEP 3 - 詳細位置合わせ", "STEP 3 - Fine alignment"))
         st.caption(tr("非線形補正方式を選び、必要な場合だけ詳細設定を確認します。", "Choose a nonlinear refinement method and inspect detailed settings only when needed."))
-    fine_alignment_method = st.radio(
+    primary_fine_alignment_method = st.radio(
         tr("詳細位置合わせ方式", "Fine alignment method"),
-        WORKFLOW_C_FINE_METHODS,
-        index=WORKFLOW_C_FINE_METHODS.index("cluster-anchor"),
-        key="workflow-c-fine-method",
-        format_func=lambda method: f"{WORKFLOW_C_METHOD_GROUPS[method]} | {method_labels[method]}",
-        help=tr("選択した方式に関係する設定だけを表示します。GeoJSON固定点は移動しません。", "Only settings for the selected method are shown. Fixed GeoJSON points are never moved."),
+        WORKFLOW_C_PRIMARY_FINE_METHODS,
+        index=0,
+        key="workflow-c-primary-fine-method",
+        format_func=lambda method: f"{WORKFLOW_C_METHOD_GROUPS[method]} | {WORKFLOW_C_SHORT_METHOD_NAMES[method]}",
+        help=tr(
+            "表示名は短縮名です。内部実装名は診断とexportに保持されます。GeoJSON固定点は移動しません。",
+            "Short display names are used here. Detailed implementation identifiers remain in diagnostics and exports. Fixed GeoJSON points are never moved.",
+        ),
     )
+    description_left, description_right = st.columns(2)
+    with description_left:
+        st.markdown("**Joint Flow**")
+        st.caption(_workflow_c_method_description("joint density + tissue-structure flow"))
+        st.markdown("**Density Flow**")
+        st.caption(_workflow_c_method_description("tissue-aware density flow"))
+    with description_right:
+        st.markdown("**Affine only**")
+        st.caption(_workflow_c_method_description("off"))
+        st.markdown("**Cluster-anchor**")
+        st.caption(_workflow_c_method_description("cluster-anchor"))
+
+    legacy_fine_alignment_method = "none"
+    with st.expander(tr("Legacy / 開発用方式", "Legacy / development methods"), expanded=False):
+        st.caption(
+            tr(
+                "互換性と研究比較のために保持されています。明示的に選択した場合だけ使用されます。",
+                "Retained for compatibility and research comparison. Used only when explicitly selected.",
+            )
+        )
+        legacy_fine_alignment_method = st.selectbox(
+            tr("Legacy方式", "Legacy method"),
+            ("none",) + WORKFLOW_C_LEGACY_FINE_METHODS,
+            index=0,
+            key="workflow-c-legacy-fine-method",
+            format_func=lambda method: (
+                tr("使用しない", "Not selected")
+                if method == "none" else WORKFLOW_C_SHORT_METHOD_NAMES[method]
+            ),
+            help="Implementation identifiers: matched nuclei RBF, local translation field, center-snap.",
+        )
+    fine_alignment_method = (
+        legacy_fine_alignment_method
+        if legacy_fine_alignment_method != "none"
+        else primary_fine_alignment_method
+    )
+    if legacy_fine_alignment_method != "none":
+        st.warning(
+            f"Legacy / development method selected: {WORKFLOW_C_SHORT_METHOD_NAMES[fine_alignment_method]}"
+        )
     st.caption(_workflow_c_method_description(fine_alignment_method))
 
     joint_presets = _workflow_c_joint_presets()
@@ -1963,7 +2005,7 @@ def show_he_geojson_preparation() -> None:
         st.caption(tr("設定を確認してから一度だけ実行します。", "Review the compact configuration, then start registration."))
     st.markdown(f"**{tr('Registration設定', 'Registration configuration')}**")
     summary_method_col, summary_preset_col = st.columns(2)
-    summary_method_col.markdown(f"**{tr('方式', 'Method')}**  \n{method_labels[fine_alignment_method]}")
+    summary_method_col.markdown(f"**{tr('方式', 'Method')}**  \n{WORKFLOW_C_SHORT_METHOD_NAMES[fine_alignment_method]}")
     summary_preset_col.markdown(f"**{tr('プリセット', 'Preset')}**  \n{selected_preset}")
     if fine_alignment_method == "joint density + tissue-structure flow":
         stage_a_col, stage_b_col, checkpoint_col = st.columns(3)
@@ -1988,7 +2030,7 @@ def show_he_geojson_preparation() -> None:
                 tr("境界ピン留め", "Boundary pinning"),
             ],
             tr("値", "Value"): [
-                method_labels[fine_alignment_method], selected_preset,
+                WORKFLOW_C_SHORT_METHOD_NAMES[fine_alignment_method], selected_preset,
                 tr("使用", "On") if use_edge_candidates_for_anchors else tr("不使用", "Off"), interpolation_summary,
                 str(search_radius_summary), str(local_shift_summary), str(max_final_displacement_um),
                 f"{jacobian_min_limit} / {jacobian_max_limit}",
@@ -2795,7 +2837,7 @@ def show_he_geojson_preparation() -> None:
     applied_checkpoint = joint_result_context.get("stage_a_selected_checkpoint", "-")
     context_left, context_right = st.columns(2)
     context_left.caption(
-        f"Method: {method_labels[fine_alignment_method]}  |  Preset: {selected_preset}"
+        f"Method: {WORKFLOW_C_SHORT_METHOD_NAMES[fine_alignment_method]}  |  Preset: {selected_preset}"
     )
     context_right.caption(
         f"Stage-A checkpoint policy: {joint_stage_a_checkpoint_policy if joint_result_context else '-'}  |  "

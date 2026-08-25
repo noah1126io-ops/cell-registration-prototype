@@ -2,7 +2,10 @@ import inspect
 
 from app import (
     WORKFLOW_C_FINE_METHODS,
+    WORKFLOW_C_LEGACY_FINE_METHODS,
     WORKFLOW_C_METHOD_GROUPS,
+    WORKFLOW_C_PRIMARY_FINE_METHODS,
+    WORKFLOW_C_SHORT_METHOD_NAMES,
     _workflow_c_joint_presets,
     show_he_geojson_preparation,
     show_mask_to_mask_workflow,
@@ -21,9 +24,49 @@ def test_workflow_c_keeps_every_fine_alignment_method_available():
         "center-snap",
     }
     assert WORKFLOW_C_METHOD_GROUPS["joint density + tissue-structure flow"] == (
-        "Recommended / current research"
+        "Recommended"
     )
-    assert WORKFLOW_C_METHOD_GROUPS["tissue-aware density flow"] == "Baseline"
+    assert WORKFLOW_C_METHOD_GROUPS["tissue-aware density flow"] == "Baselines"
+    assert WORKFLOW_C_METHOD_GROUPS["cluster-anchor"] == "Alternative"
+
+
+def test_primary_and_legacy_method_groups_use_short_names_and_joint_default():
+    assert WORKFLOW_C_PRIMARY_FINE_METHODS == (
+        "joint density + tissue-structure flow",
+        "tissue-aware density flow",
+        "off",
+        "cluster-anchor",
+    )
+    assert WORKFLOW_C_LEGACY_FINE_METHODS == (
+        "matched nuclei RBF",
+        "local translation field",
+        "center-snap",
+    )
+    assert [WORKFLOW_C_SHORT_METHOD_NAMES[value] for value in WORKFLOW_C_PRIMARY_FINE_METHODS] == [
+        "Joint Flow",
+        "Density Flow",
+        "Affine only",
+        "Cluster-anchor",
+    ]
+
+    source = inspect.getsource(show_he_geojson_preparation)
+    assert "WORKFLOW_C_PRIMARY_FINE_METHODS" in source
+    assert "index=0" in source
+    assert 'key="workflow-c-primary-fine-method"' in source
+    assert 'with st.expander(tr("Legacy / 開発用方式", "Legacy / development methods"), expanded=False)' in source
+    assert '("none",) + WORKFLOW_C_LEGACY_FINE_METHODS' in source
+    assert 'key="workflow-c-legacy-fine-method"' in source
+
+
+def test_legacy_methods_remain_callable_and_keep_internal_identifiers():
+    source = inspect.getsource(show_he_geojson_preparation)
+
+    for method in WORKFLOW_C_LEGACY_FINE_METHODS:
+        assert method in source
+    assert 'elif fine_alignment_method == "matched nuclei RBF"' in source
+    assert 'elif fine_alignment_method == "local translation field"' in source
+    assert 'elif fine_alignment_method == "center-snap"' in source
+    assert '"fine_method": fine_alignment_method' in source
 
 
 def test_joint_flow_preset_values_are_unchanged_and_custom_is_available():
