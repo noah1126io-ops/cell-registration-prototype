@@ -246,6 +246,87 @@ def raster_fidelity_summary(
     return summary
 
 
+def rejection_gate_analysis(gates: Mapping[str, Mapping]) -> pd.DataFrame:
+    """Evaluate QC gates without changing registration application decisions."""
+    rows = []
+    for check, specification in gates.items():
+        observed = specification.get("observed")
+        required_min = specification.get("required_min")
+        required_max = specification.get("required_max")
+        available = observed is not None
+        if available and isinstance(observed, (float, np.floating)):
+            available = bool(np.isfinite(observed))
+        if not available:
+            status = "NOT AVAILABLE"
+            margin = None
+        else:
+            observed_value = float(observed) if isinstance(observed, (bool, int, float, np.number)) else observed
+            margins = []
+            if required_min is not None:
+                margins.append(float(observed_value) - float(required_min))
+            if required_max is not None:
+                margins.append(float(required_max) - float(observed_value))
+            margin = min(margins) if margins else None
+            status = "PASS" if margin is None or margin >= 0.0 else "FAIL"
+        rows.append(
+            {
+                "check": check,
+                "observed": observed,
+                "required_min": required_min,
+                "required_max": required_max,
+                "margin_to_threshold": margin,
+                "status": status,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def rejected_candidate_statuses(
+    affine_symmetric_median: float,
+    attempted_symmetric_median: float,
+    rejection_analysis: pd.DataFrame,
+) -> dict[str, str | int | float | None]:
+    """Separate alignment performance from deformation-safety status."""
+    affine = float(affine_symmetric_median)
+    attempted = float(attempted_symmetric_median)
+    if attempted < affine:
+        alignment_status = "IMPROVED"
+    elif attempted > affine:
+        alignment_status = "WORSE"
+    else:
+        alignment_status = "UNCHANGED"
+    failed = rejection_analysis.loc[rejection_analysis["status"] == "FAIL"]
+    finite_margins = pd.to_numeric(failed["margin_to_threshold"], errors="coerce").dropna()
+    return {
+        "final_status": "REJECTED",
+        "attempted_alignment_status": alignment_status,
+        "safety_status": "FAILED" if not failed.empty else "PASS",
+        "failed_gate_count": int(len(failed)),
+        "minimum_safety_margin": float(finite_margins.min()) if not finite_margins.empty else None,
+    }
+
+
+def human_qc_review_record(
+    assessment: str = "Not reviewed",
+    *,
+    note: str = "",
+    flags: list[str] | tuple[str, ...] | None = None,
+) -> dict:
+    """Build annotation-only metadata for a rejected research candidate."""
+    normalized_assessment = str(assessment).strip() or "Not reviewed"
+    return {
+        "review_status": (
+            "not_reviewed" if normalized_assessment.lower() == "not reviewed" else "reviewed"
+        ),
+        "assessment": normalized_assessment,
+        "note": str(note),
+        "note_present": bool(str(note).strip()),
+        "flags": list(flags or ()),
+        "annotation_only": True,
+        "changes_registration_result": False,
+    }
+
+
 def displacement_endpoint_error(
     estimated_x: np.ndarray,
     estimated_y: np.ndarray,

@@ -8,9 +8,12 @@ from src.registration_evaluation import (
     deformation_validity_metrics,
     displacement_endpoint_error,
     generate_method_scorecard,
+    human_qc_review_record,
     landmark_tre_metrics,
     local_region_evaluation,
     raster_fidelity_summary,
+    rejected_candidate_statuses,
+    rejection_gate_analysis,
     transform_validation_landmarks,
 )
 
@@ -128,3 +131,53 @@ def test_rejected_unsafe_deformation_cannot_receive_pass():
     safety_status = scorecard.loc[scorecard["domain"] == "Deformation safety", "status"].iloc[0]
     assert safety_status == "FAIL"
     assert summary["overall_status"] == "UNSAFE / REJECTED"
+
+
+def test_rejection_gate_analysis_reports_all_gates_and_signed_margins():
+    table = rejection_gate_analysis(
+        {
+            "Jacobian p05": {"observed": 0.772, "required_min": 0.8},
+            "Jacobian max": {"observed": 1.2, "required_max": 3.0},
+            "inverse raster convergence": {"observed": None, "required_min": 1.0},
+        }
+    ).set_index("check")
+
+    assert table.loc["Jacobian p05", "status"] == "FAIL"
+    assert np.isclose(table.loc["Jacobian p05", "margin_to_threshold"], -0.028)
+    assert table.loc["Jacobian max", "status"] == "PASS"
+    assert np.isclose(table.loc["Jacobian max", "margin_to_threshold"], 1.8)
+    assert table.loc["inverse raster convergence", "status"] == "NOT AVAILABLE"
+
+
+def test_rejected_candidate_separates_alignment_improvement_from_failed_safety():
+    analysis = rejection_gate_analysis(
+        {"Jacobian p05": {"observed": 0.772, "required_min": 0.8}}
+    )
+    statuses = rejected_candidate_statuses(10.0, 9.5, analysis)
+
+    assert statuses["attempted_alignment_status"] == "IMPROVED"
+    assert statuses["safety_status"] == "FAILED"
+    assert statuses["final_status"] == "REJECTED"
+    assert statuses["failed_gate_count"] == 1
+
+
+def test_human_qc_review_is_annotation_only_and_defaults_to_not_reviewed():
+    default_review = human_qc_review_record()
+    reviewed = human_qc_review_record(
+        "Probably better",
+        note="Boundary alignment appears improved.",
+        flags=["tissue boundaries look better aligned"],
+    )
+
+    assert default_review == {
+        "review_status": "not_reviewed",
+        "assessment": "Not reviewed",
+        "note": "",
+        "note_present": False,
+        "flags": [],
+        "annotation_only": True,
+        "changes_registration_result": False,
+    }
+    assert reviewed["review_status"] == "reviewed"
+    assert reviewed["note_present"] is True
+    assert reviewed["changes_registration_result"] is False

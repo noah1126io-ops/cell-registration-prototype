@@ -73,3 +73,15 @@ def test_workflow_c_ui_controls_do_not_leak_into_workflows_a_or_b():
         assert "WORKFLOW_C_FINE_METHODS" not in source
         assert "workflow-c-run-registration" not in source
         assert "Joint Flow preset" not in source
+
+
+def test_rejected_candidate_ui_is_qc_only_and_has_no_safety_override():
+    source = inspect.getsource(show_he_geojson_preparation)
+
+    assert 'key="workflow-c-show-rejected-candidate"' in source
+    assert '["Summary", "Compare", "Full diagnostics"]' in source
+    assert "NOT APPLIED - REJECTED RESEARCH QC CANDIDATE" in source
+    assert "human_qc_review_record" in source
+    assert "Apply anyway" not in source
+    assert "Force apply" not in source
+    assert "Ignore safety" not in source

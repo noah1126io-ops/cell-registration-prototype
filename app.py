@@ -58,10 +58,13 @@ from src.registration_evaluation import (
     METRIC_DEFINITIONS_VERSION,
     deformation_validity_metrics,
     generate_method_scorecard,
+    human_qc_review_record,
     landmark_tre_metrics,
     local_region_evaluation,
     pointset_scorecard,
     raster_fidelity_summary,
+    rejected_candidate_statuses,
+    rejection_gate_analysis,
     transform_validation_landmarks,
 )
 from src.visualization import (
@@ -2005,10 +2008,13 @@ def show_he_geojson_preparation() -> None:
         disabled=not required_inputs_ready,
         key="workflow-c-run-registration",
     )
+    if run_registration:
+        st.session_state["workflow-c-run-active"] = True
     if not required_inputs_ready:
+        st.session_state["workflow-c-run-active"] = False
         st.info(tr("HE核.npyとGeoJSONを指定すると実行できます。", "Ready after HE nuclei .npy and GeoJSON are supplied."))
         return
-    if not run_registration:
+    if not st.session_state.get("workflow-c-run-active", False):
         st.info(tr("状態: 実行準備完了", "Status: Ready"))
         return
     st.info(tr("状態: 実行中", "Status: Running"))
@@ -2550,6 +2556,140 @@ def show_he_geojson_preparation() -> None:
         tre_before_after_figure = visualize_tre_before_after(validation_landmark_table)
         tre_change_figure = visualize_landmark_tre_change(validation_landmark_table)
 
+    attempted_deformation = evaluation_deformation_table.iloc[0]
+    pointset_rows = evaluation_pointset_table.set_index("stage")
+    affine_pointset = pointset_rows.loc["affine"]
+    attempted_pointset = pointset_rows.loc["attempted fine"]
+    applied_pointset = pointset_rows.loc["applied final"]
+    mutual_before_qc = _mutual_nearest_fraction_for_export(
+        metric_fixed_points, metric_moving_affine_points
+    )
+    mutual_attempted_qc = _mutual_nearest_fraction_for_export(
+        metric_fixed_points, metric_moving_attempted_points
+    )
+    mutual_applied_qc = _mutual_nearest_fraction_for_export(
+        metric_fixed_points, metric_moving_applied_points
+    )
+    density_gate = density_flow_method_selected
+    minimum_median_improvement = (
+        max(
+            density_flow_min_absolute_improvement,
+            density_flow_min_relative_improvement
+            * before_metrics["symmetric_median_distance"],
+        )
+        if density_gate
+        else 0.0
+    )
+    rejection_gates = {
+        "meaningful median improvement": {
+            "observed": before_metrics["symmetric_median_distance"]
+            - attempted_metrics["symmetric_median_distance"],
+            "required_min": minimum_median_improvement,
+        },
+        "mutual-nearest tolerance": {
+            "observed": (
+                mutual_attempted_qc - mutual_before_qc
+                if density_gate and mutual_before_qc is not None and mutual_attempted_qc is not None
+                else None
+            ),
+            "required_min": -density_flow_max_mutual_decrease if density_gate else None,
+        },
+        **{
+            f"within-{threshold} tolerance": {
+                "observed": (
+                    attempted_metrics[f"symmetric_within_{threshold}"]
+                    - before_metrics[f"symmetric_within_{threshold}"]
+                    if density_gate else None
+                ),
+                "required_min": -density_flow_max_within_decrease if density_gate else None,
+            }
+            for threshold in (3, 5, 10)
+        },
+        "Jacobian min": {
+            "observed": attempted_deformation["jacobian_min"],
+            "required_min": jacobian_min_limit,
+        },
+        "Jacobian p05": {
+            "observed": attempted_deformation["jacobian_p05"] if density_gate else None,
+            "required_min": density_flow_min_jacobian_p05 if density_gate else None,
+        },
+        "Jacobian p95": {
+            "observed": attempted_deformation["jacobian_p95"] if density_gate else None,
+            "required_max": density_flow_max_jacobian_p95 if density_gate else None,
+        },
+        "Jacobian max": {
+            "observed": attempted_deformation["jacobian_max"],
+            "required_max": jacobian_max_limit,
+        },
+        "fold-over": {
+            "observed": attempted_deformation["fold_over_fraction"],
+            "required_max": 0.0,
+        },
+        "p95 displacement": {
+            "observed": attempted_deformation["displacement_p95_um"],
+            "required_max": displacement_p95_limit_um if enable_displacement_p95_limit else None,
+        },
+        "max displacement": {
+            "observed": attempted_deformation["displacement_max_um"],
+            "required_max": max_final_displacement_um,
+        },
+        "finite field": {
+            "observed": float(
+                np.isfinite(attempted_displacement_x).all()
+                and np.isfinite(attempted_displacement_y).all()
+                and np.isfinite(attempted_points).all()
+            ),
+            "required_min": 1.0,
+        },
+        "inverse raster convergence": {
+            "observed": None,
+            "required_min": 1.0,
+        },
+    }
+    rejection_analysis_table = rejection_gate_analysis(rejection_gates)
+    rejected_status_summary = rejected_candidate_statuses(
+        before_metrics["symmetric_median_distance"],
+        attempted_metrics["symmetric_median_distance"],
+        rejection_analysis_table,
+    )
+    attempted_local_improved_fraction = None
+    attempted_local_worsened_fraction = None
+    if not evaluation_local_table.empty:
+        attempted_local_delta = evaluation_local_table["delta_affine_to_attempted"].to_numpy(dtype=float)
+        attempted_local_improved_fraction = float(np.mean(attempted_local_delta < -0.05))
+        attempted_local_worsened_fraction = float(np.mean(attempted_local_delta > 0.05))
+
+    rejected_candidate_summary = pd.DataFrame(
+        [
+            {"Metric": "symmetric median (um)", "Affine": affine_pointset["symmetric_nn_median_um"], "Attempted": attempted_pointset["symmetric_nn_median_um"], "Applied": applied_pointset["symmetric_nn_median_um"]},
+            {"Metric": "p90 (um)", "Affine": affine_pointset["bidirectional_p90_um"], "Attempted": attempted_pointset["bidirectional_p90_um"], "Applied": applied_pointset["bidirectional_p90_um"]},
+            {"Metric": "p95 (um)", "Affine": affine_pointset["bidirectional_p95_um"], "Attempted": attempted_pointset["bidirectional_p95_um"], "Applied": applied_pointset["bidirectional_p95_um"]},
+            *[
+                {"Metric": f"within {threshold} um", "Affine": affine_pointset[f"within_{threshold}_um_fraction"], "Attempted": attempted_pointset[f"within_{threshold}_um_fraction"], "Applied": applied_pointset[f"within_{threshold}_um_fraction"]}
+                for threshold in (3, 5, 10)
+            ],
+            {"Metric": "mutual nearest", "Affine": mutual_before_qc, "Attempted": mutual_attempted_qc, "Applied": mutual_applied_qc},
+            {"Metric": "landmark TRE median (um)", "Affine": validation_landmark_summaries["affine"]["tre_median_after_um"] if validation_landmark_summaries else None, "Attempted": validation_landmark_summaries["attempted"]["tre_median_after_um"] if validation_landmark_summaries else None, "Applied": validation_landmark_summaries["applied"]["tre_median_after_um"] if validation_landmark_summaries else None},
+            {"Metric": "local improved fraction", "Affine": 0.0, "Attempted": attempted_local_improved_fraction, "Applied": evaluation_local_summary.get("fraction_improved")},
+            {"Metric": "local worsened fraction", "Affine": 0.0, "Attempted": attempted_local_worsened_fraction, "Applied": evaluation_local_summary.get("fraction_worsened")},
+            {"Metric": "p95 displacement (um)", "Affine": 0.0, "Attempted": attempted_deformation["displacement_p95_um"], "Applied": evaluation_deformation_table.iloc[1]["displacement_p95_um"]},
+            {"Metric": "max displacement (um)", "Affine": 0.0, "Attempted": attempted_deformation["displacement_max_um"], "Applied": evaluation_deformation_table.iloc[1]["displacement_max_um"]},
+            {"Metric": "Jacobian p05", "Affine": 1.0, "Attempted": attempted_deformation["jacobian_p05"], "Applied": evaluation_deformation_table.iloc[1]["jacobian_p05"]},
+            {"Metric": "Jacobian median", "Affine": 1.0, "Attempted": attempted_deformation["jacobian_median"], "Applied": evaluation_deformation_table.iloc[1]["jacobian_median"]},
+            {"Metric": "Jacobian p95", "Affine": 1.0, "Attempted": attempted_deformation["jacobian_p95"], "Applied": evaluation_deformation_table.iloc[1]["jacobian_p95"]},
+            {"Metric": "fold-over fraction", "Affine": 0.0, "Attempted": attempted_deformation["fold_over_fraction"], "Applied": evaluation_deformation_table.iloc[1]["fold_over_fraction"]},
+        ]
+    )
+    rejected_candidate_summary["Attempted vs Affine"] = (
+        rejected_candidate_summary["Attempted"] - rejected_candidate_summary["Affine"]
+    )
+
+    show_rejected_candidate = False
+    rejected_view_mode = "Summary"
+    human_qc_assessment = "Not reviewed"
+    human_qc_note = ""
+    human_qc_flags: list[str] = []
+
     accepted_anchor_count = fine_result.n_pairs
     total_anchor_count = fine_result.n_candidate_pairs
     rejected_anchor_count = fine_result.n_filtered_pairs
@@ -2566,7 +2706,81 @@ def show_he_geojson_preparation() -> None:
     if status == "applied":
         st.success(tr("Fine warpを適用しました。最終結果は affine + fine warp です。", "Fine warp applied. The final result uses affine + fine warp."))
     elif status == "rejected":
-        st.warning(tr("Fine warpは安全条件でrejectされました。最終結果はaffineのみです。", "Fine warp was rejected by safety checks. The final result uses affine-only registration."))
+        failed_gates = rejection_analysis_table.loc[rejection_analysis_table["status"] == "FAIL"]
+        rejection_gate_names = {
+            "jacobian_expansion_too_high": "Jacobian max",
+            "jacobian_or_fold_check_failed": "Jacobian min",
+            "max_displacement_too_large": "max displacement",
+            "displacement_p95_too_large": "p95 displacement",
+            "median_distance_worsened": "meaningful median improvement",
+            "valid_region_median_distance_worsened": "meaningful median improvement",
+            "no_improving_safe_checkpoint": "meaningful median improvement",
+        }
+        named_primary = failed_gates.loc[
+            failed_gates["check"] == rejection_gate_names.get(rejection_reason)
+        ]
+        primary_gate = (
+            named_primary.iloc[0]
+            if not named_primary.empty
+            else (
+                failed_gates.sort_values("margin_to_threshold").iloc[0]
+                if not failed_gates.empty else None
+            )
+        )
+        observed_text = "N/A" if primary_gate is None else str(primary_gate["observed"])
+        required_text = "N/A"
+        if primary_gate is not None:
+            if pd.notna(primary_gate["required_min"]):
+                required_text = f">= {primary_gate['required_min']}"
+            elif pd.notna(primary_gate["required_max"]):
+                required_text = f"<= {primary_gate['required_max']}"
+        st.error(
+            "FINAL STATUS: REJECTED - AFFINE FALLBACK\n\n"
+            f"Primary rejection reason: {rejection_reason or 'unspecified'}\n\n"
+            f"Observed: {observed_text} | Required: {required_text}"
+        )
+        show_rejected_candidate = st.checkbox(
+            tr("reject候補を表示", "Show rejected candidate"),
+            value=False,
+            key="workflow-c-show-rejected-candidate",
+        )
+        if show_rejected_candidate:
+            rejected_view_mode = st.radio(
+                tr("表示モード", "View mode"),
+                ["Summary", "Compare", "Full diagnostics"],
+                horizontal=True,
+                key="workflow-c-rejected-view-mode",
+            )
+            st.error("NOT APPLIED - REJECTED RESEARCH QC CANDIDATE")
+            if rejected_view_mode == "Summary":
+                st.markdown("**Attempted: REJECTED CANDIDATE - QC ONLY**")
+                st.markdown("**Applied: AFFINE FALLBACK**")
+                st.dataframe(rejected_candidate_summary, use_container_width=True, hide_index=True)
+            with st.expander(tr("Human QC評価（annotationのみ）", "Human QC assessment (annotation only)"), expanded=False):
+                human_qc_assessment = st.selectbox(
+                    tr("Human QC判定", "Human QC assessment"),
+                    ["Clearly better", "Probably better", "No clear difference", "Probably worse", "Clearly worse", "Not reviewed"],
+                    index=5,
+                    key="workflow-c-human-qc-assessment",
+                )
+                human_qc_note = st.text_area(
+                    tr("Human QCメモ", "Human QC notes"),
+                    key="workflow-c-human-qc-note",
+                )
+                human_qc_flags = st.multiselect(
+                    tr("観察フラグ", "Structured review flags"),
+                    [
+                        "tissue boundaries look better aligned",
+                        "internal structures look better aligned",
+                        "obvious local stretching",
+                        "obvious compression",
+                        "suspicious fold / tear",
+                        "edge artifact",
+                        "difficult to judge",
+                    ],
+                    key="workflow-c-human-qc-flags",
+                )
+                st.caption("Annotation only. This cannot alter application, safety, metrics, or optimization.")
     else:
         st.info(tr("Fine alignmentは無効です。最終結果はaffineのみです。", "Fine alignment is disabled. The final result is affine-only."))
     if rejection_reason:
@@ -2696,6 +2910,20 @@ def show_he_geojson_preparation() -> None:
     safety_tab = diagnostics_tab
     anchor_tab = diagnostics_tab
     downloads_tab = export_tab
+
+    if status == "rejected" and show_rejected_candidate:
+        performance_col, safety_col = diagnostics_tab.columns(2)
+        performance_col.metric(
+            "SCIENTIFIC / ALIGNMENT PERFORMANCE",
+            rejected_status_summary["attempted_alignment_status"],
+        )
+        safety_col.metric(
+            "DEFORMATION SAFETY",
+            rejected_status_summary["safety_status"],
+        )
+        diagnostics_tab.caption(
+            "Final application: REJECTED. Alignment performance and deformation safety are reported independently."
+        )
 
     if density_flow_mode and isinstance(fine_result.metrics, dict):
         flow_metadata = fine_result.metrics.get("density_flow", {})
@@ -4023,6 +4251,60 @@ def show_he_geojson_preparation() -> None:
             mime="image/png",
         )
 
+    if inverse_solver_diagnostics is not None:
+        rejection_gates["inverse raster convergence"]["observed"] = float(
+            bool(inverse_solver_diagnostics.get("converged", False))
+        )
+    rejection_analysis_table = rejection_gate_analysis(rejection_gates)
+    rejected_status_summary = rejected_candidate_statuses(
+        before_metrics["symmetric_median_distance"],
+        attempted_metrics["symmetric_median_distance"],
+        rejection_analysis_table,
+    )
+
+    if status == "rejected" and show_rejected_candidate and rejected_view_mode == "Full diagnostics":
+        diagnostics_tab.subheader("Rejected candidate gate analysis")
+        diagnostics_tab.dataframe(
+            rejection_analysis_table,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    if status == "rejected" and show_rejected_candidate and rejected_view_mode == "Compare":
+        overview_tab.error("NOT APPLIED - REJECTED RESEARCH QC CANDIDATE")
+        compare_affine, compare_attempted, compare_applied = overview_tab.columns(3)
+        compare_affine.markdown("**AFFINE BASELINE**")
+        compare_affine.pyplot(affine_figure, clear_figure=False)
+        compare_attempted.markdown("**ATTEMPTED CANDIDATE**")
+        compare_attempted.error("NOT APPLIED - REJECTED RESEARCH QC CANDIDATE")
+        compare_attempted.pyplot(attempted_figure, clear_figure=False)
+        compare_applied.markdown("**APPLIED FINAL**")
+        compare_applied.caption("AFFINE FALLBACK")
+        compare_applied.pyplot(fine_figure, clear_figure=False)
+        if affine_warped_he_image is not None:
+            raster_affine, raster_attempted, raster_applied = deformation_tab.columns(3)
+            raster_affine.markdown("**AFFINE BASELINE HE**")
+            raster_affine.image(affine_warped_he_image, use_container_width=True)
+            raster_attempted.markdown("**ATTEMPTED HE - QC ONLY**")
+            raster_attempted.error("NOT APPLIED")
+            raster_attempted.image(
+                attempted_warped_he_image
+                if attempted_warped_he_image is not None
+                else affine_warped_he_image,
+                use_container_width=True,
+            )
+            raster_applied.markdown("**APPLIED FINAL HE**")
+            raster_applied.caption("AFFINE FALLBACK")
+            raster_applied.image(warped_he_image, use_container_width=True)
+        deformation_tab.subheader("Rejected candidate deformation QC")
+        deformation_compare_left, deformation_compare_right = deformation_tab.columns(2)
+        deformation_compare_left.pyplot(attempted_field_figure, clear_figure=False)
+        deformation_compare_right.pyplot(attempted_jacobian_figure, clear_figure=False)
+        if attempted_grid_figure is not None:
+            deformation_tab.pyplot(attempted_grid_figure, clear_figure=False)
+        if local_improvement_figure is not None:
+            deformation_tab.pyplot(local_improvement_figure, clear_figure=False)
+
     evaluation_raster_fidelity = raster_fidelity_summary(inverse_solver_diagnostics)
     affine_evaluation_metrics = evaluation_pointset_table.loc[
         evaluation_pointset_table["stage"] == "affine"
@@ -4387,6 +4669,42 @@ def show_he_geojson_preparation() -> None:
     mutual_before = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_affine_points)
     mutual_attempted = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_attempted_points)
     mutual_applied = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_applied_points)
+    human_qc_review = human_qc_review_record(
+        human_qc_assessment,
+        note=human_qc_note,
+        flags=human_qc_flags,
+    )
+    rejection_analysis_payload = {
+        "method": fine_alignment_method,
+        "preset": selected_preset,
+        "candidate_type": "rejected_nonlinear_qc_candidate" if status == "rejected" else status,
+        "final_status": status,
+        "rejection_reason": rejection_reason or None,
+        "checks": rejection_analysis_table.to_dict(orient="records"),
+        "thresholds_used": {
+            row["check"]: {
+                "required_min": row["required_min"],
+                "required_max": row["required_max"],
+            }
+            for row in rejection_analysis_table.to_dict(orient="records")
+        },
+        "timestamp": pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),
+    }
+    if status == "rejected":
+        history_statuses = rejected_status_summary
+    else:
+        history_statuses = {
+            "final_status": status.upper(),
+            "attempted_alignment_status": (
+                "IMPROVED"
+                if attempted_metrics["symmetric_median_distance"]
+                < before_metrics["symmetric_median_distance"]
+                else "WORSE"
+            ),
+            "safety_status": "PASS" if status == "applied" else "NOT AVAILABLE",
+            "failed_gate_count": 0,
+            "minimum_safety_margin": None,
+        }
     run_metrics = {
         "fine_method": fine_alignment_method,
         "fine_status": status,
@@ -4458,6 +4776,8 @@ def show_he_geojson_preparation() -> None:
             if isinstance(fine_result.metrics, dict) else None
         ),
         "registration_evaluation": evaluation_export_summary,
+        "rejection_analysis": rejection_analysis_payload,
+        "human_qc_review": human_qc_review,
     }
     parameters["include_original_uploaded_inputs"] = include_original_inputs
     parameters["comparison_run_id"] = previous_entry.get("run_id") if previous_entry else None
@@ -4603,6 +4923,14 @@ def show_he_geojson_preparation() -> None:
         "evaluation/raster_fidelity.json": json.dumps(
             evaluation_raster_fidelity, indent=2, allow_nan=False
         ).encode("utf-8"),
+        "evaluation/rejection_analysis.json": json.dumps(
+            _json_summary_safe(rejection_analysis_payload), indent=2, allow_nan=False
+        ).encode("utf-8"),
+        "evaluation/rejection_analysis.csv": rejection_analysis_table.to_csv(index=False).encode("utf-8"),
+        "evaluation/attempted_candidate_metrics.csv": rejected_candidate_summary.to_csv(index=False).encode("utf-8"),
+        "review/human_qc_review.json": json.dumps(
+            _json_summary_safe(human_qc_review), indent=2, allow_nan=False
+        ).encode("utf-8"),
     }
     if fine_alignment_method == "joint density + tissue-structure flow":
         stage_a_export_names = {
@@ -4740,6 +5068,14 @@ def show_he_geojson_preparation() -> None:
         "max_displacement": run_metrics["max_displacement"],
         "timestamp": run_manifest["local_timestamp"],
         "parameters": dict(parameters),
+        "final_status": history_statuses["final_status"],
+        "attempted_alignment_status": history_statuses["attempted_alignment_status"],
+        "safety_status": history_statuses["safety_status"],
+        "primary_rejection_reason": rejection_reason or None,
+        "failed_gate_count": history_statuses["failed_gate_count"],
+        "minimum_safety_margin": history_statuses["minimum_safety_margin"],
+        "human_review": human_qc_review["assessment"],
+        "human_review_note_present": human_qc_review["note_present"],
     }
     action_left, action_right = downloads_tab.columns(2)
     with action_left:
@@ -4759,14 +5095,45 @@ def show_he_geojson_preparation() -> None:
         )
 
     history_display_fields = [
-        "run_id", "label", "fine_method", "status", "rejection_reason", "affine_median",
+        "run_id", "label", "fine_method", "status", "final_status",
+        "attempted_alignment_status", "safety_status", "primary_rejection_reason",
+        "failed_gate_count", "minimum_safety_margin", "human_review",
+        "human_review_note_present", "affine_median",
         "attempted_median", "delta_median", "final_median", "mutual_before", "mutual_attempted",
         "jacobian_min", "jacobian_max", "local_residual_p95", "max_displacement", "timestamp",
     ]
     if experiment_history:
+        history_filter = downloads_tab.selectbox(
+            tr("実験履歴フィルタ", "Experiment history filter"),
+            [
+                "All runs",
+                "Applied",
+                "Rejected",
+                "Rejected + alignment improved",
+                "Rejected + human rated better",
+            ],
+            key="workflow-c-history-filter",
+        )
+        filtered_history = list(experiment_history)
+        if history_filter == "Applied":
+            filtered_history = [row for row in filtered_history if row.get("final_status") == "APPLIED"]
+        elif history_filter == "Rejected":
+            filtered_history = [row for row in filtered_history if row.get("final_status") == "REJECTED"]
+        elif history_filter == "Rejected + alignment improved":
+            filtered_history = [
+                row for row in filtered_history
+                if row.get("final_status") == "REJECTED"
+                and row.get("attempted_alignment_status") == "IMPROVED"
+            ]
+        elif history_filter == "Rejected + human rated better":
+            filtered_history = [
+                row for row in filtered_history
+                if row.get("final_status") == "REJECTED"
+                and row.get("human_review") in {"Clearly better", "Probably better"}
+            ]
         downloads_tab.dataframe(
             pd.DataFrame(
-                [{key: entry.get(key) for key in history_display_fields} for entry in experiment_history]
+                [{key: entry.get(key) for key in history_display_fields} for entry in filtered_history]
             ),
             use_container_width=True,
             hide_index=True,

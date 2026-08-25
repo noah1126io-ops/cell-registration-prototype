@@ -88,6 +88,10 @@ EXPECTED_ARTIFACTS = (
     "evaluation/raster_fidelity.json",
     "evaluation/ground_truth_metrics.json",
     "evaluation/displacement_epe.csv",
+    "evaluation/rejection_analysis.json",
+    "evaluation/rejection_analysis.csv",
+    "evaluation/attempted_candidate_metrics.csv",
+    "review/human_qc_review.json",
 )
 
 
@@ -239,6 +243,9 @@ def metrics_summary_csv(metrics: Mapping[str, Any]) -> bytes:
 def experiment_history_csv(history: list[Mapping[str, Any]]) -> bytes:
     fields = [
         "run_id", "label", "fine_method", "status", "rejection_reason",
+        "final_status", "attempted_alignment_status", "safety_status",
+        "primary_rejection_reason", "failed_gate_count", "minimum_safety_margin",
+        "human_review", "human_review_note_present",
         "affine_median", "attempted_median", "delta_median", "final_median",
         "mutual_before", "mutual_attempted", "jacobian_min", "jacobian_max",
         "local_residual_p95", "max_displacement", "timestamp",

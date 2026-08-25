@@ -10,6 +10,7 @@ from app import show_mask_to_mask_workflow, show_point_registration_workflow
 from src.workflow_c_run_export import (
     EXPECTED_ARTIFACTS,
     build_workflow_c_run_bundle,
+    experiment_history_csv,
     generate_run_id,
     git_provenance,
     input_file_record,
@@ -225,3 +226,72 @@ def test_joint_stage_a_checkpoint_artifacts_are_declared_as_npz_and_qc_images():
         "images/stage_a_selected_displacement.png",
     } <= expected
     assert not any(path.endswith(".json") and "displacement_field" in path for path in expected)
+
+
+def test_rejected_candidate_analysis_and_human_review_are_exported_without_arrays():
+    rejection = {
+        "method": "joint density + tissue-structure flow",
+        "candidate_type": "rejected_nonlinear_qc_candidate",
+        "checks": [{"check": "Jacobian p05", "observed": 0.772, "required_min": 0.8}],
+    }
+    review = {
+        "review_status": "not_reviewed",
+        "annotation_only": True,
+        "changes_registration_result": False,
+    }
+    artifacts = {
+        "evaluation/rejection_analysis.json": json.dumps(rejection).encode("utf-8"),
+        "evaluation/rejection_analysis.csv": b"check,observed,required_min\nJacobian p05,0.772,0.8\n",
+        "evaluation/attempted_candidate_metrics.csv": b"Metric,Affine,Attempted\nmedian,10,9.5\n",
+        "review/human_qc_review.json": json.dumps(review).encode("utf-8"),
+        "fields/attempted_displacement_field.npz": b"npz-field-payload",
+    }
+    bundle, _ = _bundle(artifacts=artifacts)
+
+    with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+        names = set(archive.namelist())
+        exported_rejection = json.loads(archive.read("evaluation/rejection_analysis.json"))
+        exported_review = json.loads(archive.read("review/human_qc_review.json"))
+
+    assert set(artifacts) <= names
+    assert exported_rejection["checks"][0]["observed"] == 0.772
+    assert exported_review["review_status"] == "not_reviewed"
+    assert "displacement_x" not in json.dumps(exported_rejection)
+
+
+def test_rejected_candidate_artifacts_and_history_fields_are_declared():
+    expected = set(EXPECTED_ARTIFACTS)
+    assert {
+        "evaluation/rejection_analysis.json",
+        "evaluation/rejection_analysis.csv",
+        "evaluation/attempted_candidate_metrics.csv",
+        "review/human_qc_review.json",
+    } <= expected
+
+    csv_text = experiment_history_csv(
+        [
+            {
+                "run_id": "run-1",
+                "final_status": "REJECTED",
+                "attempted_alignment_status": "IMPROVED",
+                "safety_status": "FAILED",
+                "primary_rejection_reason": "jacobian_p05",
+                "failed_gate_count": 1,
+                "minimum_safety_margin": -0.028,
+                "human_review": "Probably better",
+                "human_review_note_present": True,
+            }
+        ]
+    ).decode("utf-8")
+
+    for field in (
+        "final_status",
+        "attempted_alignment_status",
+        "safety_status",
+        "primary_rejection_reason",
+        "failed_gate_count",
+        "minimum_safety_margin",
+        "human_review",
+        "human_review_note_present",
+    ):
+        assert field in csv_text.splitlines()[0]
