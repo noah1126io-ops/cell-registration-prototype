@@ -92,6 +92,17 @@ EXPECTED_ARTIFACTS = (
     "evaluation/rejection_analysis.csv",
     "evaluation/attempted_candidate_metrics.csv",
     "review/human_qc_review.json",
+    "evaluation/objective_terms.csv",
+    "evaluation/objective_history_canonical.csv",
+    "evaluation/ablation_configuration.json",
+    "evaluation/density_mismatch_summary.json",
+    "evaluation/term_interaction_summary.json",
+    "fields/research_diagnostic_fields.npz",
+    "fields/selected_diagnostic_update_fields.npz",
+    "images/density_residual.png",
+    "images/weighted_density_residual.png",
+    "images/support_residual.png",
+    "images/structure_residual.png",
 )
 
 

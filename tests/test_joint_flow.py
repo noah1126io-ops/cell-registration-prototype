@@ -10,6 +10,7 @@ from src.joint_flow import (
     build_fixed_nuclear_structure_features,
     build_he_nuclear_structure_features,
 )
+from src.flow_ablation import FlowAblationConfig
 
 
 def _metadata(size: int) -> dict:
@@ -115,6 +116,21 @@ def test_joint_no_deformation_stays_near_zero_and_fixed_points_never_move():
     assert np.percentile(magnitude, 95) < 0.2
     assert result.metrics["joint_flow"]["fixed_points_moved"] is False
     np.testing.assert_array_equal(fixed, fixed.copy())
+
+
+def test_joint_flow_retains_independent_stage_ablation_configuration():
+    stage_a = FlowAblationConfig(use_density_term=False, use_structure_term=False)
+    stage_b = FlowAblationConfig(use_support_term=False)
+    _, _, result = _joint_case(
+        1.0,
+        stage_a_ablation_config=stage_a,
+        stage_b_ablation_config=stage_b,
+    )
+    configuration = result.metrics["joint_flow"]["ablation_configuration"]
+    assert configuration["stage_a"]["use_density_term"] is False
+    assert configuration["stage_a"]["use_support_term"] is True
+    assert configuration["stage_b"]["use_density_term"] is True
+    assert configuration["stage_b"]["use_support_term"] is False
 
 
 @pytest.mark.parametrize("amplitude, expected_sign", [(4.0, 1.0), (-4.0, -1.0)])

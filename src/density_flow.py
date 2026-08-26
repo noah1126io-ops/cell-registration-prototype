@@ -9,6 +9,14 @@ from scipy.signal import fftconvolve
 from scipy.spatial import cKDTree
 
 from src.pointset_registration import FineWarpResult, point_bidirectional_distance_metrics
+from src.flow_ablation import (
+    FlowAblationConfig,
+    density_mismatch_diagnostics,
+    normalize_ablation_config,
+    objective_decomposition,
+    objective_rows,
+    term_interaction_summary,
+)
 from src.raster_deformation_qc import local_region_metrics, soft_jacobian_log_penalty
 
 
@@ -555,7 +563,9 @@ def _field_objective(
     support_weight: float = 0.0,
     structure_weight: float = 0.0,
     soft_jacobian_weight: float = 0.0,
-) -> dict[str, float]:
+    ablation_config: FlowAblationConfig | dict | None = None,
+) -> dict[str, object]:
+    ablation = normalize_ablation_config(ablation_config)
     residual = fixed_density - moving_density
     density_energy = float(np.mean(tissue_weight * fixed_density**2))
     density_term = float(
@@ -589,17 +599,20 @@ def _field_objective(
         else 0.0
     )
     soft_jacobian_term = soft_jacobian_log_penalty(jacobian)
-    total = (
-        density_weight * density_term
-        + support_weight * support_term
-        + structure_weight * structure_term
-        + smoothness_weight * smoothness_term
-        + magnitude_weight * magnitude_term
-        + jacobian_weight * jacobian_term
-        + boundary_weight * boundary_term
-        + inverse_consistency_weight * inverse_term
-        + soft_jacobian_weight * soft_jacobian_term
-    )
+    raw_values = {
+        "density": density_term, "support": support_term, "structure": structure_term,
+        "smoothness": smoothness_term, "magnitude": magnitude_term,
+        "jacobian_barrier": jacobian_term, "tissue_boundary": boundary_term,
+        "inverse_consistency": inverse_term, "soft_jacobian": soft_jacobian_term,
+    }
+    weights = {
+        "density": density_weight, "support": support_weight, "structure": structure_weight,
+        "smoothness": smoothness_weight, "magnitude": magnitude_weight,
+        "jacobian_barrier": jacobian_weight, "tissue_boundary": boundary_weight,
+        "inverse_consistency": inverse_consistency_weight, "soft_jacobian": soft_jacobian_weight,
+    }
+    decomposition = objective_decomposition(raw_values, weights, ablation)
+    total = decomposition["weighted_total"]
     return {
         "total": float(total),
         "density": density_term,
@@ -611,6 +624,13 @@ def _field_objective(
         "tissue_boundary": boundary_term,
         "inverse_consistency": inverse_term,
         "soft_jacobian": soft_jacobian_term,
+        "weighted_data_total": decomposition["weighted_data_total"],
+        "weighted_regularization_total": decomposition["weighted_regularization_total"],
+        **{
+            f"weighted_{name}": values["weighted"]
+            for name, values in decomposition["terms"].items()
+        },
+        "objective_decomposition": decomposition,
     }
 
 
@@ -640,6 +660,7 @@ def _evaluate_density_flow_state(
     support_weight: float = 0.0,
     structure_weight: float = 0.0,
     soft_jacobian_weight: float = 0.0,
+    ablation_config: FlowAblationConfig | dict | None = None,
 ) -> dict[str, object]:
     """Evaluate density and field penalties from one internally consistent field."""
     transformed_points = moving_points + _sample_field(
@@ -682,6 +703,7 @@ def _evaluate_density_flow_state(
         support_weight=support_weight,
         structure_weight=structure_weight,
         soft_jacobian_weight=soft_jacobian_weight,
+        ablation_config=ablation_config,
     )
     return {
         "transformed_points": transformed_points,
@@ -870,10 +892,13 @@ def tissue_aware_density_flow_registration(
     checkpoint_strict_displacement_p95_limit: float | None = None,
     detect_axis_reversal: bool = True,
     max_grid_side: int = 1024,
+    ablation_config: FlowAblationConfig | dict | None = None,
+    retain_research_diagnostic_fields: bool = False,
 ) -> FineWarpResult:
     """Independently estimate a tissue-weighted multiscale density-flow point warp."""
     fixed = _validate_points(fixed_points, "fixed_points")
     moving = _validate_points(moving_points, "moving_points")
+    ablation = normalize_ablation_config(ablation_config)
     metric_fixed = fixed if success_metric_fixed_points is None else _validate_points(success_metric_fixed_points, "success_metric_fixed_points")
     metric_moving = moving if success_metric_moving_points is None else _validate_points(success_metric_moving_points, "success_metric_moving_points")
     if density_pixel_size <= 0 or not np.isfinite(density_pixel_size):
@@ -1102,6 +1127,7 @@ def tissue_aware_density_flow_registration(
             support_weight=tissue_support_channel_weight,
             structure_weight=structure_channel_weight,
             soft_jacobian_weight=soft_jacobian_weight,
+            ablation_config=ablation,
         )
 
     def point_metrics_for_field(current_x: np.ndarray, current_y: np.ndarray) -> tuple[dict, np.ndarray]:
@@ -1169,6 +1195,7 @@ def tissue_aware_density_flow_registration(
     initial_objective: float | None = None
     consecutive_failed_updates = 0
     point_stall_count = 0
+    last_update_components: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
     initial_metric_values, _ = point_metrics_for_field(field_x, field_y)
     canonical_sigma = active_scales[-1]
@@ -1225,6 +1252,8 @@ def tissue_aware_density_flow_registration(
             "canonical_density_objective": float(canonical_objective["density"]),
             "canonical_support_objective": float(canonical_objective["support"]),
             "canonical_total_objective": float(canonical_objective["total"]),
+            "objective_decomposition": objective["objective_decomposition"],
+            "canonical_objective_decomposition": canonical_objective["objective_decomposition"],
             "displacement_median": float(np.median(displacement_values)),
             "p95_displacement": float(np.percentile(displacement_values, 95)),
             "max_displacement": float(np.max(displacement_values)),
@@ -1238,6 +1267,11 @@ def tissue_aware_density_flow_registration(
             "strict_final_safe": strict_safe,
             "temporary_point_guard_pass": temporary_stage_a_point_guard(values),
             "final_point_improvement": improves_affine(values, canonical_state),
+            "update_fields": {
+                f"{name}_update_{axis}": np.asarray(component[index]).copy()
+                for name, component in last_update_components.items()
+                for index, axis in enumerate(("x", "y"))
+            } if retain_research_diagnostic_fields else {},
         }
 
     for level, sigma_px in enumerate(active_scales):
@@ -1265,19 +1299,25 @@ def tissue_aware_density_flow_registration(
             grad_x = fixed_grad_x + moving_grad_x
             grad_y = fixed_grad_y + moving_grad_y
             denominator = grad_x**2 + grad_y**2 + 0.1 * residual**2 + 1e-15
-            update_x = (
+            density_update_x = (
                 -learning_rate * density_pixel_size * density_channel_weight
                 * residual * grad_x / denominator
             )
-            update_y = (
+            density_update_y = (
                 -learning_rate * density_pixel_size * density_channel_weight
                 * residual * grad_y / denominator
             )
-            for fixed_channel, moving_channel, channel_weight in (
-                (fixed_support_map, current_state.get("moving_support"), tissue_support_channel_weight),
-                (fixed_structure_map, current_state.get("moving_structure"), structure_channel_weight),
+            if not ablation.use_density_term:
+                density_update_x = np.zeros_like(field_x)
+                density_update_y = np.zeros_like(field_y)
+            update_x = density_update_x.copy()
+            update_y = density_update_y.copy()
+            channel_components: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+            for channel_name, fixed_channel, moving_channel, channel_weight, channel_enabled in (
+                ("support", fixed_support_map, current_state.get("moving_support"), tissue_support_channel_weight, ablation.use_support_term),
+                ("structure", fixed_structure_map, current_state.get("moving_structure"), structure_channel_weight, ablation.use_structure_term),
             ):
-                if fixed_channel is None or moving_channel is None or channel_weight <= 0:
+                if fixed_channel is None or moving_channel is None or channel_weight <= 0 or not channel_enabled:
                     continue
                 channel_residual = fixed_channel - np.asarray(moving_channel)
                 fixed_channel_grad_y, fixed_channel_grad_x = np.gradient(fixed_channel)
@@ -1288,33 +1328,63 @@ def tissue_aware_density_flow_registration(
                     channel_grad_x**2 + channel_grad_y**2
                     + 0.1 * channel_residual**2 + 1e-12
                 )
-                update_x += (
+                channel_update_x = (
                     -learning_rate * density_pixel_size * channel_weight
                     * channel_residual * channel_grad_x / channel_denominator
                 )
-                update_y += (
+                channel_update_y = (
                     -learning_rate * density_pixel_size * channel_weight
                     * channel_residual * channel_grad_y / channel_denominator
                 )
+                update_x += channel_update_x
+                update_y += channel_update_y
+                channel_components[channel_name] = (channel_update_x, channel_update_y)
             update_x *= tissue_weight_map
             update_y *= tissue_weight_map
-            update_x += learning_rate * smoothness_weight * laplace(field_x, mode="nearest")
-            update_y += learning_rate * smoothness_weight * laplace(field_y, mode="nearest")
-            update_x -= learning_rate * magnitude_weight * field_x
-            update_y -= learning_rate * magnitude_weight * field_y
-            update_x -= learning_rate * tissue_boundary_weight * (1.0 - tissue_weight_map) * field_x
-            update_y -= learning_rate * tissue_boundary_weight * (1.0 - tissue_weight_map) * field_y
-            if inverse_consistency_weight > 0:
+            diagnostic_components = {
+                **({
+                    "density": (density_update_x * tissue_weight_map, density_update_y * tissue_weight_map)
+                } if ablation.use_density_term else {}),
+                **{
+                    name: (values[0] * tissue_weight_map, values[1] * tissue_weight_map)
+                    for name, values in channel_components.items()
+                },
+            }
+            if ablation.use_smoothness_regularization:
+                smooth_x = learning_rate * smoothness_weight * laplace(field_x, mode="nearest")
+                smooth_y = learning_rate * smoothness_weight * laplace(field_y, mode="nearest")
+                update_x += smooth_x
+                update_y += smooth_y
+                diagnostic_components["smoothness"] = (smooth_x, smooth_y)
+            if ablation.use_magnitude_regularization:
+                magnitude_x = -learning_rate * magnitude_weight * field_x
+                magnitude_y = -learning_rate * magnitude_weight * field_y
+                update_x += magnitude_x
+                update_y += magnitude_y
+                diagnostic_components["magnitude"] = (magnitude_x, magnitude_y)
+            if ablation.use_boundary_regularization:
+                boundary_x = -learning_rate * tissue_boundary_weight * (1.0 - tissue_weight_map) * field_x
+                boundary_y = -learning_rate * tissue_boundary_weight * (1.0 - tissue_weight_map) * field_y
+                update_x += boundary_x
+                update_y += boundary_y
+                diagnostic_components["tissue_boundary"] = (boundary_x, boundary_y)
+            if inverse_consistency_weight > 0 and ablation.use_inverse_consistency:
                 grid_rows, grid_cols = np.indices(field_x.shape, dtype=float)
                 mapped_rows = grid_rows + field_y / density_pixel_size
                 mapped_cols = grid_cols + field_x / density_pixel_size
                 mapped_field_x = map_coordinates(field_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
                 mapped_field_y = map_coordinates(field_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
-                update_x -= learning_rate * inverse_consistency_weight * (field_x - mapped_field_x)
-                update_y -= learning_rate * inverse_consistency_weight * (field_y - mapped_field_y)
+                inverse_x = -learning_rate * inverse_consistency_weight * (field_x - mapped_field_x)
+                inverse_y = -learning_rate * inverse_consistency_weight * (field_y - mapped_field_y)
+                update_x += inverse_x
+                update_y += inverse_y
+                diagnostic_components["inverse_consistency"] = (inverse_x, inverse_y)
             update_x = gaussian_filter(update_x, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
             update_y = gaussian_filter(update_y, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
-            magnitude_damping = 1.0 / (1.0 + magnitude_weight * np.hypot(field_x, field_y))
+            magnitude_damping = (
+                1.0 / (1.0 + magnitude_weight * np.hypot(field_x, field_y))
+                if ablation.use_magnitude_regularization else 1.0
+            )
             update_x *= magnitude_damping
             update_y *= magnitude_damping
             update_magnitude = np.hypot(update_x, update_y)
@@ -1324,6 +1394,13 @@ def tissue_aware_density_flow_registration(
             )
             update_x *= update_scale
             update_y *= update_scale
+            last_update_components = {
+                name: (
+                    gaussian_filter(values[0], sigma=max(update_smoothing_sigma, 0.01), mode="nearest") * magnitude_damping,
+                    gaussian_filter(values[1], sigma=max(update_smoothing_sigma, 0.01), mode="nearest") * magnitude_damping,
+                )
+                for name, values in diagnostic_components.items()
+            }
 
             accepted_scale = 0.0
             rejection = "line_search_exhausted"
@@ -1494,6 +1571,56 @@ def tissue_aware_density_flow_registration(
     best_objective = float(canonical_attempted_state["objective"]["total"])
     final_objective = float(canonical_final_state["objective"]["total"])
 
+    objective_term_table = []
+    objective_term_table.extend(objective_rows(
+        canonical_initial_state["objective"]["objective_decomposition"],
+        state="initial_affine", stage="flow",
+    ))
+    objective_term_table.extend(objective_rows(
+        canonical_attempted_state["objective"]["objective_decomposition"],
+        state="selected_checkpoint", stage="flow",
+    ))
+    objective_term_table.extend(objective_rows(
+        canonical_final_state["objective"]["objective_decomposition"],
+        state="final_accepted_optimizer_state", stage="flow",
+    ))
+    attempted_impulses = _rasterize_points(
+        attempted_points, shape, resolved_bounds, density_pixel_size
+    )
+    density_mismatch_summary, density_diagnostic_fields = density_mismatch_diagnostics(
+        fixed_impulses,
+        attempted_impulses,
+        _normalized_density(fixed_impulses, canonical_sigma),
+        np.asarray(canonical_attempted_state["moving_density"]),
+        tissue_weight_map,
+        fixed_point_count=len(fixed),
+        moving_point_count=len(attempted_points),
+        retain_arrays=retain_research_diagnostic_fields,
+    )
+    if retain_research_diagnostic_fields:
+        if fixed_support_map is not None and canonical_attempted_state.get("moving_support") is not None:
+            density_diagnostic_fields["support_residual"] = (
+                np.asarray(fixed_support_map) - np.asarray(canonical_attempted_state["moving_support"])
+            )
+        if fixed_structure_map is not None and canonical_attempted_state.get("moving_structure") is not None:
+            density_diagnostic_fields["structure_residual"] = (
+                np.asarray(fixed_structure_map) - np.asarray(canonical_attempted_state["moving_structure"])
+            )
+    selected_update_fields = dict(selected.get("update_fields", {}))
+    selected_components = {
+        name: (
+            selected_update_fields[f"{name}_update_x"],
+            selected_update_fields[f"{name}_update_y"],
+        )
+        for name in (
+            "density", "support", "structure", "smoothness", "magnitude",
+            "tissue_boundary", "inverse_consistency",
+        )
+        if f"{name}_update_x" in selected_update_fields
+        and f"{name}_update_y" in selected_update_fields
+    }
+    interaction_summary = term_interaction_summary(selected_components)
+
     deformation = density_flow_deformation_diagnostics(
         field_x,
         field_y,
@@ -1584,6 +1711,13 @@ def tissue_aware_density_flow_registration(
     applied_metrics = attempted_metrics if success else before_metrics
     if not success:
         applied_metrics = {**before_metrics, "mutual_nearest_fraction": before_mutual}
+    objective_term_table.extend(objective_rows(
+        (
+            canonical_attempted_state["objective"]["objective_decomposition"]
+            if success else canonical_initial_state["objective"]["objective_decomposition"]
+        ),
+        state="final_applied", stage="flow",
+    ))
 
     return FineWarpResult(
         transformed_points=applied_points,
@@ -1616,7 +1750,37 @@ def tissue_aware_density_flow_registration(
             "attempted": attempted_metrics,
             "applied": applied_metrics,
             "safety": safety,
+            "hard_validity": {
+                "finite_field": finite_output,
+                "foldover_free": fold_fraction == 0.0,
+                "hard_jacobian_limits_passed": bool(
+                    jacobian_min >= jacobian_min_threshold and jacobian_max <= jacobian_max_threshold
+                ),
+                "hard_displacement_limits_passed": bool(
+                    maximum_displacement <= max_displacement
+                    and (displacement_p95_limit is None or p95_displacement <= displacement_p95_limit)
+                ),
+                "inverse_raster_solver_validity": "evaluated_during_raster_export",
+                "ablatable": False,
+            },
             "optimization_history": pd.DataFrame(history).to_dict(orient="records"),
+            "objective_terms": objective_term_table,
+            "density_mismatch_summary": density_mismatch_summary,
+            "research_diagnostic_fields": density_diagnostic_fields,
+            "selected_update_fields": selected_update_fields,
+            "term_interaction_summary": interaction_summary,
+            "ablation_configuration": ablation.to_dict(),
+            "optimization_force_roles": {
+                "density": "direct update and objective",
+                "support": "direct update and objective",
+                "structure": "direct update and objective",
+                "smoothness": "direct update and objective",
+                "magnitude": "direct update, damping, and objective",
+                "tissue_boundary": "direct update and objective",
+                "inverse_consistency": "direct update and objective",
+                "jacobian_barrier": "objective and line-search acceptance; no direct force",
+                "soft_jacobian": "objective and line-search acceptance; no direct force",
+            },
             "local_region_metrics": local_table.to_dict(orient="records"),
             "local_region_summary": local_summary,
             "density_flow": {
@@ -1677,6 +1841,7 @@ def tissue_aware_density_flow_registration(
                     if global_initialization == "auto"
                     else "disabled; nonlinear field initialized at zero"
                 ),
+                "ablation_configuration": ablation.to_dict(),
             },
         },
     )

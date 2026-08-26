@@ -24,6 +24,7 @@ from src.density_flow import (
 )
 from src.pointset_registration import FineWarpResult, point_bidirectional_distance_metrics
 from src.raster_deformation_qc import local_region_metrics
+from src.flow_ablation import FlowAblationConfig, normalize_ablation_config
 
 
 def _signed_distance(mask: np.ndarray, physical_scale_um: float, pixel_size_um: float) -> np.ndarray:
@@ -215,11 +216,20 @@ def two_stage_joint_flow_registration(
     stage_a_max_mutual_nearest_decrease: float = 0.02,
     stage_a_max_within_fraction_decrease: float = 0.03,
     joint_preset: str = "Joint Safe",
+    stage_a_ablation_config: FlowAblationConfig | dict | None = None,
+    stage_b_ablation_config: FlowAblationConfig | dict | None = None,
+    retain_research_diagnostic_fields: bool = False,
     **kwargs,
 ) -> FineWarpResult:
     """Estimate coarse tissue shape and fine nuclear residuals, then safety-gate composition."""
     fixed = np.asarray(fixed_points, dtype=float)
     moving = np.asarray(moving_points, dtype=float)
+    stage_a_ablation = normalize_ablation_config(
+        stage_a_ablation_config
+        if stage_a_ablation_config is not None
+        else FlowAblationConfig(use_structure_term=False)
+    )
+    stage_b_ablation = normalize_ablation_config(stage_b_ablation_config)
     pixel_size = float(kwargs.get("density_pixel_size", 2.0))
     bounds = kwargs.get("bounds")
     max_grid_side = int(kwargs.get("max_grid_side", 1024))
@@ -261,6 +271,7 @@ def two_stage_joint_flow_registration(
         "checkpoint_strict_jacobian_max_threshold",
         "checkpoint_strict_max_displacement",
         "checkpoint_strict_displacement_p95_limit",
+        "ablation_config", "retain_research_diagnostic_fields",
     ):
         shared.pop(key, None)
     shared.update(
@@ -298,6 +309,8 @@ def two_stage_joint_flow_registration(
         checkpoint_strict_jacobian_max_threshold=float(kwargs.get("jacobian_max_threshold", 4.0)),
         checkpoint_strict_max_displacement=float(kwargs.get("max_displacement", 35.0)),
         checkpoint_strict_displacement_p95_limit=kwargs.get("displacement_p95_limit", 30.0),
+        ablation_config=stage_a_ablation,
+        retain_research_diagnostic_fields=retain_research_diagnostic_fields,
         **shared,
     )
     stage_a_x = np.asarray(stage_a.attempted_displacement_x, dtype=float)
@@ -358,6 +371,8 @@ def two_stage_joint_flow_registration(
         jacobian_min_threshold=float(exploratory_jacobian_min),
         jacobian_max_threshold=float(exploratory_jacobian_max),
         checkpoint_policy="point_metric",
+        ablation_config=stage_b_ablation,
+        retain_research_diagnostic_fields=retain_research_diagnostic_fields,
         **stage_b_shared,
     )
     stage_b_x = np.asarray(stage_b.attempted_displacement_x, dtype=float)
@@ -454,6 +469,33 @@ def two_stage_joint_flow_registration(
         for row in stage_b_history
     ]
     rejection = None if applied else "no_joint_checkpoint_passed_final_application_safety"
+    objective_terms = [
+        {**row, "stage": "A"}
+        for row in (stage_a.metrics or {}).get("objective_terms", [])
+    ] + [
+        {**row, "stage": "B"}
+        for row in (stage_b.metrics or {}).get("objective_terms", [])
+    ]
+    diagnostic_fields = {
+        **{
+            f"stage_a_{name}": values
+            for name, values in (stage_a.metrics or {}).get("research_diagnostic_fields", {}).items()
+        },
+        **{
+            f"stage_b_{name}": values
+            for name, values in (stage_b.metrics or {}).get("research_diagnostic_fields", {}).items()
+        },
+    }
+    selected_update_fields = {
+        **{
+            f"stage_a_{name}": values
+            for name, values in (stage_a.metrics or {}).get("selected_update_fields", {}).items()
+        },
+        **{
+            f"stage_b_{name}": values
+            for name, values in (stage_b.metrics or {}).get("selected_update_fields", {}).items()
+        },
+    }
     final_summary.update({
         "affine_median": before_metrics["symmetric_median_distance"],
         "final_attempted_median": attempted_metrics["symmetric_median_distance"],
@@ -510,6 +552,21 @@ def two_stage_joint_flow_registration(
                 "mutual_nearest_fraction_attempted": attempted_metrics["mutual_nearest_fraction"],
             },
             "optimization_history": objective_history,
+            "objective_terms": objective_terms,
+            "density_mismatch_summary": {
+                "stage_a": (stage_a.metrics or {}).get("density_mismatch_summary", {}),
+                "stage_b": (stage_b.metrics or {}).get("density_mismatch_summary", {}),
+            },
+            "research_diagnostic_fields": diagnostic_fields,
+            "selected_update_fields": selected_update_fields,
+            "term_interaction_summary": {
+                "stage_a": (stage_a.metrics or {}).get("term_interaction_summary", {}),
+                "stage_b": (stage_b.metrics or {}).get("term_interaction_summary", {}),
+            },
+            "ablation_configuration": {
+                "stage_a": stage_a_ablation.to_dict(),
+                "stage_b": stage_b_ablation.to_dict(),
+            },
             "local_region_metrics": local_table.to_dict(orient="records"),
             "local_region_summary": local_summary,
             "density_flow": {
@@ -564,6 +621,10 @@ def two_stage_joint_flow_registration(
                     "features_derived_from_selected_stage_a_raster": True,
                 },
                 "fixed_points_moved": False,
+                "ablation_configuration": {
+                    "stage_a": stage_a_ablation.to_dict(),
+                    "stage_b": stage_b_ablation.to_dict(),
+                },
             },
         },
     )

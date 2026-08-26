@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import streamlit as st
 from scipy.ndimage import binary_erosion, distance_transform_edt
 from scipy.spatial import cKDTree
@@ -23,6 +24,7 @@ from src.density_flow import (
 )
 from src.export import array_to_png_bytes, figure_to_png_bytes
 from src.features import extract_cell_features, point_features_to_cell_features
+from src.flow_ablation import FlowAblationConfig, ablation_preset
 from src.geojson_utils import load_geojson_centroids
 from src.io_utils import read_uploaded_image, read_uploaded_mask
 from src.matching import match_cells
@@ -1133,6 +1135,25 @@ def _displacement_field_npz_bytes(
     return buffer.getvalue()
 
 
+def _named_arrays_npz_bytes(arrays: Mapping[str, np.ndarray]) -> bytes:
+    buffer = io.BytesIO()
+    np.savez_compressed(
+        buffer,
+        **{str(name): np.asarray(values) for name, values in arrays.items()},
+    )
+    return buffer.getvalue()
+
+
+def _scientific_map_png_bytes(values: np.ndarray, title: str) -> bytes:
+    figure, axis = plt.subplots(figsize=(6, 5))
+    artist = axis.imshow(np.asarray(values, dtype=float), cmap="coolwarm", origin="upper")
+    axis.set_title(title)
+    figure.colorbar(artist, ax=axis, shrink=0.8)
+    payload = figure_to_png_bytes(figure)
+    plt.close(figure)
+    return payload
+
+
 def _mutual_nearest_fraction_for_export(fixed: np.ndarray, moving: np.ndarray) -> float | None:
     if len(fixed) == 0 or len(moving) == 0:
         return None
@@ -1434,6 +1455,11 @@ def show_he_geojson_preparation() -> None:
     joint_stage_a_max_relative_worsening = 0.05
     joint_stage_a_max_mutual_decrease = 0.02
     joint_stage_a_max_within_decrease = 0.03
+    density_flow_research_ablation_enabled = False
+    retain_research_diagnostic_fields = False
+    density_flow_ablation_config = FlowAblationConfig()
+    joint_stage_a_ablation_config = FlowAblationConfig(use_structure_term=False)
+    joint_stage_b_ablation_config = FlowAblationConfig()
 
     with st.container(border=True):
         st.subheader(tr("STEP 3 - 詳細位置合わせ", "STEP 3 - Fine alignment"))
@@ -1752,6 +1778,105 @@ def show_he_geojson_preparation() -> None:
                 joint_support_weight = st.number_input("Stage A HE tissue-support weight", min_value=0.0, value=joint_default["support"], step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-support-weight-{joint_preset}")
                 joint_structure_weight = st.number_input("Stage B nuclear-structure weight", min_value=0.0, value=joint_default["structure"], step=0.05, disabled=not joint_custom, key=f"workflow-c-joint-structure-weight-{joint_preset}")
                 joint_soft_jacobian_weight = st.number_input("Soft log-Jacobian weight", min_value=0.0, value=0.05, step=0.01, key="workflow-c-joint-soft-jacobian-weight", disabled=not joint_custom)
+
+        with st.expander(tr("Research / ablation", "Research / ablation"), expanded=False):
+            st.warning(tr(
+                "研究診断専用です。通常実行では既定presetを使用してください。hard validityは常に有効で、ここでは無効化できません。",
+                "Research diagnostics only. Default presets should be used for normal runs. Hard mathematical validity always remains enabled.",
+            ))
+            density_flow_research_ablation_enabled = st.checkbox(
+                tr("Ablation modeを有効化", "Enable ablation mode"),
+                value=False,
+                key=f"workflow-c-flow-ablation-enabled-{fine_alignment_method}",
+                help=tr(
+                    "OFFでは既存presetの計算を変更しません。ONでは目的関数と直接updateの両方からtermを除外します。",
+                    "OFF preserves existing preset behavior. ON removes a term from both its objective and direct update contribution.",
+                ),
+            )
+            retain_research_diagnostic_fields = st.checkbox(
+                tr("Residual/update fieldをrun bundleへ保存", "Retain residual/update fields in run bundle"),
+                value=False,
+                key=f"workflow-c-flow-retain-research-fields-{fine_alignment_method}",
+                help=tr("大きな配列はJSONではなくNPZに保存します。", "Large arrays are stored as NPZ, never embedded in JSON."),
+            )
+            preset_options = [
+                "Full", "No density", "No support", "No structure", "No smoothness",
+                "No magnitude", "No boundary", "No soft Jacobian", "Custom",
+            ]
+            if fine_alignment_method == "joint density + tissue-structure flow":
+                preset_options += [
+                    "Stage A support only", "Stage A density only",
+                    "Stage B density only", "Stage B structure only",
+                ]
+            research_preset = st.selectbox(
+                tr("Ablation構成", "Ablation configuration"),
+                preset_options,
+                index=0,
+                disabled=not density_flow_research_ablation_enabled,
+                key=f"workflow-c-flow-ablation-preset-{fine_alignment_method}",
+            )
+
+            def ablation_checkboxes(label: str, base: FlowAblationConfig, key_prefix: str) -> FlowAblationConfig:
+                st.markdown(f"**{label}**")
+                data_columns = st.columns(3)
+                density_enabled = data_columns[0].checkbox("Density", value=base.use_density_term, key=f"{key_prefix}-density")
+                support_enabled = data_columns[1].checkbox("Tissue support", value=base.use_support_term, key=f"{key_prefix}-support")
+                structure_enabled = data_columns[2].checkbox("Structure", value=base.use_structure_term, key=f"{key_prefix}-structure")
+                regularization_columns = st.columns(3)
+                smoothness_enabled = regularization_columns[0].checkbox("Smoothness", value=base.use_smoothness_regularization, key=f"{key_prefix}-smoothness")
+                magnitude_enabled = regularization_columns[1].checkbox("Magnitude", value=base.use_magnitude_regularization, key=f"{key_prefix}-magnitude")
+                boundary_enabled = regularization_columns[2].checkbox("Boundary", value=base.use_boundary_regularization, key=f"{key_prefix}-boundary")
+                secondary_columns = st.columns(3)
+                inverse_enabled = secondary_columns[0].checkbox("Inverse consistency", value=base.use_inverse_consistency, key=f"{key_prefix}-inverse")
+                soft_jacobian_enabled = secondary_columns[1].checkbox("Soft Jacobian", value=base.use_soft_jacobian_regularization, key=f"{key_prefix}-soft-jacobian")
+                jacobian_barrier_enabled = secondary_columns[2].checkbox("Jacobian barrier", value=base.use_jacobian_barrier, key=f"{key_prefix}-jacobian-barrier")
+                return FlowAblationConfig(
+                    use_density_term=density_enabled,
+                    use_support_term=support_enabled,
+                    use_structure_term=structure_enabled,
+                    use_smoothness_regularization=smoothness_enabled,
+                    use_magnitude_regularization=magnitude_enabled,
+                    use_boundary_regularization=boundary_enabled,
+                    use_inverse_consistency=inverse_enabled,
+                    use_soft_jacobian_regularization=soft_jacobian_enabled,
+                    use_jacobian_barrier=jacobian_barrier_enabled,
+                )
+
+            if density_flow_research_ablation_enabled:
+                if fine_alignment_method == "joint density + tissue-structure flow":
+                    stage_a_base = FlowAblationConfig(use_structure_term=False)
+                    stage_b_base = FlowAblationConfig()
+                    if research_preset.startswith("Stage A "):
+                        stage_a_base = ablation_preset(research_preset, base=stage_a_base)
+                    elif research_preset.startswith("Stage B "):
+                        stage_b_base = ablation_preset(research_preset, base=stage_b_base)
+                    elif research_preset != "Custom":
+                        stage_a_base = ablation_preset(research_preset, base=stage_a_base)
+                        stage_b_base = ablation_preset(research_preset, base=stage_b_base)
+                    if research_preset == "Custom":
+                        joint_stage_a_ablation_config = ablation_checkboxes(
+                            "Stage A", stage_a_base, "workflow-c-ablation-stage-a"
+                        )
+                        joint_stage_b_ablation_config = ablation_checkboxes(
+                            "Stage B", stage_b_base, "workflow-c-ablation-stage-b"
+                        )
+                    else:
+                        joint_stage_a_ablation_config = stage_a_base
+                        joint_stage_b_ablation_config = stage_b_base
+                        st.json({"stage_a": stage_a_base.to_dict(), "stage_b": stage_b_base.to_dict()})
+                else:
+                    base = FlowAblationConfig()
+                    if research_preset != "Custom":
+                        density_flow_ablation_config = ablation_preset(research_preset, base=base)
+                        st.json(density_flow_ablation_config.to_dict())
+                    else:
+                        density_flow_ablation_config = ablation_checkboxes(
+                            "Density Flow", base, "workflow-c-ablation-density-flow"
+                        )
+            st.caption(tr(
+                "Hard validity: finite field、fold-over、Jacobian hard limit、変位hard limit、inverse raster validationは常時有効です。",
+                "Hard validity always includes finite-field, fold-over, hard Jacobian/displacement, and inverse-raster checks.",
+            ))
 
     elif fine_alignment_method == "matched nuclei RBF":
         rbf_left, rbf_right = st.columns(2)
@@ -2277,6 +2402,7 @@ def show_he_geojson_preparation() -> None:
                 maximum_jacobian_p95=density_flow_max_jacobian_p95,
                 local_region_block_size=density_flow_local_region_size,
                 detect_axis_reversal=density_flow_detect_axis_reversal,
+                retain_research_diagnostic_fields=retain_research_diagnostic_fields,
             )
             if fine_alignment_method == "joint density + tissue-structure flow":
                 if affine_tissue_image is None or tissue_mask is None or affine_tissue_metadata is None:
@@ -2323,12 +2449,15 @@ def show_he_geojson_preparation() -> None:
                         stage_a_max_mutual_nearest_decrease=joint_stage_a_max_mutual_decrease,
                         stage_a_max_within_fraction_decrease=joint_stage_a_max_within_decrease,
                         joint_preset=joint_preset,
+                        stage_a_ablation_config=joint_stage_a_ablation_config,
+                        stage_b_ablation_config=joint_stage_b_ablation_config,
                         **density_flow_kwargs,
                     )
             else:
                 fine_result = tissue_aware_density_flow_registration(
                     density_flow_fixed_points,
                     affine_result.transformed_points,
+                    ablation_config=density_flow_ablation_config,
                     **density_flow_kwargs,
                 )
         elif fine_alignment_method == "cluster-anchor":
@@ -3062,9 +3191,72 @@ def show_he_geojson_preparation() -> None:
                     "Objective values are diagnostic within each scale; compare absolute values across scales cautiously.",
                 )
             )
-            safety_tab.line_chart(flow_history[["total", "density"]])
+            comparable_columns = [
+                column for column in (
+                    "weighted_data_total", "weighted_regularization_total", "total"
+                ) if column in flow_history
+            ]
+            if comparable_columns:
+                safety_tab.line_chart(flow_history[comparable_columns])
+            raw_columns = [
+                column for column in (
+                    "density", "support", "structure", "smoothness", "magnitude",
+                    "tissue_boundary", "inverse_consistency", "jacobian_barrier", "soft_jacobian",
+                ) if column in flow_history
+            ]
+            if raw_columns:
+                with safety_tab.expander(
+                    "Raw objective at active scale - not directly comparable across levels",
+                    expanded=False,
+                ):
+                    st.line_chart(flow_history[raw_columns])
             with safety_tab.expander(tr("最適化履歴", "Optimization history"), expanded=False):
                 st.dataframe(flow_history, use_container_width=True, hide_index=True)
+        objective_terms = pd.DataFrame(fine_result.metrics.get("objective_terms", []))
+        if not objective_terms.empty:
+            safety_tab.subheader(tr("目的関数の寄与", "Objective contributions"))
+            contribution_columns = [
+                "state", "stage", "term", "group", "raw_value", "weight",
+                "weighted_value", "fraction_of_total", "enabled",
+            ]
+            safety_tab.dataframe(
+                objective_terms[[column for column in contribution_columns if column in objective_terms]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        interaction_summary = fine_result.metrics.get("term_interaction_summary", {})
+        if interaction_summary:
+            with safety_tab.expander(tr("Term間のupdate相互作用", "Term update interactions"), expanded=False):
+                st.json(_json_summary_safe(interaction_summary))
+                cosine_values = interaction_summary.get("cosine_similarity", {})
+                if any(value is not None and value < -0.5 for value in cosine_values.values()):
+                    st.warning(tr("強く逆向きのupdate成分があります。診断所見であり、生物学的失敗判定ではありません。", "Strongly opposing update components are present. This is diagnostic, not a biological failure criterion."))
+        mismatch_summary = fine_result.metrics.get("density_mismatch_summary", {})
+        if mismatch_summary:
+            with safety_tab.expander(tr("Density mismatch分解", "Density mismatch decomposition"), expanded=False):
+                st.json(_json_summary_safe(mismatch_summary))
+        research_fields = fine_result.metrics.get("research_diagnostic_fields", {})
+        if research_fields:
+            with safety_tab.expander(tr("Term residual maps", "Term residual maps"), expanded=False):
+                map_names = [
+                    name for name in (
+                        "density_residual", "weighted_density_residual",
+                        "support_residual", "structure_residual",
+                        "stage_a_density_residual", "stage_a_weighted_density_residual",
+                        "stage_a_support_residual", "stage_b_density_residual",
+                        "stage_b_structure_residual",
+                    ) if name in research_fields
+                ]
+                for start in range(0, len(map_names), 2):
+                    columns = st.columns(2)
+                    for column, name in zip(columns, map_names[start:start + 2]):
+                        values = np.asarray(research_fields[name], dtype=float)
+                        figure, axis = plt.subplots(figsize=(5, 4))
+                        image_artist = axis.imshow(values, cmap="coolwarm", origin="upper")
+                        axis.set_title(name.replace("_", " "))
+                        figure.colorbar(image_artist, ax=axis, shrink=0.8)
+                        column.pyplot(figure, clear_figure=False)
+                        plt.close(figure)
         if fine_alignment_method == "joint density + tissue-structure flow":
             joint_metrics = fine_result.metrics.get("joint_flow", {})
             stage_a_metrics = joint_metrics.get("stage_a", {})
@@ -4548,6 +4740,11 @@ def show_he_geojson_preparation() -> None:
         "joint_density_weight": joint_density_weight,
         "joint_tissue_support_weight": joint_support_weight,
         "joint_structure_weight": joint_structure_weight,
+        "research_ablation_enabled": density_flow_research_ablation_enabled,
+        "retain_research_diagnostic_fields": retain_research_diagnostic_fields,
+        "density_flow_ablation_configuration": density_flow_ablation_config.to_dict(),
+        "joint_stage_a_ablation_configuration": joint_stage_a_ablation_config.to_dict(),
+        "joint_stage_b_ablation_configuration": joint_stage_b_ablation_config.to_dict(),
         "joint_soft_jacobian_weight": joint_soft_jacobian_weight,
         "joint_preset": joint_preset,
         "joint_stage_a_scales_um": joint_stage_a_scales_text,
@@ -4824,6 +5021,40 @@ def show_he_geojson_preparation() -> None:
     parameters["include_original_uploaded_inputs"] = include_original_inputs
     parameters["comparison_run_id"] = previous_entry.get("run_id") if previous_entry else None
 
+    research_objective_terms = pd.DataFrame(
+        fine_result.metrics.get("objective_terms", [])
+        if isinstance(fine_result.metrics, dict) else []
+    )
+    research_ablation_configuration = (
+        fine_result.metrics.get("ablation_configuration", {})
+        if isinstance(fine_result.metrics, dict) else {}
+    )
+    research_density_mismatch = (
+        fine_result.metrics.get("density_mismatch_summary", {})
+        if isinstance(fine_result.metrics, dict) else {}
+    )
+    research_term_interactions = (
+        fine_result.metrics.get("term_interaction_summary", {})
+        if isinstance(fine_result.metrics, dict) else {}
+    )
+    research_diagnostic_fields = (
+        fine_result.metrics.get("research_diagnostic_fields", {})
+        if isinstance(fine_result.metrics, dict) else {}
+    )
+    research_update_fields = (
+        fine_result.metrics.get("selected_update_fields", {})
+        if isinstance(fine_result.metrics, dict) else {}
+    )
+
+    def research_field_for_image(suffix: str):
+        direct = research_diagnostic_fields.get(suffix)
+        if direct is not None:
+            return direct
+        for name, values in research_diagnostic_fields.items():
+            if name.endswith(suffix):
+                return values
+        return None
+
     artifacts = {
         "points/affine_he_nuclei.csv": transformed_affine_points.to_csv(index=False).encode("utf-8"),
         "points/attempted_he_nuclei.csv": transformed_attempted_points.to_csv(index=False).encode("utf-8"),
@@ -4973,6 +5204,47 @@ def show_he_geojson_preparation() -> None:
         "review/human_qc_review.json": json.dumps(
             _json_summary_safe(human_qc_review), indent=2, allow_nan=False
         ).encode("utf-8"),
+        "evaluation/objective_terms.csv": (
+            research_objective_terms.to_csv(index=False).encode("utf-8")
+            if not research_objective_terms.empty else None
+        ),
+        "evaluation/objective_history_canonical.csv": (
+            research_objective_terms.to_csv(index=False).encode("utf-8")
+            if not research_objective_terms.empty else None
+        ),
+        "evaluation/ablation_configuration.json": json.dumps(
+            _json_summary_safe(research_ablation_configuration), indent=2, allow_nan=False
+        ).encode("utf-8"),
+        "evaluation/density_mismatch_summary.json": json.dumps(
+            _json_summary_safe(research_density_mismatch), indent=2, allow_nan=False
+        ).encode("utf-8"),
+        "evaluation/term_interaction_summary.json": json.dumps(
+            _json_summary_safe(research_term_interactions), indent=2, allow_nan=False
+        ).encode("utf-8"),
+        "fields/research_diagnostic_fields.npz": (
+            _named_arrays_npz_bytes(research_diagnostic_fields)
+            if research_diagnostic_fields else None
+        ),
+        "fields/selected_diagnostic_update_fields.npz": (
+            _named_arrays_npz_bytes(research_update_fields)
+            if research_update_fields else None
+        ),
+        "images/density_residual.png": (
+            _scientific_map_png_bytes(research_field_for_image("density_residual"), "Density residual")
+            if research_field_for_image("density_residual") is not None else None
+        ),
+        "images/weighted_density_residual.png": (
+            _scientific_map_png_bytes(research_field_for_image("weighted_density_residual"), "Weighted density residual")
+            if research_field_for_image("weighted_density_residual") is not None else None
+        ),
+        "images/support_residual.png": (
+            _scientific_map_png_bytes(research_field_for_image("support_residual"), "Support residual")
+            if research_field_for_image("support_residual") is not None else None
+        ),
+        "images/structure_residual.png": (
+            _scientific_map_png_bytes(research_field_for_image("structure_residual"), "Structure residual")
+            if research_field_for_image("structure_residual") is not None else None
+        ),
     }
     if fine_alignment_method == "joint density + tissue-structure flow":
         stage_a_export_names = {
