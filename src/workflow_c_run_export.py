@@ -17,6 +17,7 @@ from typing import Any, Iterable, Mapping
 
 
 EXPECTED_ARTIFACTS = (
+    "workflow_c_result.zip",
     "points/affine_he_nuclei.csv",
     "points/attempted_he_nuclei.csv",
     "points/final_applied_he_nuclei.csv",

@@ -84,6 +84,7 @@ from src.visualization import (
     visualize_local_residual_map,
     visualize_local_improvement_heatmap,
     visualize_point_sets,
+    visualize_registered_point_pairs,
     visualize_roi_comparisons,
     visualize_translation_anchors,
     visualize_tre_before_after,
@@ -97,6 +98,15 @@ from src.workflow_c_run_export import (
     experiment_history_csv,
     generate_run_id,
     input_file_record,
+)
+from src.workflow_c_result import (
+    build_workflow_c_result_artifact,
+    load_workflow_c_result_artifact,
+)
+from src.workflow_d import (
+    build_workflow_d_export,
+    fine_result_from_artifact,
+    run_workflow_d_raster_deformation,
 )
 
 
@@ -1248,11 +1258,11 @@ def show_he_geojson_preparation() -> None:
     def tr(ja: str, en: str) -> str:
         return ja if is_ja else en
 
-    st.header(tr("Workflow C: HE-GeoJSON位置合わせ", "Workflow C: HE-GeoJSON alignment"))
+    st.header(tr("Workflow C: 点群レジストレーション", "Workflow C: Point Registration"))
     st.caption(
         tr(
-            "HE核点群を蛍光GeoJSONのworld-um座標へ合わせる特殊座標系ワークフローです。",
-            "Align HE nuclei points to fluorescence GeoJSON in world-um coordinates.",
+            "HE核点群を蛍光GeoJSONのworld-um座標へ登録し、Workflow D用artifactを出力します。最終HE画像warpは実行しません。",
+            "Register HE nuclei points to fluorescence GeoJSON in world-um coordinates and export an artifact for Workflow D. Final HE raster warping is not run here.",
         )
     )
     with st.container(border=True):
@@ -3654,6 +3664,30 @@ def show_he_geojson_preparation() -> None:
             mime="image/png",
         )
 
+    pair_figure = visualize_registered_point_pairs(
+        geojson_array,
+        final_points,
+        max_pair_distance=10.0,
+        max_pairs=max_warped_overlay_points,
+        title="Final point registration with mutual-nearest pairs",
+        invert_x_axis=invert_x_axis,
+        invert_y_axis=invert_y_axis,
+    )
+    point_tab.subheader(tr("対応点QC", "Registered pair QC"))
+    point_tab.caption(
+        tr(
+            "cyan=固定GeoJSON、orange=登録後HE、green=10 um以内の相互最近傍ペア。表示専用で登録計算には使いません。",
+            "Cyan=fixed GeoJSON, orange=registered HE, green=mutual-nearest pairs within 10 um. This QC overlay does not change registration.",
+        )
+    )
+    point_tab.pyplot(pair_figure, clear_figure=False)
+    point_tab.download_button(
+        "Download registered pair QC PNG",
+        data=figure_to_png_bytes(pair_figure),
+        file_name="workflow_c_registered_point_pairs.png",
+        mime="image/png",
+    )
+
     before_distances = point_nearest_distances(metric_fixed_points, metric_moving_affine_points)
     attempted_distances = point_nearest_distances(metric_fixed_points, metric_moving_attempted_points)
     after_distances = point_nearest_distances(metric_fixed_points, metric_moving_applied_points)
@@ -3915,7 +3949,8 @@ def show_he_geojson_preparation() -> None:
     roi_comparison_figure = None
     local_improvement_figure = None
     local_metrics_table = pd.DataFrame()
-    if he_image is not None:
+    workflow_c_raster_outputs_enabled = False
+    if he_image is not None and workflow_c_raster_outputs_enabled:
         try:
             affine_warped_he_image, affine_warped_he_metadata = warp_he_image_to_world(
                 he_image,
@@ -4620,12 +4655,11 @@ def show_he_geojson_preparation() -> None:
     )
     evaluation_tab.dataframe(evaluation_deformation_table, use_container_width=True, hide_index=True)
 
-    evaluation_tab.subheader(tr("E. ラスタwarp実装忠実度", "E. Raster warp fidelity"))
-    evaluation_tab.json(evaluation_raster_fidelity)
-    evaluation_tab.caption(
+    evaluation_tab.subheader(tr("E. ラスタ変形", "E. Raster deformation"))
+    evaluation_tab.info(
         tr(
-            "実HE画像の画素差はwarpで画像がどれだけ変化したかを示すQCであり、registration精度ではありません。",
-            "Pixel difference on real HE is a QC measure of raster change, not registration accuracy.",
+            "最終HE画像warpとraster QCは、Workflow C result artifactをWorkflow Dへ読み込んで実行します。",
+            "Final HE raster warping and raster QC are performed in Workflow D using the Workflow C result artifact.",
         )
     )
 
@@ -4640,10 +4674,12 @@ def show_he_geojson_preparation() -> None:
         evaluation_tab.warning(overall_status)
     evaluation_tab.caption(evaluation_summary["warning"])
 
-    if he_image is None:
-        image_tab.info(tr("HE画像が未入力のため、画像warpは表示しません。点群結果は他のタブで確認できます。", "No HE image was uploaded. Point results remain available in the other tabs."))
-    elif warped_he_image is None:
-        image_tab.warning(tr("HE画像warpを生成できませんでした。点群結果と診断は引き続き利用できます。", "The warped HE image could not be generated. Point results and diagnostics remain available."))
+    image_tab.info(
+        tr(
+            "このWorkflowでは点群登録と変位場QCのみを表示します。HE raster出力はWorkflow Dで生成します。",
+            "This workflow shows point registration and displacement-field QC only. Generate HE raster outputs in Workflow D.",
+        )
+    )
 
     downloads_tab.subheader(tr("出力ファイル", "Exports"))
     downloads_tab.download_button(
@@ -4702,7 +4738,7 @@ def show_he_geojson_preparation() -> None:
             mime="text/csv",
         )
     parameters = {
-        "workflow": "Workflow C: HE-GeoJSON alignment",
+        "workflow": "Workflow C: Point Registration",
         "language": language,
         "fine_alignment_method": fine_alignment_method,
         "fine_applied": fine_applied,
@@ -5332,6 +5368,52 @@ def show_he_geojson_preparation() -> None:
             "fixed_points_move": False,
         },
     }
+    workflow_c_result_metrics = {
+        **run_metrics,
+        "affine_mean_residual": affine_result.mean_residual,
+        "affine_median_residual": affine_result.median_residual,
+        "affine_n_pairs": affine_result.n_pairs,
+        "attempted_metrics": attempted_metrics,
+        "applied_metrics": applied_metrics,
+    }
+    workflow_c_result_bytes = build_workflow_c_result_artifact(
+        fixed_geojson_points=geojson_array,
+        original_moving_he_points=he_array,
+        affine_he_points=affine_points,
+        attempted_registered_he_points=attempted_points,
+        applied_registered_he_points=final_points,
+        affine_matrix=affine_result.affine_matrix,
+        affine_translation=affine_result.translation,
+        affine_flip_x=affine_result.flip_x,
+        affine_flip_y=affine_result.flip_y,
+        affine_image_width=affine_result.image_width,
+        affine_image_height=affine_result.image_height,
+        attempted_displacement_x=attempted_displacement_x,
+        attempted_displacement_y=attempted_displacement_y,
+        applied_displacement_x=final_displacement_x,
+        applied_displacement_y=final_displacement_y,
+        grid_x=fine_result.grid_x,
+        grid_y=fine_result.grid_y,
+        field_bounds=fine_result.bounds,
+        field_spacing=fine_result.grid_spacing,
+        fine_method=fine_alignment_method,
+        fine_applied=fine_applied,
+        output_pixel_size_um=warped_he_pixel_size,
+        output_origin=warped_he_output_origin,
+        inverse_iterations=int(density_flow_inverse_iterations),
+        inverse_tolerance_pixels=density_flow_inverse_tolerance_pixels,
+        metrics=workflow_c_result_metrics,
+        parameters=parameters,
+        provenance=provenance,
+    )
+    artifacts["workflow_c_result.zip"] = workflow_c_result_bytes
+    downloads_tab.download_button(
+        tr("Workflow C result artifactをダウンロード", "Download Workflow C result artifact"),
+        data=workflow_c_result_bytes,
+        file_name="workflow_c_registration_result.zip",
+        mime="application/zip",
+        type="primary",
+    )
     optimization_history = (
         fine_result.metrics.get("optimization_history", [])
         if isinstance(fine_result.metrics, dict)
@@ -5464,6 +5546,203 @@ def show_he_geojson_preparation() -> None:
     # TODO: Add GeoJSON polygon overlay and warp-field vector QC panels.
 
 
+def show_raster_deformation_workflow() -> None:
+    """Render HE raster deformation from an immutable Workflow C result."""
+    st.header("Workflow D: Raster Deformation")
+    st.caption(
+        "Apply a saved Workflow C transform to an HE raster. "
+        "Registration parameters and point transforms are not recalculated here."
+    )
+
+    input_left, input_right = st.columns(2)
+    with input_left:
+        he_image_file = st.file_uploader(
+            "Raw HE image",
+            type=["png", "jpg", "jpeg", "tif", "tiff"],
+            key="workflow-d-he-image",
+            help="The source HE raster used when the Workflow C nuclei coordinates were generated.",
+        )
+    with input_right:
+        result_file = st.file_uploader(
+            "Workflow C result artifact",
+            type=["zip"],
+            key="workflow-d-result-artifact",
+            help="Load workflow_c_registration_result.zip exported by Workflow C.",
+        )
+
+    if result_file is None:
+        st.info("Upload a Workflow C result artifact to inspect its registration result.")
+        return
+    try:
+        artifact = load_workflow_c_result_artifact(result_file.getvalue())
+    except ValueError as exc:
+        st.error(f"Invalid Workflow C result artifact: {exc}")
+        return
+
+    manifest = artifact.manifest
+    point_counts = pd.DataFrame(
+        [
+            {"Point set": "Fixed GeoJSON", "Count": len(artifact.arrays["fixed_geojson_points"])},
+            {"Point set": "Original HE", "Count": len(artifact.arrays["original_moving_he_points"])},
+            {"Point set": "Affine HE", "Count": len(artifact.arrays["affine_he_points"])},
+            {"Point set": "Attempted HE", "Count": len(artifact.arrays["attempted_registered_he_points"])},
+            {"Point set": "Applied HE", "Count": len(artifact.arrays["applied_registered_he_points"])},
+        ]
+    )
+    summary_left, summary_right = st.columns(2)
+    summary_left.dataframe(point_counts, use_container_width=True, hide_index=True)
+    summary_right.json(
+        {
+            "fine_method": artifact.fine_method,
+            "fine_applied": artifact.applied,
+            "field_spacing_um": artifact.field_spacing,
+            "output_pixel_size_um": manifest["output_pixel_size_um"],
+            "output_origin": manifest["output_origin"],
+        }
+    )
+
+    point_figure = visualize_density_flow_point_comparison(
+        artifact.arrays["fixed_geojson_points"],
+        artifact.arrays["affine_he_points"],
+        artifact.arrays["attempted_registered_he_points"],
+        artifact.arrays["applied_registered_he_points"],
+        title="Workflow C point registration result",
+    )
+    st.pyplot(point_figure, use_container_width=True)
+    plt.close(point_figure)
+
+    if he_image_file is None:
+        st.info("Upload the raw HE image to run raster deformation and image QC.")
+        return
+    try:
+        he_image = read_uploaded_image(he_image_file)
+        raster_result = run_workflow_d_raster_deformation(he_image, artifact)
+    except (ValueError, RuntimeError) as exc:
+        st.error(f"Raster deformation failed: {exc}")
+        return
+
+    if raster_result.raster_applied:
+        st.success("Final applied HE image uses the safety-approved fine displacement field.")
+    else:
+        reason = raster_result.raster_rejection_reason or "fine field was not applied"
+        st.warning(f"Final applied HE image is affine-only. Reason: {reason}")
+
+    images_tab, overlay_tab, deformation_tab, qc_tab, downloads_tab = st.tabs(
+        ["Images", "Point overlay", "Deformation", "Raster QC", "Downloads"]
+    )
+    with images_tab:
+        image_columns = st.columns(3)
+        image_columns[0].image(raster_result.affine_image, caption="Affine-only HE image", use_container_width=True)
+        image_columns[1].image(
+            raster_result.attempted_image,
+            caption="Attempted fine-warp HE image",
+            use_container_width=True,
+        )
+        image_columns[2].image(
+            raster_result.final_image,
+            caption="Final applied HE image",
+            use_container_width=True,
+        )
+
+    with overlay_tab:
+        fixed_pixels = world_points_to_warped_image_pixels(
+            artifact.arrays["fixed_geojson_points"], raster_result.warp_metadata
+        )
+        applied_pixels = world_points_to_warped_image_pixels(
+            artifact.arrays["applied_registered_he_points"], raster_result.warp_metadata
+        )
+        overlay_figure = visualize_warped_he_point_overlay(
+            raster_result.final_image,
+            fixed_pixels,
+            applied_pixels,
+            title="Final raster with fixed GeoJSON and applied HE nuclei",
+        )
+        st.pyplot(overlay_figure, use_container_width=True)
+        plt.close(overlay_figure)
+
+    with deformation_tab:
+        fine_result = fine_result_from_artifact(artifact)
+        grid_spacing = max(artifact.field_spacing * 5.0, 1.0)
+        before_lines = _warp_grid_lines_pixels(
+            artifact.field_bounds, grid_spacing, raster_result.warp_metadata
+        )
+        attempted_result = replace(
+            fine_result,
+            displacement_x=np.asarray(artifact.arrays["attempted_displacement_x"]),
+            displacement_y=np.asarray(artifact.arrays["attempted_displacement_y"]),
+        )
+        attempted_lines = _warp_grid_lines_pixels(
+            artifact.field_bounds,
+            grid_spacing,
+            raster_result.warp_metadata,
+            attempted_result,
+        )
+        grid_figure = visualize_warp_grid_overlay(
+            raster_result.attempted_image,
+            before_lines,
+            attempted_lines,
+            title="Attempted displacement grid",
+        )
+        st.pyplot(grid_figure, use_container_width=True)
+        plt.close(grid_figure)
+
+        jacobian_columns = st.columns(2)
+        attempted_jacobian_figure = visualize_jacobian_heatmap(
+            artifact.arrays["grid_x"],
+            artifact.arrays["grid_y"],
+            raster_result.attempted_jacobian,
+            title="Attempted field Jacobian",
+        )
+        jacobian_columns[0].pyplot(attempted_jacobian_figure, use_container_width=True)
+        plt.close(attempted_jacobian_figure)
+        applied_jacobian_figure = visualize_jacobian_heatmap(
+            artifact.arrays["grid_x"],
+            artifact.arrays["grid_y"],
+            raster_result.applied_jacobian,
+            title="Applied field Jacobian",
+        )
+        jacobian_columns[1].pyplot(applied_jacobian_figure, use_container_width=True)
+        plt.close(applied_jacobian_figure)
+
+    with qc_tab:
+        qc_columns = st.columns(2)
+        qc_columns[0].image(
+            raster_result.checkerboard_image,
+            caption="Affine / attempted checkerboard",
+            use_container_width=True,
+        )
+        qc_columns[1].image(
+            raster_result.edge_overlay_image,
+            caption="Affine / attempted edge overlay",
+            use_container_width=True,
+        )
+        st.dataframe(
+            pd.DataFrame(
+                [{"Metric": key, "Value": value} for key, value in raster_result.difference_metrics.items()]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with downloads_tab:
+        export_bytes = build_workflow_d_export(raster_result, artifact)
+        st.download_button(
+            "Download Workflow D raster result ZIP",
+            data=export_bytes,
+            file_name="workflow_d_raster_deformation.zip",
+            mime="application/zip",
+            type="primary",
+            key="workflow-d-download-bundle",
+        )
+        st.download_button(
+            "Download final applied HE PNG",
+            data=array_to_png_bytes(raster_result.final_image),
+            file_name="workflow_d_final_applied_he.png",
+            mime="image/png",
+            key="workflow-d-download-final-image",
+        )
+
+
 def main() -> None:
     st.title("Cell Registration Prototype")
     st.caption("Research prototype for point-based registration, matching, and QC. Not for diagnostic use.")
@@ -5473,7 +5752,8 @@ def main() -> None:
         [
             "Workflow A: Point registration",
             "Workflow B: Mask-derived point registration",
-            "Workflow C: HE-GeoJSON alignment",
+            "Workflow C: Point Registration",
+            "Workflow D: Raster Deformation",
         ],
     )
     st.sidebar.divider()
@@ -5506,8 +5786,10 @@ def main() -> None:
         show_point_registration_workflow(**workflow_kwargs)
     elif workflow.startswith("Workflow B"):
         show_mask_to_mask_workflow(**workflow_kwargs)
-    else:
+    elif workflow.startswith("Workflow C"):
         show_he_geojson_preparation()
+    else:
+        show_raster_deformation_workflow()
 
 
 if __name__ == "__main__":

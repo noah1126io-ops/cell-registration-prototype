@@ -339,6 +339,60 @@ def visualize_density_flow_point_comparison(
     return fig
 
 
+def visualize_registered_point_pairs(
+    fixed_points: np.ndarray,
+    moving_points: np.ndarray,
+    *,
+    max_pair_distance: float = 10.0,
+    max_pairs: int = 2000,
+    title: str = "Registered point pairs",
+    invert_x_axis: bool = False,
+    invert_y_axis: bool = False,
+):
+    """Show mutual-nearest point pairs for registration QC only."""
+    from scipy.spatial import cKDTree
+
+    fixed = np.asarray(fixed_points, dtype=float)
+    moving = np.asarray(moving_points, dtype=float)
+    if fixed.ndim != 2 or fixed.shape[1] != 2 or moving.ndim != 2 or moving.shape[1] != 2:
+        raise ValueError("fixed_points and moving_points must have shape (n, 2).")
+
+    fig, ax = plt.subplots(figsize=(9, 8))
+    if len(fixed) and len(moving):
+        moving_distance, moving_to_fixed = cKDTree(fixed).query(moving, k=1)
+        _, fixed_to_moving = cKDTree(moving).query(fixed, k=1)
+        pair_indices = [
+            (moving_index, int(fixed_index))
+            for moving_index, fixed_index in enumerate(moving_to_fixed)
+            if fixed_to_moving[fixed_index] == moving_index
+            and moving_distance[moving_index] <= float(max_pair_distance)
+        ][: max(1, int(max_pairs))]
+        for moving_index, fixed_index in pair_indices:
+            ax.plot(
+                [fixed[fixed_index, 0], moving[moving_index, 0]],
+                [fixed[fixed_index, 1], moving[moving_index, 1]],
+                color="#22c55e",
+                linewidth=0.65,
+                alpha=0.55,
+                zorder=1,
+            )
+    ax.scatter(fixed[:, 0], fixed[:, 1], s=13, c="#00d1ff", label="fixed GeoJSON", zorder=2)
+    ax.scatter(
+        moving[:, 0], moving[:, 1], s=15, c="#ffb000", marker="x",
+        linewidths=0.8, label="registered HE", zorder=3,
+    )
+    ax.plot([], [], color="#22c55e", linewidth=1.2, label=f"mutual pair <= {max_pair_distance:g} um")
+    ax.set_title(title)
+    ax.set_aspect("equal", adjustable="box")
+    if invert_x_axis:
+        ax.invert_xaxis()
+    if invert_y_axis:
+        ax.invert_yaxis()
+    ax.legend(loc="best", fontsize=8, frameon=True)
+    fig.tight_layout()
+    return fig
+
+
 def visualize_warped_he_point_overlay(
     warped_he_image,
     geojson_pixels: np.ndarray,

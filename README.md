@@ -97,22 +97,33 @@ integer label mask から細胞中心と特徴量を抽出し、その後は poi
 
 mask は `0` を背景、正の整数値を cell ID とする label image を想定します。
 
-### Workflow C: HE-GeoJSON alignment
+### Workflow C: Point Registration
 
-HE nuclei `.npy` と fluorescence nuclei GeoJSON を使う特殊座標系 workflow です。通常の画像表示は左上原点である一方、GeoJSON world-µm 座標は下向きでない座標系として扱われることがあるため、特に Y 方向の扱いを明示します。ICP、fine center-snap warp、Jacobian QC を扱うため、他の workflow とは独立して維持します。
+HE nuclei `.npy` を fluorescence nuclei GeoJSON の world-µm 座標へ登録し、その結果を再利用可能な artifact として保存する workflow です。HE画像や tissue mask を fine registration の計算補助に使う場合はありますが、最終 HE raster image の warp と出力は行いません。
 
 | 項目 | 内容 |
 | --- | --- |
 | 入力 | HE nuclei centers `.npy`, fluorescence nuclei GeoJSON, optional HE image |
 | 主な処理 | GeoJSON centroid loading, HE point loading, Y-flip centered orientation handling, optional X/Y-flip candidate selection, similarity ICP, affine ICP, cluster-anchor / local translation / experimental tissue-aware density-flow point warp, Jacobian QC, world-µm scatter QC |
-| 出力 | transformed HE centers CSV, local translation anchors CSV, HE-GeoJSON transform summary JSON, affine/fine scatter QC PNG, warped HE image PNG |
-| 未実装 | full-resolution tiled raster warp export, GeoJSON polygon overlay QC, production-grade warp report |
+| 出力 | transformed HE centers CSV, displacement fields, point-set metrics, Jacobian/safety QC, scatter QC PNG, `workflow_c_registration_result.zip` |
+| 未実装 | GeoJSON polygon overlay QC, production-grade registration report |
 
 HE 側の `.npy` は StarDist などで事前検出済みの核中心を想定します。StarDist 由来ファイルでは座標順が `xy` か `yx` かを必ず確認してください。
 
-Workflow C では、registration QC scatter の表示向きと warped HE image の出力向きを別々に指定できます。registration QC図だけが上下反転して見える場合は、`Registration QC display origin` を切り替えて確認します。warped HE image が上下反転して見える場合は、`Warped HE output origin` を `lower-left` / `upper-left` で切り替えて確認します。
+`workflow_c_registration_result.zip` には `registration_result.npz`、`metrics.json`、`parameters.json`、`provenance.json`、`manifest.json` が含まれます。NPZには fixed/original/affine/attempted/applied points、affine transform、attempted/applied displacement field、grid、bounds が保存され、Workflow D は registration を再計算せず利用します。
 
-`Tissue-aware density flow [Experimental]` は独立実装の実験方式です。HE点群に加え、反復inverse mappingでHE raster imageのattempted/final warpも生成します。reject時はattempted画像をQC用に残し、final画像はaffine-onlyへ戻ります。設計は [docs/DENSITY_FLOW_METHOD.md](docs/DENSITY_FLOW_METHOD.md)、独立実装の来歴は [docs/DENSITY_FLOW_PROVENANCE.md](docs/DENSITY_FLOW_PROVENANCE.md) を参照してください。STalignとの同等性や生物学的精度向上は主張していません。
+`Tissue-aware density flow [Experimental]` は独立実装の実験方式です。Workflow C では点群と変位場を計算し、画像への inverse raster mapping は Workflow D が担当します。設計は [docs/DENSITY_FLOW_METHOD.md](docs/DENSITY_FLOW_METHOD.md)、独立実装の来歴は [docs/DENSITY_FLOW_PROVENANCE.md](docs/DENSITY_FLOW_PROVENANCE.md) を参照してください。STalignとの同等性や生物学的精度向上は主張していません。
+
+### Workflow D: Raster Deformation
+
+Workflow C が保存した registration result と元の HE image を入力し、既存の inverse raster mapping と raster QC を実行します。固定 GeoJSON 点は移動せず、登録パラメータや変位場も再推定しません。
+
+| 項目 | 内容 |
+| --- | --- |
+| 入力 | raw HE image, `workflow_c_registration_result.zip` |
+| 主な処理 | affine HE生成, attempted/applied inverse raster warp, safety-gated affine fallback, checkerboard, edge overlay, difference/Jacobian/warp-grid QC |
+| 出力 | affine HE PNG, attempted warped HE PNG, final applied HE PNG, raster QC JSON, warp metadata JSON, Workflow D result ZIP |
+| 未実装 | full-resolution tiled raster export, GPU backend, Slurm integration |
 
 ## 既存 HE-to-GeoJSON 研究パイプラインの設計メモ
 
@@ -146,10 +157,11 @@ Workflow C では、registration QC scatter の表示向きと warped HE image �
 - fine center-snap warp
 - robust pair filtering for fine center-snap warp
 - local translation field fine alignment
-- tissue-aware density-flow point/raster registration（実験的、inverse raster mapping）
+- tissue-aware density-flow point registration と displacement field 計算（Workflow C）
+- 保存済み displacement field による inverse raster mapping（Workflow D）
 - local translation anchors CSV export
 - attempted/applied fine alignment diagnostics
-- warped HE image PNG export for QC
+- Workflow C result artifact export と Workflow D raster result export
 - Jacobian QC
 - NaN area / eccentricity に対応した matching
 - scatter plot / match overlay / density overlay
@@ -171,6 +183,7 @@ Workflow C では、registration QC scatter の表示向きと warped HE image �
 
 - 出力された transform、matching、QC は必ず目視確認してください。
 - affine registration が失敗した場合は identity transform に fallback します。
-- Workflow C の warped HE image は QC 用のMVP出力です。大きな画像の本格的な tiled export は今後の課題です。
+- Workflow C は最終 HE raster を生成しません。保存した result artifact と元画像を Workflow D へ入力してください。
+- Workflow D の warped HE image は QC 用のMVP出力です。大きな画像の本格的な tiled export は今後の課題です。
 - fine center-snap warp は Jacobian min が 0 以下の場合、局所的な fold-over の可能性があります。
 - fine snap を強くしすぎると局所変形が破綻する可能性があるため、`Jacobian min` と overlay QC を確認してください。
