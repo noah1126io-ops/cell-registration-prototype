@@ -1245,6 +1245,53 @@ def _workflow_c_preset_purpose(preset: str) -> str:
     }.get(preset, "Uses the selected method preset.")
 
 
+WORKFLOW_C_CURRENT_RESULT_KEY = "workflow_c_current_result"
+WORKFLOW_SELECTOR_KEY = "workflow-selector"
+WORKFLOW_D_LABEL = "Workflow D: Raster Deformation"
+WORKFLOW_D_ARTIFACT_SOURCE_KEY = "workflow-d-artifact-source"
+
+
+def _store_current_workflow_c_result(
+    session_state,
+    *,
+    artifact_bytes: bytes,
+    run_id: str,
+    registration_status: str,
+    method: str,
+    preset: str,
+    he_image: np.ndarray | None,
+    registration_metadata: dict,
+) -> None:
+    """Store the current C result for an in-session handoff to Workflow D."""
+    session_state[WORKFLOW_C_CURRENT_RESULT_KEY] = {
+        "artifact_bytes": bytes(artifact_bytes),
+        "run_id": str(run_id),
+        "registration_status": str(registration_status),
+        "method": str(method),
+        "preset": str(preset),
+        "he_image": None if he_image is None else np.asarray(he_image).copy(),
+        "registration_metadata": dict(registration_metadata),
+    }
+
+
+def _continue_to_workflow_d(session_state) -> None:
+    """Select Workflow D without rerunning registration."""
+    session_state[WORKFLOW_SELECTOR_KEY] = WORKFLOW_D_LABEL
+    session_state[WORKFLOW_D_ARTIFACT_SOURCE_KEY] = "Current Workflow C result"
+
+
+def _workflow_d_artifact_payload(session_state, source: str, uploaded_file) -> tuple[bytes | None, dict | None]:
+    """Resolve either the current in-session artifact or an uploaded artifact."""
+    current = session_state.get(WORKFLOW_C_CURRENT_RESULT_KEY)
+    if source == "Current Workflow C result":
+        if current is None:
+            return None, None
+        return current["artifact_bytes"], current
+    if uploaded_file is None:
+        return None, None
+    return uploaded_file.getvalue(), None
+
+
 def show_he_geojson_preparation() -> None:
     workflow_c_started_at = time.perf_counter()
     language = st.selectbox(
@@ -5407,6 +5454,31 @@ def show_he_geojson_preparation() -> None:
         provenance=provenance,
     )
     artifacts["workflow_c_result.zip"] = workflow_c_result_bytes
+    _store_current_workflow_c_result(
+        st.session_state,
+        artifact_bytes=workflow_c_result_bytes,
+        run_id=run_id,
+        registration_status=status,
+        method=fine_alignment_method,
+        preset=selected_preset,
+        he_image=he_image,
+        registration_metadata={
+            "parameters": parameters,
+            "metrics": workflow_c_result_metrics,
+            "provenance": provenance,
+        },
+    )
+    downloads_tab.button(
+        tr("Workflow Dへ進む", "Continue to Workflow D"),
+        type="primary",
+        key="workflow-c-continue-to-d",
+        help=tr(
+            "現在のregistration resultとHE画像を同一セッション内でWorkflow Dへ渡します。",
+            "Pass the current registration result and HE image to Workflow D in this session.",
+        ),
+        on_click=_continue_to_workflow_d,
+        args=(st.session_state,),
+    )
     downloads_tab.download_button(
         tr("Workflow C result artifactをダウンロード", "Download Workflow C result artifact"),
         data=workflow_c_result_bytes,
@@ -5554,10 +5626,23 @@ def show_raster_deformation_workflow() -> None:
         "Registration parameters and point transforms are not recalculated here."
     )
 
+    current_result = st.session_state.get(WORKFLOW_C_CURRENT_RESULT_KEY)
+    artifact_sources = (
+        ["Current Workflow C result", "Uploaded Workflow C artifact"]
+        if current_result is not None
+        else ["Uploaded Workflow C artifact"]
+    )
+    artifact_source = st.radio(
+        "Registration result source",
+        artifact_sources,
+        horizontal=True,
+        key=WORKFLOW_D_ARTIFACT_SOURCE_KEY,
+    )
+
     input_left, input_right = st.columns(2)
     with input_left:
         he_image_file = st.file_uploader(
-            "Raw HE image",
+            "Raw HE image (optional when loaded from current Workflow C result)",
             type=["png", "jpg", "jpeg", "tif", "tiff"],
             key="workflow-d-he-image",
             help="The source HE raster used when the Workflow C nuclei coordinates were generated.",
@@ -5570,11 +5655,22 @@ def show_raster_deformation_workflow() -> None:
             help="Load workflow_c_registration_result.zip exported by Workflow C.",
         )
 
-    if result_file is None:
+    artifact_bytes, current_context = _workflow_d_artifact_payload(
+        st.session_state, artifact_source, result_file
+    )
+    if current_context is not None:
+        st.success("Loaded from current Workflow C result")
+        st.caption(
+            f"Run ID: {current_context['run_id']} | "
+            f"Status: {current_context['registration_status']} | "
+            f"Method: {current_context['method']} | Preset: {current_context['preset']}"
+        )
+
+    if artifact_bytes is None:
         st.info("Upload a Workflow C result artifact to inspect its registration result.")
         return
     try:
-        artifact = load_workflow_c_result_artifact(result_file.getvalue())
+        artifact = load_workflow_c_result_artifact(artifact_bytes)
     except ValueError as exc:
         st.error(f"Invalid Workflow C result artifact: {exc}")
         return
@@ -5611,11 +5707,21 @@ def show_raster_deformation_workflow() -> None:
     st.pyplot(point_figure, use_container_width=True)
     plt.close(point_figure)
 
-    if he_image_file is None:
+    try:
+        he_image = None
+        if he_image_file is not None:
+            he_image = read_uploaded_image(he_image_file)
+        elif current_context is not None and current_context.get("he_image") is not None:
+            he_image = np.asarray(current_context["he_image"]).copy()
+            st.info("Raw HE image was carried over from the current Workflow C session.")
+    except ValueError as exc:
+        st.error(f"Invalid HE image: {exc}")
+        return
+
+    if he_image is None:
         st.info("Upload the raw HE image to run raster deformation and image QC.")
         return
     try:
-        he_image = read_uploaded_image(he_image_file)
         raster_result = run_workflow_d_raster_deformation(he_image, artifact)
     except (ValueError, RuntimeError) as exc:
         st.error(f"Raster deformation failed: {exc}")
@@ -5753,8 +5859,9 @@ def main() -> None:
             "Workflow A: Point registration",
             "Workflow B: Mask-derived point registration",
             "Workflow C: Point Registration",
-            "Workflow D: Raster Deformation",
+            WORKFLOW_D_LABEL,
         ],
+        key=WORKFLOW_SELECTOR_KEY,
     )
     st.sidebar.divider()
     density_sigma = st.sidebar.slider("Density map sigma", min_value=1.0, max_value=100.0, value=10.0, step=1.0)
