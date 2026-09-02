@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+import platform
+import subprocess
 from typing import Any, Literal
 
 import numpy as np
@@ -31,6 +34,10 @@ class ArrayBackend:
             return np.asarray(values)
         return self.xp.asnumpy(values)
 
+    def scalar(self, value: Any):
+        """Cross the device boundary for one scalar, never an entire grid."""
+        return value.item() if hasattr(value, "item") else value
+
     def gaussian_filter(self, values: Any, *, sigma: float, mode: str = "reflect"):
         return self.ndimage.gaussian_filter(values, sigma=sigma, mode=mode)
 
@@ -43,9 +50,46 @@ class ArrayBackend:
     def gradient(self, values: Any, *spacing: float):
         return self.xp.gradient(values, *spacing)
 
+    def laplace(self, values: Any, *, mode: str = "reflect"):
+        return self.ndimage.laplace(values, mode=mode)
+
     def synchronize(self) -> None:
         if self.name == "cuda":
             self.xp.cuda.get_current_stream().synchronize()
+
+    def provenance(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "compute_backend": self.name,
+            "hostname": platform.node(),
+            "dtype": "float64",
+        }
+        if self.name == "cpu":
+            return result
+        device = self.xp.cuda.Device()
+        properties = self.xp.cuda.runtime.getDeviceProperties(device.id)
+        name = properties.get("name", "unknown")
+        if isinstance(name, bytes):
+            name = name.decode(errors="replace")
+        result.update({
+            "gpu_model": str(name),
+            "gpu_uuid": None,
+            "total_vram_bytes": int(properties["totalGlobalMem"]),
+            "driver_version": int(self.xp.cuda.runtime.driverGetVersion()),
+            "cuda_runtime_version": int(self.xp.cuda.runtime.runtimeGetVersion()),
+            "cupy_version": self.xp.__version__,
+            "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+        })
+        try:
+            query = subprocess.run(
+                ["nvidia-smi", "--query-gpu=uuid", "--format=csv,noheader"],
+                check=True, capture_output=True, text=True, timeout=5,
+            )
+            uuids = [line.strip() for line in query.stdout.splitlines() if line.strip()]
+            if uuids:
+                result["gpu_uuid"] = uuids[0]
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return result
 
 
 def _load_cupy():

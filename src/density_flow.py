@@ -8,6 +8,7 @@ from scipy.ndimage import distance_transform_edt, gaussian_filter, laplace, map_
 from scipy.signal import fftconvolve
 from scipy.spatial import cKDTree
 
+from src.array_backend import ArrayBackend, DeviceName, get_array_backend
 from src.pointset_registration import FineWarpResult, point_bidirectional_distance_metrics
 from src.flow_ablation import (
     FlowAblationConfig,
@@ -92,15 +93,17 @@ def _rasterize_points(
     shape: tuple[int, int],
     bounds: tuple[float, float, float, float],
     pixel_size: float,
+    backend: ArrayBackend | None = None,
 ) -> np.ndarray:
+    xp = np if backend is None else backend.xp
     min_x, min_y, _, _ = bounds
     cols = (points[:, 0] - min_x) / pixel_size
     rows = (points[:, 1] - min_y) / pixel_size
-    row0 = np.floor(rows).astype(int)
-    col0 = np.floor(cols).astype(int)
+    row0 = xp.floor(rows).astype(int)
+    col0 = xp.floor(cols).astype(int)
     row_fraction = rows - row0
     col_fraction = cols - col0
-    raster = np.zeros(shape, dtype=float)
+    raster = xp.zeros(shape, dtype=xp.float64)
     for row_offset, col_offset, weight in (
         (0, 0, (1.0 - row_fraction) * (1.0 - col_fraction)),
         (0, 1, (1.0 - row_fraction) * col_fraction),
@@ -115,13 +118,19 @@ def _rasterize_points(
             & (target_cols >= 0)
             & (target_cols < shape[1])
         )
-        np.add.at(raster, (target_rows[valid], target_cols[valid]), weight[valid])
+        xp.add.at(raster, (target_rows[valid], target_cols[valid]), weight[valid])
     return raster
 
 
-def _normalized_density(impulses: np.ndarray, sigma_px: float) -> np.ndarray:
-    density = gaussian_filter(impulses, sigma=max(float(sigma_px), 0.01), mode="constant")
-    total = float(np.sum(density))
+def _normalized_density(
+    impulses: np.ndarray, sigma_px: float, backend: ArrayBackend | None = None
+) -> np.ndarray:
+    if backend is None:
+        density = gaussian_filter(impulses, sigma=max(float(sigma_px), 0.01), mode="constant")
+        total = float(np.sum(density))
+    else:
+        density = backend.gaussian_filter(impulses, sigma=max(float(sigma_px), 0.01), mode="constant")
+        total = float(backend.scalar(backend.xp.sum(density)))
     return density / total if total > 0 else density
 
 
@@ -133,14 +142,17 @@ def _sample_field(
     pixel_size: float,
     *,
     mode: str = "constant",
+    backend: ArrayBackend | None = None,
 ) -> np.ndarray:
+    xp = np if backend is None else backend.xp
     min_x, min_y, _, _ = bounds
     cols = (points[:, 0] - min_x) / pixel_size
     rows = (points[:, 1] - min_y) / pixel_size
-    coordinates = np.vstack([rows, cols])
-    sampled_x = map_coordinates(field_x, coordinates, order=1, mode=mode, cval=0.0)
-    sampled_y = map_coordinates(field_y, coordinates, order=1, mode=mode, cval=0.0)
-    return np.column_stack([sampled_x, sampled_y])
+    coordinates = xp.vstack([rows, cols])
+    mapper = map_coordinates if backend is None else backend.map_coordinates
+    sampled_x = mapper(field_x, coordinates, order=1, mode=mode, cval=0.0)
+    sampled_y = mapper(field_y, coordinates, order=1, mode=mode, cval=0.0)
+    return xp.column_stack([sampled_x, sampled_y])
 
 
 def _output_world_grid_from_metadata(
@@ -221,16 +233,19 @@ def _warp_scalar_grid_with_field(
     pixel_size: float,
     *,
     inverse_iterations: int = 8,
+    backend: ArrayBackend | None = None,
 ) -> np.ndarray:
-    rows, cols = np.indices(source.shape, dtype=float)
+    xp = np if backend is None else backend.xp
+    mapper = map_coordinates if backend is None else backend.map_coordinates
+    rows, cols = xp.indices(source.shape, dtype=xp.float64)
     source_rows = rows.copy()
     source_cols = cols.copy()
     for _ in range(inverse_iterations):
-        sampled_x = map_coordinates(field_x, [source_rows, source_cols], order=1, mode="nearest")
-        sampled_y = map_coordinates(field_y, [source_rows, source_cols], order=1, mode="nearest")
+        sampled_x = mapper(field_x, [source_rows, source_cols], order=1, mode="nearest")
+        sampled_y = mapper(field_y, [source_rows, source_cols], order=1, mode="nearest")
         source_cols = cols - sampled_x / pixel_size
         source_rows = rows - sampled_y / pixel_size
-    return map_coordinates(source, [source_rows, source_cols], order=1, mode="constant", cval=0.0)
+    return mapper(source, [source_rows, source_cols], order=1, mode="constant", cval=0.0)
 
 
 def _normalized_feature(values: np.ndarray) -> np.ndarray:
@@ -429,18 +444,25 @@ def _compose_fields(
     update_x: np.ndarray,
     update_y: np.ndarray,
     pixel_size: float,
+    backend: ArrayBackend | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    rows, cols = np.indices(field_x.shape, dtype=float)
+    xp = np if backend is None else backend.xp
+    mapper = map_coordinates if backend is None else backend.map_coordinates
+    rows, cols = xp.indices(field_x.shape, dtype=xp.float64)
     mapped_rows = rows + field_y / pixel_size
     mapped_cols = cols + field_x / pixel_size
-    composed_update_x = map_coordinates(update_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
-    composed_update_y = map_coordinates(update_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
+    composed_update_x = mapper(update_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
+    composed_update_y = mapper(update_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
     return field_x + composed_update_x, field_y + composed_update_y
 
 
-def _jacobian(field_x: np.ndarray, field_y: np.ndarray, pixel_size: float) -> np.ndarray:
-    dfx_dy, dfx_dx = np.gradient(field_x, pixel_size, pixel_size)
-    dfy_dy, dfy_dx = np.gradient(field_y, pixel_size, pixel_size)
+def _jacobian(
+    field_x: np.ndarray, field_y: np.ndarray, pixel_size: float,
+    backend: ArrayBackend | None = None,
+) -> np.ndarray:
+    gradient = np.gradient if backend is None else backend.gradient
+    dfx_dy, dfx_dx = gradient(field_x, pixel_size, pixel_size)
+    dfy_dy, dfy_dx = gradient(field_y, pixel_size, pixel_size)
     return (1.0 + dfx_dx) * (1.0 + dfy_dy) - dfx_dy * dfy_dx
 
 
@@ -564,41 +586,50 @@ def _field_objective(
     structure_weight: float = 0.0,
     soft_jacobian_weight: float = 0.0,
     ablation_config: FlowAblationConfig | dict | None = None,
+    backend: ArrayBackend | None = None,
 ) -> dict[str, object]:
+    xp = np if backend is None else backend.xp
+    scalar = float if backend is None else lambda value: float(backend.scalar(value))
+    mapper = map_coordinates if backend is None else backend.map_coordinates
+    gradient = np.gradient if backend is None else backend.gradient
     ablation = normalize_ablation_config(ablation_config)
     residual = fixed_density - moving_density
-    density_energy = float(np.mean(tissue_weight * fixed_density**2))
-    density_term = float(
-        np.mean(tissue_weight * residual**2) / max(density_energy, np.finfo(float).eps)
+    density_energy = scalar(xp.mean(tissue_weight * fixed_density**2))
+    density_term = scalar(
+        xp.mean(tissue_weight * residual**2) / max(density_energy, np.finfo(float).eps)
     )
-    dfx_dy, dfx_dx = np.gradient(field_x, pixel_size, pixel_size)
-    dfy_dy, dfy_dx = np.gradient(field_y, pixel_size, pixel_size)
-    smoothness_term = float(np.mean(dfx_dx**2 + dfx_dy**2 + dfy_dx**2 + dfy_dy**2))
-    magnitude_term = float(np.mean(field_x**2 + field_y**2))
-    jacobian_term = float(
-        np.mean(
-            np.maximum(jacobian_min_threshold - jacobian, 0.0) ** 2
-            + np.maximum(jacobian - jacobian_max_threshold, 0.0) ** 2
+    dfx_dy, dfx_dx = gradient(field_x, pixel_size, pixel_size)
+    dfy_dy, dfy_dx = gradient(field_y, pixel_size, pixel_size)
+    smoothness_term = scalar(xp.mean(dfx_dx**2 + dfx_dy**2 + dfy_dx**2 + dfy_dy**2))
+    magnitude_term = scalar(xp.mean(field_x**2 + field_y**2))
+    jacobian_term = scalar(
+        xp.mean(
+            xp.maximum(jacobian_min_threshold - jacobian, 0.0) ** 2
+            + xp.maximum(jacobian - jacobian_max_threshold, 0.0) ** 2
         )
     )
-    boundary_term = float(np.mean((1.0 - tissue_weight) * (field_x**2 + field_y**2)))
-    rows, cols = np.indices(field_x.shape, dtype=float)
+    boundary_term = scalar(xp.mean((1.0 - tissue_weight) * (field_x**2 + field_y**2)))
+    rows, cols = xp.indices(field_x.shape, dtype=xp.float64)
     mapped_rows = rows + field_y / pixel_size
     mapped_cols = cols + field_x / pixel_size
-    mapped_x = map_coordinates(field_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
-    mapped_y = map_coordinates(field_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
-    inverse_term = float(np.mean((field_x - mapped_x) ** 2 + (field_y - mapped_y) ** 2))
+    mapped_x = mapper(field_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
+    mapped_y = mapper(field_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
+    inverse_term = scalar(xp.mean((field_x - mapped_x) ** 2 + (field_y - mapped_y) ** 2))
     support_term = (
-        float(np.mean((fixed_support - moving_support) ** 2))
+        scalar(xp.mean((fixed_support - moving_support) ** 2))
         if fixed_support is not None and moving_support is not None
         else 0.0
     )
     structure_term = (
-        float(np.mean((fixed_structure - moving_structure) ** 2))
+        scalar(xp.mean((fixed_structure - moving_structure) ** 2))
         if fixed_structure is not None and moving_structure is not None
         else 0.0
     )
-    soft_jacobian_term = soft_jacobian_log_penalty(jacobian)
+    soft_jacobian_term = (
+        soft_jacobian_log_penalty(jacobian)
+        if backend is None
+        else scalar(xp.mean(xp.log(xp.maximum(jacobian, 1e-6)) ** 2))
+    )
     raw_values = {
         "density": density_term, "support": support_term, "structure": structure_term,
         "smoothness": smoothness_term, "magnitude": magnitude_term,
@@ -661,22 +692,25 @@ def _evaluate_density_flow_state(
     structure_weight: float = 0.0,
     soft_jacobian_weight: float = 0.0,
     ablation_config: FlowAblationConfig | dict | None = None,
+    backend: ArrayBackend | None = None,
 ) -> dict[str, object]:
+    xp = np if backend is None else backend.xp
+    scalar = float if backend is None else lambda value: float(backend.scalar(value))
     """Evaluate density and field penalties from one internally consistent field."""
     transformed_points = moving_points + _sample_field(
-        moving_points, field_x, field_y, bounds, pixel_size
+        moving_points, field_x, field_y, bounds, pixel_size, backend=backend
     )
-    moving_impulses = _rasterize_points(transformed_points, shape, bounds, pixel_size)
-    moving_density = _normalized_density(moving_impulses, density_sigma)
-    jacobian = _jacobian(field_x, field_y, pixel_size)
-    displacement = np.hypot(field_x, field_y)
+    moving_impulses = _rasterize_points(transformed_points, shape, bounds, pixel_size, backend)
+    moving_density = _normalized_density(moving_impulses, density_sigma, backend)
+    jacobian = _jacobian(field_x, field_y, pixel_size, backend)
+    displacement = xp.hypot(field_x, field_y)
     warped_support = (
-        _warp_scalar_grid_with_field(moving_support_source, field_x, field_y, pixel_size)
+        _warp_scalar_grid_with_field(moving_support_source, field_x, field_y, pixel_size, backend=backend)
         if moving_support_source is not None
         else None
     )
     warped_structure = (
-        _warp_scalar_grid_with_field(moving_structure_source, field_x, field_y, pixel_size)
+        _warp_scalar_grid_with_field(moving_structure_source, field_x, field_y, pixel_size, backend=backend)
         if moving_structure_source is not None
         else None
     )
@@ -704,6 +738,7 @@ def _evaluate_density_flow_state(
         structure_weight=structure_weight,
         soft_jacobian_weight=soft_jacobian_weight,
         ablation_config=ablation_config,
+        backend=backend,
     )
     return {
         "transformed_points": transformed_points,
@@ -714,20 +749,20 @@ def _evaluate_density_flow_state(
         "displacement": displacement,
         "objective": objective,
         "finite": bool(
-            np.isfinite(transformed_points).all()
-            and np.isfinite(moving_density).all()
-            and np.isfinite(field_x).all()
-            and np.isfinite(field_y).all()
-            and np.isfinite(jacobian).all()
-            and np.isfinite(displacement).all()
+            scalar(xp.isfinite(transformed_points).all())
+            and scalar(xp.isfinite(moving_density).all())
+            and scalar(xp.isfinite(field_x).all())
+            and scalar(xp.isfinite(field_y).all())
+            and scalar(xp.isfinite(jacobian).all())
+            and scalar(xp.isfinite(displacement).all())
             and np.isfinite(float(objective["total"]))
-            and (warped_support is None or np.isfinite(warped_support).all())
-            and (warped_structure is None or np.isfinite(warped_structure).all())
+            and (warped_support is None or scalar(xp.isfinite(warped_support).all()))
+            and (warped_structure is None or scalar(xp.isfinite(warped_structure).all()))
         ),
-        "jacobian_min": float(np.min(jacobian)),
-        "jacobian_max": float(np.max(jacobian)),
-        "max_displacement": float(np.max(displacement)),
-        "p95_displacement": float(np.percentile(displacement, 95)),
+        "jacobian_min": scalar(xp.min(jacobian)),
+        "jacobian_max": scalar(xp.max(jacobian)),
+        "max_displacement": scalar(xp.max(displacement)),
+        "p95_displacement": scalar(xp.percentile(displacement, 95)),
     }
 
 
@@ -894,10 +929,14 @@ def tissue_aware_density_flow_registration(
     max_grid_side: int = 1024,
     ablation_config: FlowAblationConfig | dict | None = None,
     retain_research_diagnostic_fields: bool = False,
+    device: DeviceName = "cpu",
+    dtype: str = "float64",
 ) -> FineWarpResult:
     """Independently estimate a tissue-weighted multiscale density-flow point warp."""
     fixed = _validate_points(fixed_points, "fixed_points")
     moving = _validate_points(moving_points, "moving_points")
+    backend = get_array_backend(device, dtype=dtype)
+    xp = backend.xp
     ablation = normalize_ablation_config(ablation_config)
     metric_fixed = fixed if success_metric_fixed_points is None else _validate_points(success_metric_fixed_points, "success_metric_fixed_points")
     metric_moving = moving if success_metric_moving_points is None else _validate_points(success_metric_moving_points, "success_metric_moving_points")
@@ -999,7 +1038,11 @@ def tissue_aware_density_flow_registration(
             applied_metrics=metrics,
             rejection_reason="possible_xy_reversal",
             applied=False,
-            metrics={"before": metrics, "attempted": metrics, "applied": metrics},
+            metrics={
+                "before": metrics, "attempted": metrics, "applied": metrics,
+                "compute_backend": backend.name,
+                "backend_provenance": backend.provenance(),
+            },
         )
 
     fixed_impulses = _rasterize_points(fixed, shape, resolved_bounds, density_pixel_size)
@@ -1101,12 +1144,25 @@ def tissue_aware_density_flow_registration(
         field_y.fill(global_shift[1])
     initial_field_x = field_x.copy()
     initial_field_y = field_y.copy()
+    # Cross the host/device boundary once before the iterative grid optimizer.
+    field_x = backend.asarray(field_x)
+    field_y = backend.asarray(field_y)
+    initial_field_x = backend.asarray(initial_field_x)
+    initial_field_y = backend.asarray(initial_field_y)
+    fixed_impulses = backend.asarray(fixed_impulses)
+    tissue_weight_map = backend.asarray(tissue_weight_map)
+    fixed_support_map = None if fixed_support_map is None else backend.asarray(fixed_support_map)
+    moving_support_map = None if moving_support_map is None else backend.asarray(moving_support_map)
+    fixed_structure_map = None if fixed_structure_map is None else backend.asarray(fixed_structure_map)
+    moving_structure_map = None if moving_structure_map is None else backend.asarray(moving_structure_map)
+    original_moving_device = backend.asarray(original_moving)
+
     def evaluate_state(current_x: np.ndarray, current_y: np.ndarray, sigma_px: float) -> dict[str, object]:
         return _evaluate_density_flow_state(
-            original_moving,
+            original_moving_device,
             current_x,
             current_y,
-            fixed_density=_normalized_density(fixed_impulses, sigma_px),
+            fixed_density=_normalized_density(fixed_impulses, sigma_px, backend),
             density_sigma=sigma_px,
             shape=shape,
             bounds=resolved_bounds,
@@ -1128,12 +1184,15 @@ def tissue_aware_density_flow_registration(
             structure_weight=structure_channel_weight,
             soft_jacobian_weight=soft_jacobian_weight,
             ablation_config=ablation,
+            backend=backend,
         )
 
     def point_metrics_for_field(current_x: np.ndarray, current_y: np.ndarray) -> tuple[dict, np.ndarray]:
-        transformed = metric_moving + _sample_field(
-            metric_moving, current_x, current_y, resolved_bounds, density_pixel_size
+        sampled = _sample_field(
+            backend.asarray(metric_moving), current_x, current_y,
+            resolved_bounds, density_pixel_size, backend=backend,
         )
+        transformed = metric_moving + backend.to_cpu(sampled)
         values = point_bidirectional_distance_metrics(metric_fixed, transformed)
         values["mutual_nearest_fraction"] = _mutual_nearest_fraction(metric_fixed, transformed)
         bidirectional = np.concatenate([
@@ -1145,11 +1204,11 @@ def tissue_aware_density_flow_registration(
         return values, transformed
 
     def improves_affine(values: dict, state: dict[str, object]) -> bool:
-        jacobian_values = np.asarray(state["jacobian"], dtype=float)
+        jacobian_values = state["jacobian"]
         topology_safe = bool(
-            np.mean(jacobian_values <= 0.0) == 0.0
-            and np.percentile(jacobian_values, 5) >= minimum_jacobian_p05
-            and np.percentile(jacobian_values, 95) <= maximum_jacobian_p95
+            backend.scalar(xp.mean(jacobian_values <= 0.0)) == 0.0
+            and backend.scalar(xp.percentile(jacobian_values, 5)) >= minimum_jacobian_p05
+            and backend.scalar(xp.percentile(jacobian_values, 95)) <= maximum_jacobian_p95
         )
         return topology_safe and _checkpoint_improves_affine(
             values,
@@ -1213,8 +1272,8 @@ def tissue_aware_density_flow_registration(
         sigma_value: float,
     ) -> dict[str, object]:
         canonical_state = evaluate_state(current_x, current_y, canonical_sigma)
-        jacobian_values = np.asarray(canonical_state["jacobian"], dtype=float)
-        displacement_values = np.hypot(current_x, current_y)
+        jacobian_values = canonical_state["jacobian"]
+        displacement_values = xp.hypot(current_x, current_y)
         exploratory_safe, _ = _density_flow_trial_is_safe(
             canonical_state,
             jacobian_min_threshold=jacobian_min_threshold,
@@ -1230,9 +1289,9 @@ def tissue_aware_density_flow_registration(
             displacement_p95_limit=strict_checkpoint_p95_limit,
         )
         strict_topology = bool(
-            np.mean(jacobian_values <= 0.0) == 0.0
-            and np.percentile(jacobian_values, 5) >= minimum_jacobian_p05
-            and np.percentile(jacobian_values, 95) <= maximum_jacobian_p95
+            backend.scalar(xp.mean(jacobian_values <= 0.0)) == 0.0
+            and backend.scalar(xp.percentile(jacobian_values, 5)) >= minimum_jacobian_p05
+            and backend.scalar(xp.percentile(jacobian_values, 95)) <= maximum_jacobian_p95
         )
         strict_safe = bool(strict_hard_safe and strict_topology)
         objective = state["objective"]
@@ -1254,28 +1313,28 @@ def tissue_aware_density_flow_registration(
             "canonical_total_objective": float(canonical_objective["total"]),
             "objective_decomposition": objective["objective_decomposition"],
             "canonical_objective_decomposition": canonical_objective["objective_decomposition"],
-            "displacement_median": float(np.median(displacement_values)),
-            "p95_displacement": float(np.percentile(displacement_values, 95)),
-            "max_displacement": float(np.max(displacement_values)),
-            "jacobian_min": float(np.min(jacobian_values)),
-            "jacobian_p05": float(np.percentile(jacobian_values, 5)),
-            "jacobian_median": float(np.median(jacobian_values)),
-            "jacobian_p95": float(np.percentile(jacobian_values, 95)),
-            "jacobian_max": float(np.max(jacobian_values)),
-            "fold_over_fraction": float(np.mean(jacobian_values <= 0.0)),
+            "displacement_median": float(backend.scalar(xp.median(displacement_values))),
+            "p95_displacement": float(backend.scalar(xp.percentile(displacement_values, 95))),
+            "max_displacement": float(backend.scalar(xp.max(displacement_values))),
+            "jacobian_min": float(backend.scalar(xp.min(jacobian_values))),
+            "jacobian_p05": float(backend.scalar(xp.percentile(jacobian_values, 5))),
+            "jacobian_median": float(backend.scalar(xp.median(jacobian_values))),
+            "jacobian_p95": float(backend.scalar(xp.percentile(jacobian_values, 95))),
+            "jacobian_max": float(backend.scalar(xp.max(jacobian_values))),
+            "fold_over_fraction": float(backend.scalar(xp.mean(jacobian_values <= 0.0))),
             "exploratory_safe": bool(exploratory_safe),
             "strict_final_safe": strict_safe,
             "temporary_point_guard_pass": temporary_stage_a_point_guard(values),
             "final_point_improvement": improves_affine(values, canonical_state),
             "update_fields": {
-                f"{name}_update_{axis}": np.asarray(component[index]).copy()
+                f"{name}_update_{axis}": backend.to_cpu(component[index]).copy()
                 for name, component in last_update_components.items()
                 for index, axis in enumerate(("x", "y"))
             } if retain_research_diagnostic_fields else {},
         }
 
     for level, sigma_px in enumerate(active_scales):
-        fixed_density = _normalized_density(fixed_impulses, sigma_px)
+        fixed_density = _normalized_density(fixed_impulses, sigma_px, backend)
         current_state = evaluate_state(field_x, field_y, sigma_px)
         if initial_objective is None:
             initial_objective = float(current_state["objective"]["total"])
@@ -1292,10 +1351,10 @@ def tissue_aware_density_flow_registration(
         for iteration in range(int(iterations_per_level)):
             attempted_steps += 1
             global_iteration += 1
-            moving_density = np.asarray(current_state["moving_density"])
+            moving_density = current_state["moving_density"]
             residual = fixed_density - moving_density
-            fixed_grad_y, fixed_grad_x = np.gradient(fixed_density)
-            moving_grad_y, moving_grad_x = np.gradient(moving_density)
+            fixed_grad_y, fixed_grad_x = backend.gradient(fixed_density)
+            moving_grad_y, moving_grad_x = backend.gradient(moving_density)
             grad_x = fixed_grad_x + moving_grad_x
             grad_y = fixed_grad_y + moving_grad_y
             denominator = grad_x**2 + grad_y**2 + 0.1 * residual**2 + 1e-15
@@ -1308,8 +1367,8 @@ def tissue_aware_density_flow_registration(
                 * residual * grad_y / denominator
             )
             if not ablation.use_density_term:
-                density_update_x = np.zeros_like(field_x)
-                density_update_y = np.zeros_like(field_y)
+                density_update_x = xp.zeros_like(field_x)
+                density_update_y = xp.zeros_like(field_y)
             update_x = density_update_x.copy()
             update_y = density_update_y.copy()
             channel_components: dict[str, tuple[np.ndarray, np.ndarray]] = {}
@@ -1319,9 +1378,9 @@ def tissue_aware_density_flow_registration(
             ):
                 if fixed_channel is None or moving_channel is None or channel_weight <= 0 or not channel_enabled:
                     continue
-                channel_residual = fixed_channel - np.asarray(moving_channel)
-                fixed_channel_grad_y, fixed_channel_grad_x = np.gradient(fixed_channel)
-                moving_channel_grad_y, moving_channel_grad_x = np.gradient(moving_channel)
+                channel_residual = fixed_channel - moving_channel
+                fixed_channel_grad_y, fixed_channel_grad_x = backend.gradient(fixed_channel)
+                moving_channel_grad_y, moving_channel_grad_x = backend.gradient(moving_channel)
                 channel_grad_x = fixed_channel_grad_x + moving_channel_grad_x
                 channel_grad_y = fixed_channel_grad_y + moving_channel_grad_y
                 channel_denominator = (
@@ -1351,8 +1410,8 @@ def tissue_aware_density_flow_registration(
                 },
             }
             if ablation.use_smoothness_regularization:
-                smooth_x = learning_rate * smoothness_weight * laplace(field_x, mode="nearest")
-                smooth_y = learning_rate * smoothness_weight * laplace(field_y, mode="nearest")
+                smooth_x = learning_rate * smoothness_weight * backend.laplace(field_x, mode="nearest")
+                smooth_y = learning_rate * smoothness_weight * backend.laplace(field_y, mode="nearest")
                 update_x += smooth_x
                 update_y += smooth_y
                 diagnostic_components["smoothness"] = (smooth_x, smooth_y)
@@ -1369,35 +1428,35 @@ def tissue_aware_density_flow_registration(
                 update_y += boundary_y
                 diagnostic_components["tissue_boundary"] = (boundary_x, boundary_y)
             if inverse_consistency_weight > 0 and ablation.use_inverse_consistency:
-                grid_rows, grid_cols = np.indices(field_x.shape, dtype=float)
+                grid_rows, grid_cols = xp.indices(field_x.shape, dtype=xp.float64)
                 mapped_rows = grid_rows + field_y / density_pixel_size
                 mapped_cols = grid_cols + field_x / density_pixel_size
-                mapped_field_x = map_coordinates(field_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
-                mapped_field_y = map_coordinates(field_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
+                mapped_field_x = backend.map_coordinates(field_x, [mapped_rows, mapped_cols], order=1, mode="nearest")
+                mapped_field_y = backend.map_coordinates(field_y, [mapped_rows, mapped_cols], order=1, mode="nearest")
                 inverse_x = -learning_rate * inverse_consistency_weight * (field_x - mapped_field_x)
                 inverse_y = -learning_rate * inverse_consistency_weight * (field_y - mapped_field_y)
                 update_x += inverse_x
                 update_y += inverse_y
                 diagnostic_components["inverse_consistency"] = (inverse_x, inverse_y)
-            update_x = gaussian_filter(update_x, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
-            update_y = gaussian_filter(update_y, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
+            update_x = backend.gaussian_filter(update_x, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
+            update_y = backend.gaussian_filter(update_y, sigma=max(update_smoothing_sigma, 0.01), mode="nearest")
             magnitude_damping = (
-                1.0 / (1.0 + magnitude_weight * np.hypot(field_x, field_y))
+                1.0 / (1.0 + magnitude_weight * xp.hypot(field_x, field_y))
                 if ablation.use_magnitude_regularization else 1.0
             )
             update_x *= magnitude_damping
             update_y *= magnitude_damping
-            update_magnitude = np.hypot(update_x, update_y)
-            update_scale = np.minimum(
+            update_magnitude = xp.hypot(update_x, update_y)
+            update_scale = xp.minimum(
                 1.0,
-                (density_pixel_size * 0.25) / np.maximum(update_magnitude, 1e-12),
+                (density_pixel_size * 0.25) / xp.maximum(update_magnitude, 1e-12),
             )
             update_x *= update_scale
             update_y *= update_scale
             last_update_components = {
                 name: (
-                    gaussian_filter(values[0], sigma=max(update_smoothing_sigma, 0.01), mode="nearest") * magnitude_damping,
-                    gaussian_filter(values[1], sigma=max(update_smoothing_sigma, 0.01), mode="nearest") * magnitude_damping,
+                    backend.gaussian_filter(values[0], sigma=max(update_smoothing_sigma, 0.01), mode="nearest") * magnitude_damping,
+                    backend.gaussian_filter(values[1], sigma=max(update_smoothing_sigma, 0.01), mode="nearest") * magnitude_damping,
                 )
                 for name, values in diagnostic_components.items()
             }
@@ -1414,6 +1473,7 @@ def tissue_aware_density_flow_registration(
                     update_x * trial_scale,
                     update_y * trial_scale,
                     density_pixel_size,
+                    backend,
                 )
                 trial_state = evaluate_state(trial_x, trial_y, sigma_px)
                 accepted, rejection = _density_flow_trial_is_acceptable(
@@ -1551,25 +1611,37 @@ def tissue_aware_density_flow_registration(
         )
     if selected is None:
         selected = {
-            "field_x": zeros.copy(),
-            "field_y": zeros.copy(),
+            "field_x": backend.asarray(zeros),
+            "field_y": backend.asarray(zeros),
             "metrics": {**before_metrics, "mutual_nearest_fraction": before_mutual},
             "iteration": None,
         }
-    field_x = np.asarray(selected["field_x"]).copy()
-    field_y = np.asarray(selected["field_y"]).copy()
-    attempted_points = original_moving + _sample_field(original_moving, field_x, field_y, resolved_bounds, density_pixel_size)
-    attempted_metric_points = metric_moving + _sample_field(metric_moving, field_x, field_y, resolved_bounds, density_pixel_size)
+    field_x_device = selected["field_x"].copy()
+    field_y_device = selected["field_y"].copy()
+    attempted_points = original_moving + backend.to_cpu(_sample_field(
+        original_moving_device, field_x_device, field_y_device,
+        resolved_bounds, density_pixel_size, backend=backend,
+    ))
+    attempted_metric_points = metric_moving + backend.to_cpu(_sample_field(
+        backend.asarray(metric_moving), field_x_device, field_y_device,
+        resolved_bounds, density_pixel_size, backend=backend,
+    ))
     attempted_metrics = point_bidirectional_distance_metrics(metric_fixed, attempted_metric_points)
     attempted_metrics["mutual_nearest_fraction"] = _mutual_nearest_fraction(metric_fixed, attempted_metric_points)
     attempted_metrics["possible_xy_reversal"] = False
     attempted_metrics["xy_reversal_diagnostics"] = reversal
 
-    canonical_attempted_state = evaluate_state(field_x, field_y, canonical_sigma)
+    canonical_attempted_state = evaluate_state(field_x_device, field_y_device, canonical_sigma)
     canonical_final_state = evaluate_state(final_field_x, final_field_y, canonical_sigma)
     initial_objective = float(canonical_initial_state["objective"]["total"])
     best_objective = float(canonical_attempted_state["objective"]["total"])
     final_objective = float(canonical_final_state["objective"]["total"])
+
+    # Final full-grid transfer happens only after optimization and selection.
+    field_x = backend.to_cpu(field_x_device).copy()
+    field_y = backend.to_cpu(field_y_device).copy()
+    final_field_x = backend.to_cpu(final_field_x).copy()
+    final_field_y = backend.to_cpu(final_field_y).copy()
 
     objective_term_table = []
     objective_term_table.extend(objective_rows(
@@ -1588,11 +1660,11 @@ def tissue_aware_density_flow_registration(
         attempted_points, shape, resolved_bounds, density_pixel_size
     )
     density_mismatch_summary, density_diagnostic_fields = density_mismatch_diagnostics(
-        fixed_impulses,
+        backend.to_cpu(fixed_impulses),
         attempted_impulses,
-        _normalized_density(fixed_impulses, canonical_sigma),
-        np.asarray(canonical_attempted_state["moving_density"]),
-        tissue_weight_map,
+        backend.to_cpu(_normalized_density(fixed_impulses, canonical_sigma, backend)),
+        backend.to_cpu(canonical_attempted_state["moving_density"]),
+        backend.to_cpu(tissue_weight_map),
         fixed_point_count=len(fixed),
         moving_point_count=len(attempted_points),
         retain_arrays=retain_research_diagnostic_fields,
@@ -1600,11 +1672,11 @@ def tissue_aware_density_flow_registration(
     if retain_research_diagnostic_fields:
         if fixed_support_map is not None and canonical_attempted_state.get("moving_support") is not None:
             density_diagnostic_fields["support_residual"] = (
-                np.asarray(fixed_support_map) - np.asarray(canonical_attempted_state["moving_support"])
+                backend.to_cpu(fixed_support_map) - backend.to_cpu(canonical_attempted_state["moving_support"])
             )
         if fixed_structure_map is not None and canonical_attempted_state.get("moving_structure") is not None:
             density_diagnostic_fields["structure_residual"] = (
-                np.asarray(fixed_structure_map) - np.asarray(canonical_attempted_state["moving_structure"])
+                backend.to_cpu(fixed_structure_map) - backend.to_cpu(canonical_attempted_state["moving_structure"])
             )
     selected_update_fields = dict(selected.get("update_fields", {}))
     selected_components = {
@@ -1719,6 +1791,13 @@ def tissue_aware_density_flow_registration(
         state="final_applied", stage="flow",
     ))
 
+    # Checkpoint fields may have remained device-resident; exported metrics must
+    # contain ordinary NumPy arrays and JSON-compatible provenance.
+    for snapshot in stage_checkpoint_snapshots.values():
+        if snapshot is not None:
+            snapshot["field_x"] = backend.to_cpu(snapshot["field_x"])
+            snapshot["field_y"] = backend.to_cpu(snapshot["field_y"])
+
     return FineWarpResult(
         transformed_points=applied_points,
         grid_x=grid_x,
@@ -1746,6 +1825,8 @@ def tissue_aware_density_flow_registration(
         applied=success,
         anchors=None,
         metrics={
+            "compute_backend": backend.name,
+            "backend_provenance": backend.provenance(),
             "before": {**before_metrics, "mutual_nearest_fraction": before_mutual},
             "attempted": attempted_metrics,
             "applied": applied_metrics,
