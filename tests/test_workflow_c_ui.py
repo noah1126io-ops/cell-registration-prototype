@@ -110,6 +110,16 @@ def test_workflow_c_ui_has_five_steps_run_action_and_six_result_tabs():
     assert 'with st.expander("Advanced parameters - Joint two-stage optimizer"' in source
 
 
+def test_workflow_c_records_runtime_breakdown_in_run_metrics_and_provenance():
+    source = inspect.getsource(show_he_geojson_preparation)
+
+    assert 'workflow_runtime.stop("input_preprocessing"' in source
+    assert 'workflow_runtime.stop("affine_icp"' in source
+    assert 'workflow_runtime.stop("fine_registration"' in source
+    assert '"runtime_breakdown": runtime_breakdown' in source
+    assert 'provenance["runtime_breakdown"]' in source
+
+
 def test_workflow_c_ui_controls_do_not_leak_into_workflows_a_or_b():
     for workflow in (show_point_registration_workflow, show_mask_to_mask_workflow):
         source = inspect.getsource(workflow)

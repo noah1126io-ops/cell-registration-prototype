@@ -108,6 +108,7 @@ from src.workflow_d import (
     fine_result_from_artifact,
     run_workflow_d_raster_deformation,
 )
+from src.runtime_instrumentation import RuntimeRecorder
 
 
 st.set_page_config(
@@ -1294,6 +1295,7 @@ def _workflow_d_artifact_payload(session_state, source: str, uploaded_file) -> t
 
 def show_he_geojson_preparation() -> None:
     workflow_c_started_at = time.perf_counter()
+    workflow_runtime = RuntimeRecorder()
     language = st.selectbox(
         "Language / 言語",
         ["日本語", "English"],
@@ -2247,6 +2249,7 @@ def show_he_geojson_preparation() -> None:
         st.subheader(tr("STEP 5 - 結果", "STEP 5 - Results"))
         st.caption(tr("主要結果、評価、変形QC、再現可能な出力を確認します。", "Review the main result, evaluation, deformation QC, and reproducible exports."))
 
+    input_started = workflow_runtime.start()
     he_image = show_uploaded_image("Optional HE image", he_image_file) if he_image_file else None
 
     try:
@@ -2310,6 +2313,7 @@ def show_he_geojson_preparation() -> None:
 
     he_array = _points_from_table(he_points)
     geojson_array = _points_from_table(geojson_points)
+    workflow_runtime.stop("input_preprocessing", input_started)
     affine_tissue_image = None
     affine_tissue_metadata = None
 
@@ -2321,6 +2325,7 @@ def show_he_geojson_preparation() -> None:
             "y": ((False, True),),
             "x+y": ((True, True),),
         }[flip_mode]
+        affine_started = workflow_runtime.start()
         affine_result = estimate_affine_with_y_flip(
             he_array,
             geojson_array,
@@ -2330,6 +2335,7 @@ def show_he_geojson_preparation() -> None:
             similarity_trim_quantile=similarity_trim,
             affine_trim_quantile=affine_trim,
         )
+        workflow_runtime.stop("affine_icp", affine_started)
         fine_target_array = geojson_array
         fine_target_weights = np.ones(len(geojson_array), dtype=float)
         geojson_classification = np.full(len(geojson_array), "valid", dtype=object)
@@ -2405,6 +2411,7 @@ def show_he_geojson_preparation() -> None:
                     "Fewer than 3 GeoJSON points are valid inside the affine HE tissue mask. "
                     "Fine warp will likely be rejected."
                 )
+        fine_registration_started = workflow_runtime.start()
         if len(fine_target_array) == 0:
             fine_result = _identity_fine_result(
                 affine_result.transformed_points,
@@ -2639,6 +2646,7 @@ def show_he_geojson_preparation() -> None:
     except ValueError as exc:
         st.warning(str(exc))
         return
+    workflow_runtime.stop("fine_registration", fine_registration_started)
 
     if not fine_result.success:
         st.warning(fine_result.message)
@@ -4988,6 +4996,12 @@ def show_he_geojson_preparation() -> None:
         else {}
     )
     runtime_seconds = float(time.perf_counter() - workflow_c_started_at)
+    runtime_breakdown = workflow_runtime.snapshot()
+    runtime_breakdown["total_runtime_seconds"] = runtime_seconds
+    if isinstance(fine_result.metrics, dict):
+        runtime_breakdown.update(fine_result.metrics.get("runtime_breakdown", {}))
+        runtime_breakdown["total_runtime_seconds"] = runtime_seconds
+    runtime_breakdown["artifact_creation_export"] = None
     mutual_before = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_affine_points)
     mutual_attempted = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_attempted_points)
     mutual_applied = _mutual_nearest_fraction_for_export(metric_fixed_points, metric_moving_applied_points)
@@ -5087,6 +5101,7 @@ def show_he_geojson_preparation() -> None:
         "best_checkpoint_median": density_flow_metadata.get("best_attempted_symmetric_median"),
         "best_checkpoint_mutual_fraction": density_flow_metadata.get("mutual_nearest_fraction_best"),
         "runtime_seconds": runtime_seconds,
+        "runtime_breakdown": runtime_breakdown,
         "raster_warp_metrics": raster_warp_metrics_values,
         "inverse_solver_diagnostics": (
             {key: value for key, value in inverse_solver_diagnostics.items() if key != "history"}
@@ -5423,6 +5438,7 @@ def show_he_geojson_preparation() -> None:
         "attempted_metrics": attempted_metrics,
         "applied_metrics": applied_metrics,
     }
+    artifact_started = workflow_runtime.start()
     workflow_c_result_bytes = build_workflow_c_result_artifact(
         fixed_geojson_points=geojson_array,
         original_moving_he_points=he_array,
@@ -5453,6 +5469,10 @@ def show_he_geojson_preparation() -> None:
         parameters=parameters,
         provenance=provenance,
     )
+    runtime_breakdown["artifact_creation_export"] = workflow_runtime.stop(
+        "artifact_creation_export", artifact_started
+    )
+    provenance["runtime_breakdown"] = dict(runtime_breakdown)
     artifacts["workflow_c_result.zip"] = workflow_c_result_bytes
     _store_current_workflow_c_result(
         st.session_state,

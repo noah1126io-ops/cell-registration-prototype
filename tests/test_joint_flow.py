@@ -118,6 +118,22 @@ def test_joint_no_deformation_stays_near_zero_and_fixed_points_never_move():
     np.testing.assert_array_equal(fixed, fixed.copy())
 
 
+def test_joint_flow_records_cpu_runtime_breakdown_without_changing_result_fields():
+    _, _, result = _joint_case(0.0)
+    runtime = result.metrics["runtime_breakdown"]
+
+    assert {
+        "joint_feature_construction",
+        "stage_a",
+        "intermediate_he_mask_processing",
+        "stage_b",
+        "point_metrics",
+        "jacobian_safety_qc",
+        "total_runtime_seconds",
+    } <= runtime.keys()
+    assert all(runtime[name] >= 0.0 for name in runtime)
+
+
 def test_joint_flow_retains_independent_stage_ablation_configuration():
     stage_a = FlowAblationConfig(use_density_term=False, use_structure_term=False)
     stage_b = FlowAblationConfig(use_support_term=False)

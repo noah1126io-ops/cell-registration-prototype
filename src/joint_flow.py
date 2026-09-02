@@ -25,6 +25,7 @@ from src.density_flow import (
 from src.pointset_registration import FineWarpResult, point_bidirectional_distance_metrics
 from src.raster_deformation_qc import local_region_metrics
 from src.flow_ablation import FlowAblationConfig, normalize_ablation_config
+from src.runtime_instrumentation import RuntimeRecorder
 
 
 def _signed_distance(mask: np.ndarray, physical_scale_um: float, pixel_size_um: float) -> np.ndarray:
@@ -222,6 +223,8 @@ def two_stage_joint_flow_registration(
     **kwargs,
 ) -> FineWarpResult:
     """Estimate coarse tissue shape and fine nuclear residuals, then safety-gate composition."""
+    runtime = RuntimeRecorder()
+    feature_started = runtime.start()
     fixed = np.asarray(fixed_points, dtype=float)
     moving = np.asarray(moving_points, dtype=float)
     stage_a_ablation = normalize_ablation_config(
@@ -256,6 +259,7 @@ def two_stage_joint_flow_registration(
         np.asarray(moving_features_image["signed_distance"]), affine_he_metadata,
         grid_x, grid_y, order=1,
     )
+    runtime.stop("joint_feature_construction", feature_started)
 
     shared = dict(kwargs)
     for key in (
@@ -281,6 +285,7 @@ def two_stage_joint_flow_registration(
         detect_axis_reversal=bool(kwargs.get("detect_axis_reversal", True)),
         max_grid_side=max_grid_side,
     )
+    stage_a_started = runtime.start()
     stage_a = tissue_aware_density_flow_registration(
         fixed, moving,
         density_blur_scales=tuple(float(scale) / pixel_size for scale in stage_a_scales_um),
@@ -313,6 +318,8 @@ def two_stage_joint_flow_registration(
         retain_research_diagnostic_fields=retain_research_diagnostic_fields,
         **shared,
     )
+    runtime.stop("stage_a", stage_a_started)
+    intermediate_started = runtime.start()
     stage_a_x = np.asarray(stage_a.attempted_displacement_x, dtype=float)
     stage_a_y = np.asarray(stage_a.attempted_displacement_y, dtype=float)
     stage_a_density_metadata = (stage_a.metrics or {}).get("density_flow", {})
@@ -349,6 +356,8 @@ def two_stage_joint_flow_registration(
         )
     stage_b_shared = dict(shared)
     stage_b_shared["success_metric_moving_points"] = stage_b_success_moving
+    runtime.stop("intermediate_he_mask_processing", intermediate_started)
+    stage_b_started = runtime.start()
     stage_b = tissue_aware_density_flow_registration(
         fixed, stage_a_points,
         density_blur_scales=tuple(float(scale) / pixel_size for scale in stage_b_scales_um),
@@ -375,6 +384,7 @@ def two_stage_joint_flow_registration(
         retain_research_diagnostic_fields=retain_research_diagnostic_fields,
         **stage_b_shared,
     )
+    runtime.stop("stage_b", stage_b_started)
     stage_b_x = np.asarray(stage_b.attempted_displacement_x, dtype=float)
     stage_b_y = np.asarray(stage_b.attempted_displacement_y, dtype=float)
     combined_x, combined_y = _compose_fields(stage_a_x, stage_a_y, stage_b_x, stage_b_y, pixel_size)
@@ -387,6 +397,7 @@ def two_stage_joint_flow_registration(
         combined_x = np.zeros_like(combined_x)
         combined_y = np.zeros_like(combined_y)
 
+    point_metrics_started = runtime.start()
     raw_metric_fixed = kwargs.get("success_metric_fixed_points")
     metric_fixed = fixed if raw_metric_fixed is None else np.asarray(raw_metric_fixed, dtype=float)
     raw_metric_moving = kwargs.get("success_metric_moving_points")
@@ -447,6 +458,8 @@ def two_stage_joint_flow_registration(
     applied_y = np.asarray(selected["field_y"]) if applied else np.zeros_like(combined_y)
     applied_points = moving + _sample_field(moving, applied_x, applied_y, resolved_bounds, pixel_size)
     applied_metrics = selected["metrics"] if applied else {**before_metrics, "mutual_nearest_fraction": before_mutual}
+    runtime.stop("point_metrics", point_metrics_started)
+    safety_qc_started = runtime.start()
     combined_jacobian = _jacobian(combined_x, combined_y, pixel_size)
     stage_a_summary = _stage_metrics(stage_a, stage_a_x, stage_a_y)
     stage_b_summary = _stage_metrics(stage_b, stage_b_x, stage_b_y)
@@ -459,6 +472,7 @@ def two_stage_joint_flow_registration(
         bounds=resolved_bounds, field_spacing=pixel_size,
         block_size_um=float(kwargs.get("local_region_block_size", 100.0)),
     )
+    runtime.stop("jacobian_safety_qc", safety_qc_started)
     stage_a_history = (stage_a.metrics or {}).get("optimization_history", [])
     stage_b_history = (stage_b.metrics or {}).get("optimization_history", [])
     objective_history = [
@@ -510,6 +524,7 @@ def two_stage_joint_flow_registration(
         if applied else
         "Joint Flow candidate was retained for QC, but final output fell back to affine-only."
     )
+    runtime_breakdown = runtime.snapshot()
     return FineWarpResult(
         transformed_points=applied_points,
         grid_x=grid_x, grid_y=grid_y,
@@ -534,6 +549,7 @@ def two_stage_joint_flow_registration(
             "before": {**before_metrics, "mutual_nearest_fraction": before_mutual},
             "attempted": attempted_metrics,
             "applied": applied_metrics,
+            "runtime_breakdown": runtime_breakdown,
             "safety": {
                 "finite_output": bool(np.isfinite(combined_x).all() and np.isfinite(combined_y).all()),
                 "attempted_jacobian_min": final_summary["jacobian_min"],
