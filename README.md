@@ -4,6 +4,12 @@
 
 本アプリは研究用プロトタイプです。診断、治療方針決定、臨床判断、その他の医療用途には使用しないでください。
 
+## 現在の実装状況
+
+Phase 4 まで実装済みです。Workflow C の実験的な Density Flow は、同一の計算実装を NumPy/SciPy（CPU）または CuPy/cupyx（CUDA）で実行できます。CPU が既定で、CUDA は Python API の `device="cuda"` または `device="auto"` から選択します。現時点の Streamlit UI はバックエンド選択を公開していないため、UIからの実行はCPUです。
+
+Phase 4 には、float64 の CPU/CUDA バックエンド、反復中の配列のGPU常駐、バックエンド provenance、処理時間の計測、CPU/CUDA parity test が含まれます。対象範囲とホスト・デバイス間転送の境界は [Density Flow array residency](docs/DENSITY_FLOW_BACKEND.md) を参照してください。
+
 ## アプリの位置づけ
 
 このアプリは、segmentation 前の raw image を処理するアプリではありません。
@@ -50,6 +56,28 @@ mask 由来の特徴量や GeoJSON の world-µm 座標など、入力ごとの�
 pip install -r requirements.txt
 streamlit run app.py
 ```
+
+CUDA バックエンドを利用する環境では、通常の依存関係に加えて任意依存を導入します。`requirements-cuda.txt` は CUDA 13 系向けです。
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-cuda.txt
+python scripts/cupy_smoke_test.py
+```
+
+Python API から Density Flow のバックエンドを指定できます。
+
+```python
+from src.density_flow import tissue_aware_density_flow_registration
+
+result = tissue_aware_density_flow_registration(
+    fixed_points,
+    moving_points,
+    device="cuda",  # "cpu"（既定）/ "cuda" / "auto"
+)
+```
+
+`cuda` は利用可能なCUDAデバイスとCuPyを必須とし、利用不能な場合は明示的にエラーになります。`auto` は起動時に一度だけ判定し、CUDAが利用可能ならCUDA、そうでなければCPUを選択します。CPU/CUDA parity を確立するため、現在は両方とも `float64` 固定です。
 
 8501 など他の Streamlit アプリとポートが重なる場合は、別ポートを指定します。
 
@@ -112,7 +140,7 @@ HE 側の `.npy` は StarDist などで事前検出済みの核中心を想定�
 
 `workflow_c_registration_result.zip` には `registration_result.npz`、`metrics.json`、`parameters.json`、`provenance.json`、`manifest.json` が含まれます。NPZには fixed/original/affine/attempted/applied points、affine transform、attempted/applied displacement field、grid、bounds が保存され、Workflow D は registration を再計算せず利用します。
 
-`Tissue-aware density flow [Experimental]` は独立実装の実験方式です。Workflow C では点群と変位場を計算し、画像への inverse raster mapping は Workflow D が担当します。設計は [docs/DENSITY_FLOW_METHOD.md](docs/DENSITY_FLOW_METHOD.md)、独立実装の来歴は [docs/DENSITY_FLOW_PROVENANCE.md](docs/DENSITY_FLOW_PROVENANCE.md) を参照してください。STalignとの同等性や生物学的精度向上は主張していません。
+`Tissue-aware density flow [Experimental]` は独立実装の実験方式です。Workflow C では点群と変位場を計算し、画像への inverse raster mapping は Workflow D が担当します。Density Flow の反復グリッド計算はCPU/CUDAに対応していますが、前処理、点群metric、plot、artifact exportなどはCPUで実行します。設計は [docs/DENSITY_FLOW_METHOD.md](docs/DENSITY_FLOW_METHOD.md)、独立実装の来歴は [docs/DENSITY_FLOW_PROVENANCE.md](docs/DENSITY_FLOW_PROVENANCE.md)、バックエンド境界は [docs/DENSITY_FLOW_BACKEND.md](docs/DENSITY_FLOW_BACKEND.md) を参照してください。STalignとの同等性や生物学的精度向上は主張していません。
 
 ### Workflow D: Raster Deformation
 
@@ -158,6 +186,8 @@ Workflow C が保存した registration result と元の HE image を入力し�
 - robust pair filtering for fine center-snap warp
 - local translation field fine alignment
 - tissue-aware density-flow point registration と displacement field 計算（Workflow C）
+- Density Flow の NumPy/SciPy CPU backend と CuPy/cupyx CUDA backend
+- CPU/CUDA backend provenance と runtime breakdown
 - 保存済み displacement field による inverse raster mapping（Workflow D）
 - local translation anchors CSV export
 - attempted/applied fine alignment diagnostics
@@ -166,6 +196,24 @@ Workflow C が保存した registration result と元の HE image を入力し�
 - NaN area / eccentricity に対応した matching
 - scatter plot / match overlay / density overlay
 - CSV / PNG / JSON export
+
+## テスト
+
+CPUを含む全テストは次のコマンドで実行します。CUDAデバイスがない環境ではGPU専用テストがskipされます。
+
+```bash
+python -m pytest -q
+```
+
+CUDAノードでは、まずsmoke testを実行し、その後にバックエンドとparityのテストを実行します。
+
+```bash
+python scripts/cupy_smoke_test.py
+python -m pytest -q \
+  tests/test_array_backend.py \
+  tests/test_density_flow_backend.py \
+  tests/test_density_flow_gpu_parity.py
+```
 
 ## segmentation source の方針
 
@@ -185,5 +233,6 @@ Workflow C が保存した registration result と元の HE image を入力し�
 - affine registration が失敗した場合は identity transform に fallback します。
 - Workflow C は最終 HE raster を生成しません。保存した result artifact と元画像を Workflow D へ入力してください。
 - Workflow D の warped HE image は QC 用のMVP出力です。大きな画像の本格的な tiled export は今後の課題です。
+- CUDA対応はWorkflow CのDensity Flow反復グリッド計算が対象です。Workflow Dのraster deformation、Streamlit UIからのGPU選択、Slurmジョブ投入は未実装です。
 - fine center-snap warp は Jacobian min が 0 以下の場合、局所的な fold-over の可能性があります。
 - fine snap を強くしすぎると局所変形が破綻する可能性があるため、`Jacobian min` と overlay QC を確認してください。
