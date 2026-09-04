@@ -6,6 +6,7 @@ from scipy.ndimage import map_coordinates
 
 from app import show_mask_to_mask_workflow, show_point_registration_workflow
 from src.density_flow import joint_density_tissue_structure_registration, tissue_aware_density_flow_registration
+from src.density_flow import _sample_field
 from src.joint_flow import (
     build_fixed_nuclear_structure_features,
     build_he_nuclear_structure_features,
@@ -134,6 +135,51 @@ def test_joint_flow_records_cpu_runtime_breakdown_without_changing_result_fields
     assert all(runtime[name] >= 0.0 for name in runtime)
 
 
+def test_joint_flow_default_device_matches_explicit_cpu_regression():
+    _, _, default = _joint_case(2.0, retain_research_diagnostic_fields=True)
+    _, _, explicit = _joint_case(2.0, retain_research_diagnostic_fields=True, device="cpu")
+
+    assert default.metrics["compute_backend"] == explicit.metrics["compute_backend"] == "cpu"
+    assert default.metrics["stage_backends"] == explicit.metrics["stage_backends"] == {
+        "stage_a": "cpu", "stage_b": "cpu",
+    }
+    assert (
+        default.success, default.applied, default.rejection_reason,
+        default.metrics["joint_flow"]["stage_a_selected_checkpoint"],
+        default.metrics["joint_flow"]["selected_checkpoint"],
+    ) == (
+        explicit.success, explicit.applied, explicit.rejection_reason,
+        explicit.metrics["joint_flow"]["stage_a_selected_checkpoint"],
+        explicit.metrics["joint_flow"]["selected_checkpoint"],
+    )
+    for name in (
+        "attempted_transformed_points", "transformed_points",
+        "attempted_displacement_x", "attempted_displacement_y",
+        "displacement_x", "displacement_y",
+    ):
+        np.testing.assert_array_equal(getattr(default, name), getattr(explicit, name))
+    assert default.metrics["optimization_history"] == explicit.metrics["optimization_history"]
+    assert default.metrics["density_mismatch_summary"] == explicit.metrics["density_mismatch_summary"]
+    assert default.metrics["safety"] == explicit.metrics["safety"]
+    assert default.metrics["local_region_metrics"] == explicit.metrics["local_region_metrics"]
+    for name in default.metrics["joint_flow"]["intermediate_diagnostics"]:
+        np.testing.assert_array_equal(
+            default.metrics["joint_flow"]["intermediate_diagnostics"][name],
+            explicit.metrics["joint_flow"]["intermediate_diagnostics"][name],
+        )
+
+
+def test_joint_field_sampling_uses_xy_components_and_row_column_coordinates():
+    field_x = np.tile(np.arange(6, dtype=float), (5, 1))
+    field_y = np.tile(np.arange(5, dtype=float)[:, None], (1, 6))
+    points = np.array([[1.0, 2.0], [4.0, 3.0]])
+
+    sampled = _sample_field(points, field_x, field_y, (0.0, 0.0, 5.0, 4.0), 1.0)
+
+    np.testing.assert_array_equal(sampled[:, 0], points[:, 0])
+    np.testing.assert_array_equal(sampled[:, 1], points[:, 1])
+
+
 def test_joint_flow_retains_independent_stage_ablation_configuration():
     stage_a = FlowAblationConfig(use_density_term=False, use_structure_term=False)
     stage_b = FlowAblationConfig(use_support_term=False)
@@ -207,6 +253,9 @@ def test_workflow_a_b_and_density_only_implementation_remain_separate():
     assert signature.parameters["tissue_support_channel_weight"].default == 0.0
     assert signature.parameters["structure_channel_weight"].default == 0.0
     assert signature.parameters["checkpoint_policy"].default == "point_metric"
+    joint_signature = inspect.signature(joint_density_tissue_structure_registration)
+    assert joint_signature.parameters["device"].default == "cpu"
+    assert joint_signature.parameters["dtype"].default == "float64"
 
 
 def test_joint_checkpoint_ui_is_workflow_c_only_and_presets_use_stage_objective():

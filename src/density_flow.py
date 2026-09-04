@@ -1939,6 +1939,8 @@ def joint_density_tissue_structure_registration(
     support_weight: float = 0.25,
     structure_weight: float = 0.15,
     soft_jacobian_weight: float = 0.05,
+    device: DeviceName = "cpu",
+    dtype: str = "float64",
     **kwargs,
 ) -> FineWarpResult:
     """Run the dedicated two-stage experimental joint-flow implementation."""
@@ -1954,5 +1956,7 @@ def joint_density_tissue_structure_registration(
         support_weight=support_weight,
         structure_weight=structure_weight,
         soft_jacobian_weight=soft_jacobian_weight,
+        device=device,
+        dtype=dtype,
         **kwargs,
     )

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.ndimage import distance_transform_edt, gaussian_filter, laplace, map_coordinates, sobel
 
+from src.array_backend import DeviceName, get_array_backend
 from src.density_flow import (
     _checkpoint_improves_affine,
     _compose_fields,
@@ -26,6 +27,12 @@ from src.pointset_registration import FineWarpResult, point_bidirectional_distan
 from src.raster_deformation_qc import local_region_metrics
 from src.flow_ablation import FlowAblationConfig, normalize_ablation_config
 from src.runtime_instrumentation import RuntimeRecorder
+
+
+# CuPy and SciPy agree well below the public parity tolerance for the selected
+# Stage A field.  Quantize only the raster boundary so sub-tolerance noise
+# cannot flip integer HE pixels before Stage B feature extraction.
+_INTERMEDIATE_FIELD_DECIMALS = 9
 
 
 def _signed_distance(mask: np.ndarray, physical_scale_um: float, pixel_size_um: float) -> np.ndarray:
@@ -220,9 +227,12 @@ def two_stage_joint_flow_registration(
     stage_a_ablation_config: FlowAblationConfig | dict | None = None,
     stage_b_ablation_config: FlowAblationConfig | dict | None = None,
     retain_research_diagnostic_fields: bool = False,
+    device: DeviceName = "cpu",
+    dtype: str = "float64",
     **kwargs,
 ) -> FineWarpResult:
     """Estimate coarse tissue shape and fine nuclear residuals, then safety-gate composition."""
+    backend = get_array_backend(device, dtype=dtype)
     runtime = RuntimeRecorder()
     feature_started = runtime.start()
     fixed = np.asarray(fixed_points, dtype=float)
@@ -316,8 +326,11 @@ def two_stage_joint_flow_registration(
         checkpoint_strict_displacement_p95_limit=kwargs.get("displacement_p95_limit", 30.0),
         ablation_config=stage_a_ablation,
         retain_research_diagnostic_fields=retain_research_diagnostic_fields,
+        device=backend.name,
+        dtype=dtype,
         **shared,
     )
+    backend.synchronize()
     runtime.stop("stage_a", stage_a_started)
     intermediate_started = runtime.start()
     stage_a_x = np.asarray(stage_a.attempted_displacement_x, dtype=float)
@@ -329,12 +342,16 @@ def two_stage_joint_flow_registration(
     if selected_stage_a_snapshot is not None:
         np.testing.assert_allclose(stage_a_x, selected_stage_a_snapshot["field_x"])
         np.testing.assert_allclose(stage_a_y, selected_stage_a_snapshot["field_y"])
-    stage_a_points = moving + _sample_field(moving, stage_a_x, stage_a_y, resolved_bounds, pixel_size)
+    intermediate_x = np.round(stage_a_x, decimals=_INTERMEDIATE_FIELD_DECIMALS)
+    intermediate_y = np.round(stage_a_y, decimals=_INTERMEDIATE_FIELD_DECIMALS)
+    stage_a_points = moving + _sample_field(
+        moving, intermediate_x, intermediate_y, resolved_bounds, pixel_size
+    )
     stage_a_he = _warp_feature_image(
-        affine_he_image, affine_he_metadata, stage_a_x, stage_a_y, resolved_bounds, pixel_size
+        affine_he_image, affine_he_metadata, intermediate_x, intermediate_y, resolved_bounds, pixel_size
     )
     stage_a_mask = _warp_feature_image(
-        affine_he_tissue_mask, affine_he_metadata, stage_a_x, stage_a_y,
+        affine_he_tissue_mask, affine_he_metadata, intermediate_x, intermediate_y,
         resolved_bounds, pixel_size, nearest=True,
     )
     stage_b_features_image = build_he_nuclear_structure_features(
@@ -352,10 +369,11 @@ def two_stage_joint_flow_registration(
     if stage_b_success_moving is not None:
         stage_b_success_moving = np.asarray(stage_b_success_moving, dtype=float)
         stage_b_success_moving = stage_b_success_moving + _sample_field(
-            stage_b_success_moving, stage_a_x, stage_a_y, resolved_bounds, pixel_size
+            stage_b_success_moving, intermediate_x, intermediate_y, resolved_bounds, pixel_size
         )
     stage_b_shared = dict(shared)
     stage_b_shared["success_metric_moving_points"] = stage_b_success_moving
+    backend.synchronize()
     runtime.stop("intermediate_he_mask_processing", intermediate_started)
     stage_b_started = runtime.start()
     stage_b = tissue_aware_density_flow_registration(
@@ -382,8 +400,11 @@ def two_stage_joint_flow_registration(
         checkpoint_policy="point_metric",
         ablation_config=stage_b_ablation,
         retain_research_diagnostic_fields=retain_research_diagnostic_fields,
+        device=backend.name,
+        dtype=dtype,
         **stage_b_shared,
     )
+    backend.synchronize()
     runtime.stop("stage_b", stage_b_started)
     stage_b_x = np.asarray(stage_b.attempted_displacement_x, dtype=float)
     stage_b_y = np.asarray(stage_b.attempted_displacement_y, dtype=float)
@@ -463,6 +484,7 @@ def two_stage_joint_flow_registration(
     combined_jacobian = _jacobian(combined_x, combined_y, pixel_size)
     stage_a_summary = _stage_metrics(stage_a, stage_a_x, stage_a_y)
     stage_b_summary = _stage_metrics(stage_b, stage_b_x, stage_b_y)
+    stage_b_density_metadata = (stage_b.metrics or {}).get("density_flow", {})
     final_summary = _field_summary(combined_x, combined_y, pixel_size)
     final_deformation = density_flow_deformation_diagnostics(combined_x, combined_y, pixel_size=pixel_size)
     local_table, local_summary = local_region_metrics(
@@ -510,6 +532,19 @@ def two_stage_joint_flow_registration(
             for name, values in (stage_b.metrics or {}).get("selected_update_fields", {}).items()
         },
     }
+    intermediate_diagnostics = {}
+    if retain_research_diagnostic_fields:
+        stage_b_initial_x = float(stage_b_density_metadata.get("global_density_shift_x", 0.0))
+        stage_b_initial_y = float(stage_b_density_metadata.get("global_density_shift_y", 0.0))
+        intermediate_diagnostics = {
+            "stage_a_points": stage_a_points.copy(),
+            "warped_he": np.asarray(stage_a_he).copy(),
+            "warped_mask": np.asarray(stage_a_mask, dtype=bool).copy(),
+            "stage_b_structure_grid": np.asarray(stage_b_structure_grid).copy(),
+            "stage_b_support_grid": np.asarray(stage_b_support_grid).copy(),
+            "stage_b_initial_displacement_x": np.full(shape, stage_b_initial_x, dtype=float),
+            "stage_b_initial_displacement_y": np.full(shape, stage_b_initial_y, dtype=float),
+        }
     final_summary.update({
         "affine_median": before_metrics["symmetric_median_distance"],
         "final_attempted_median": attempted_metrics["symmetric_median_distance"],
@@ -546,6 +581,16 @@ def two_stage_joint_flow_registration(
         applied_metrics=applied_metrics,
         rejection_reason=rejection, applied=applied,
         metrics={
+            "compute_backend": backend.name,
+            "backend_provenance": backend.provenance(),
+            "stage_backends": {
+                "stage_a": (stage_a.metrics or {}).get("compute_backend"),
+                "stage_b": (stage_b.metrics or {}).get("compute_backend"),
+            },
+            "stage_backend_provenance": {
+                "stage_a": (stage_a.metrics or {}).get("backend_provenance", {}),
+                "stage_b": (stage_b.metrics or {}).get("backend_provenance", {}),
+            },
             "before": {**before_metrics, "mutual_nearest_fraction": before_mutual},
             "attempted": attempted_metrics,
             "applied": applied_metrics,
@@ -636,6 +681,13 @@ def two_stage_joint_flow_registration(
                     "mask_field_matches_selected_stage_a": True,
                     "features_derived_from_selected_stage_a_raster": True,
                 },
+                "intermediate_diagnostics": intermediate_diagnostics,
+                "intermediate_processing_backend": "cpu",
+                "intermediate_transfer_policy": (
+                    "selected Stage A displacement transferred once to CPU; HE/mask preprocessing "
+                    "and rgb2hed remain on CPU; the raster-boundary field is rounded to 9 decimal places "
+                    "before discrete image sampling; Stage B feature grids are transferred once to the optimizer backend"
+                ),
                 "fixed_points_moved": False,
                 "ablation_configuration": {
                     "stage_a": stage_a_ablation.to_dict(),
