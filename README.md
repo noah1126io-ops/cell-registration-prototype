@@ -216,6 +216,41 @@ python -m pytest -q \
   tests/test_density_flow_gpu_parity.py
 ```
 
+## Workflow C GPU Slurm worker
+
+Streamlitプロセスはgateway上に残し、Workflow CのGPU計算だけを1 registration = 1 GPUのSlurm jobとして投入できます。現在はCLI worker、sbatch、最小status管理までを提供し、Streamlit UIからのjob submissionは未実装です。
+
+```bash
+python scripts/submit_workflow_c.py \
+  --config examples/workflow_c_synthetic_gpu.json \
+  --runs-dir runs
+```
+
+投入時に表示されるrun directoryの `status.json` を確認します。状態履歴は `queued`、`running`、`completed` または `failed` として保存されます。
+
+```bash
+cat runs/<run_id>/status.json
+cat runs/<run_id>/slurm_job.json
+```
+
+run directoryは次の構造です。
+
+```text
+runs/<run_id>/
+  config.json
+  input/
+  status.json
+  slurm_job.json
+  stdout.log
+  stderr.log
+  result/
+    workflow_c_registration_result.zip
+```
+
+実入力configの `inputs` にはpre-normalized `.npy` の `fixed_points` / `moving_points` を指定します。Joint Flowではさらに `.npy` の `he_image` / `tissue_mask` とJSONの `metadata` が必要です。submitterがこれらをrun directoryへコピーし、workerはjob開始時に `$SLURM_TMPDIR`、未設定なら `/tmp/cellreg_${SLURM_JOB_ID}` へコピーします。計算後は検証済みの最終artifactだけをshared NFSへatomic copyし、copy検証成功後にscratchを削除します。
+
+workerはSlurm allocationとCUDA GPUを必須とし、直接実行やGPU未割当時は明示的に失敗します。batch resourceは `mib-dbia`、1 node、1 task、1 GPU、4 CPU、16 GB、30分です。
+
 ## segmentation source の方針
 
 このアプリは Cellpose 前提ではありません。segmentation source は抽象化し、外部ツール由来のデータを normalized point table に変換して扱います。
@@ -234,6 +269,6 @@ python -m pytest -q \
 - affine registration が失敗した場合は identity transform に fallback します。
 - Workflow C は最終 HE raster を生成しません。保存した result artifact と元画像を Workflow D へ入力してください。
 - Workflow D の warped HE image は QC 用のMVP出力です。大きな画像の本格的な tiled export は今後の課題です。
-- CUDA対応はWorkflow CのDensity FlowおよびJoint Flow Stage A/B反復グリッド計算が対象です。Workflow Dのraster deformation、Streamlit UIからのGPU選択、Slurmジョブ投入は未実装です。
+- CUDA対応はWorkflow CのDensity FlowおよびJoint Flow Stage A/B反復グリッド計算が対象です。Workflow Dのraster deformationとStreamlit UIからのGPU job submissionは未実装です。
 - fine center-snap warp は Jacobian min が 0 以下の場合、局所的な fold-over の可能性があります。
 - fine snap を強くしすぎると局所変形が破綻する可能性があるため、`Jacobian min` と overlay QC を確認してください。

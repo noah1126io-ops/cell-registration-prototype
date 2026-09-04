@@ -1,0 +1,22 @@
+{
+  "fine_method": "joint density + tissue-structure flow",
+  "synthetic": {
+    "deformation_type": "Gaussian bulge",
+    "amplitude_um": 3.0,
+    "dropout_fraction": 0.0,
+    "seed": 42,
+    "size": 64,
+    "n_points": 80
+  },
+  "parameters": {
+    "density_pixel_size": 2.0,
+    "stage_a_scales_um": [12.0, 6.0],
+    "stage_b_scales_um": [6.0, 3.0],
+    "stage_a_iterations": 3,
+    "stage_b_iterations": 3,
+    "detect_axis_reversal": false,
+    "global_translation_initialization": "off",
+    "minimum_absolute_median_improvement": 0.01,
+    "minimum_relative_median_improvement": 0.001
+  }
+}
