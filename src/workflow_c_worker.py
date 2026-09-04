@@ -36,7 +36,12 @@ def _load_case(config: dict[str, Any], scratch: Path):
     synthetic = config.get("synthetic")
     if synthetic is not None:
         sample = generate_synthetic_registration_sample(**synthetic)
-        return sample.fixed_points, sample.moving_points, sample.moving_image, sample.moving_tissue_mask, sample.metadata, sample.bounds
+        return {
+            "fixed": sample.fixed_points, "moving": sample.moving_points,
+            "original_moving": sample.moving_points, "image": sample.moving_image,
+            "mask": sample.moving_tissue_mask, "metadata": sample.metadata,
+            "bounds": sample.bounds,
+        }
     inputs = config.get("inputs", {})
     required = {"fixed_points", "moving_points"}
     missing = sorted(required - inputs.keys())
@@ -48,16 +53,33 @@ def _load_case(config: dict[str, Any], scratch: Path):
     mask = np.load(scratch / inputs["tissue_mask"], allow_pickle=False) if "tissue_mask" in inputs else None
     metadata = json.loads((scratch / inputs["metadata"]).read_text(encoding="utf-8")) if "metadata" in inputs else None
     bounds = tuple(config["bounds"]) if "bounds" in config else None
-    return fixed, moving, image, mask, metadata, bounds
+    optional_arrays = {}
+    for key in ("original_fixed_points", "original_moving_points", "success_metric_fixed_points", "success_metric_moving_points"):
+        if key in inputs:
+            optional_arrays[key] = np.load(scratch / inputs[key], allow_pickle=False)
+    return {
+        "fixed": fixed, "moving": moving,
+        "original_fixed": optional_arrays.get("original_fixed_points", fixed),
+        "original_moving": optional_arrays.get("original_moving_points", moving),
+        "success_metric_fixed": optional_arrays.get("success_metric_fixed_points"),
+        "success_metric_moving": optional_arrays.get("success_metric_moving_points"),
+        "image": image, "mask": mask, "metadata": metadata, "bounds": bounds,
+    }
 
 
 def execute_config(config: dict[str, Any], scratch: Path, slurm_provenance: dict[str, Any]) -> bytes:
-    fixed, moving, image, mask, metadata, bounds = _load_case(config, scratch)
+    case = _load_case(config, scratch)
+    fixed, moving = case["fixed"], case["moving"]
+    image, mask, metadata, bounds = case["image"], case["mask"], case["metadata"], case["bounds"]
     method = config.get("fine_method", "joint density + tissue-structure flow")
     parameters = dict(config.get("parameters", {}))
     parameters.update(device="cuda", dtype="float64")
     if bounds is not None:
         parameters.setdefault("bounds", bounds)
+    if case.get("success_metric_fixed") is not None:
+        parameters["success_metric_fixed_points"] = case["success_metric_fixed"]
+    if case.get("success_metric_moving") is not None:
+        parameters["success_metric_moving_points"] = case["success_metric_moving"]
     if method == "joint density + tissue-structure flow":
         if image is None or mask is None or metadata is None:
             raise ValueError("Joint Flow requires he_image, tissue_mask, and metadata inputs.")
@@ -81,12 +103,16 @@ def execute_config(config: dict[str, Any], scratch: Path, slurm_provenance: dict
         "dtype": "float64",
     }
     metrics = dict(result.metrics)
+    affine = config.get("affine", {})
     return build_workflow_c_result_artifact(
-        fixed_geojson_points=fixed, original_moving_he_points=moving,
+        fixed_geojson_points=case.get("original_fixed", fixed), original_moving_he_points=case["original_moving"],
         affine_he_points=moving, attempted_registered_he_points=result.attempted_transformed_points,
         applied_registered_he_points=result.transformed_points,
-        affine_matrix=np.eye(2), affine_translation=np.zeros(2),
-        affine_flip_x=False, affine_flip_y=False, affine_image_width=width, affine_image_height=height,
+        affine_matrix=np.asarray(affine.get("matrix", np.eye(2)), dtype=float),
+        affine_translation=np.asarray(affine.get("translation", np.zeros(2)), dtype=float),
+        affine_flip_x=bool(affine.get("flip_x", False)), affine_flip_y=bool(affine.get("flip_y", False)),
+        affine_image_width=float(affine.get("image_width", width)),
+        affine_image_height=float(affine.get("image_height", height)),
         attempted_displacement_x=result.attempted_displacement_x,
         attempted_displacement_y=result.attempted_displacement_y,
         applied_displacement_x=result.displacement_x, applied_displacement_y=result.displacement_y,

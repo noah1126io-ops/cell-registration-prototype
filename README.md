@@ -6,7 +6,7 @@
 
 ## 現在の実装状況
 
-Phase 4 まで実装済みです。Workflow C の実験的な Density Flow と Joint Density + Tissue-Structure Flow は、同一の計算実装を NumPy/SciPy（CPU）または CuPy/cupyx（CUDA）で実行できます。Joint FlowもStage A/Bの両方で既存Density Flow backendを再利用します。CPU が既定で、CUDA は Python API の `device="cuda"` または `device="auto"` から選択します。現時点の Streamlit UI はバックエンド選択を公開していないため、UIからの実行はCPUです。
+Workflow C の実験的な Density Flow と Joint Density + Tissue-Structure Flow は、同一の計算実装を NumPy/SciPy（CPU）または CuPy/cupyx（CUDA）で実行できます。Joint FlowもStage A/Bの両方で既存Density Flow backendを再利用します。CPU が既定で、CUDA は Python API の `device="cuda"` または `device="auto"` から選択します。Streamlit UIでは既存のローカルCPU実行を維持し、明示的なGPUボタンからSlurmへ非同期投入できます。CUDAをgateway上のStreamlitプロセスで直接実行することはありません。
 
 Phase 4 には、float64 の CPU/CUDA バックエンド、Density FlowおよびJoint Flow Stage A/B反復中の配列のGPU常駐、バックエンド provenance、同期を含む処理時間の計測、CPU/CUDA parity test が含まれます。Joint Flowの中間HE/mask/structure前処理は明示的なCPU境界です。対象範囲とホスト・デバイス間転送の境界は [Density Flow array residency](docs/DENSITY_FLOW_BACKEND.md) を参照してください。
 
@@ -218,7 +218,7 @@ python -m pytest -q \
 
 ## Workflow C GPU Slurm worker
 
-Streamlitプロセスはgateway上に残し、Workflow CのGPU計算だけを1 registration = 1 GPUのSlurm jobとして投入できます。現在はCLI worker、sbatch、最小status管理までを提供し、Streamlit UIからのjob submissionは未実装です。
+Streamlitプロセスはgateway上に残し、Workflow CのGPU計算だけを1 registration = 1 GPUのSlurm jobとして投入できます。CLIに加えてWorkflow C画面からの明示的な非同期submit、status refresh、直近run/Run ID復元、artifact download、既存Workflow Dへのhandoffに対応しています。
 
 ```bash
 python scripts/submit_workflow_c.py \
@@ -269,6 +269,6 @@ workerはSlurm allocationとCUDA GPUを必須とし、直接実行やGPU未割�
 - affine registration が失敗した場合は identity transform に fallback します。
 - Workflow C は最終 HE raster を生成しません。保存した result artifact と元画像を Workflow D へ入力してください。
 - Workflow D の warped HE image は QC 用のMVP出力です。大きな画像の本格的な tiled export は今後の課題です。
-- CUDA対応はWorkflow CのDensity FlowおよびJoint Flow Stage A/B反復グリッド計算が対象です。Workflow Dのraster deformationとStreamlit UIからのGPU job submissionは未実装です。
+- CUDA対応はWorkflow CのDensity FlowおよびJoint Flow Stage A/B反復グリッド計算が対象です。Workflow Dのraster deformationは未実装で、C→D handoff後もWorkflow Dは既存CPU経路で実行します。
 - fine center-snap warp は Jacobian min が 0 以下の場合、局所的な fold-over の可能性があります。
 - fine snap を強くしすぎると局所変形が破綻する可能性があるため、`Jacobian min` と overlay QC を確認してください。

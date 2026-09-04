@@ -103,6 +103,13 @@ from src.workflow_c_result import (
     build_workflow_c_result_artifact,
     load_workflow_c_result_artifact,
 )
+from src.workflow_c_slurm import submit_prepared_workflow_c
+from src.workflow_c_slurm_ui import (
+    ACTIVE_RUN_KEY,
+    activate_run,
+    load_run_view,
+    recent_runs,
+)
 from src.workflow_d import (
     build_workflow_d_export,
     fine_result_from_artifact,
@@ -1250,6 +1257,7 @@ WORKFLOW_C_CURRENT_RESULT_KEY = "workflow_c_current_result"
 WORKFLOW_SELECTOR_KEY = "workflow-selector"
 WORKFLOW_D_LABEL = "Workflow D: Raster Deformation"
 WORKFLOW_D_ARTIFACT_SOURCE_KEY = "workflow-d-artifact-source"
+WORKFLOW_C_RUNS_DIR = Path(__file__).resolve().parent / "runs"
 
 
 def _store_current_workflow_c_result(
@@ -1291,6 +1299,85 @@ def _workflow_d_artifact_payload(session_state, source: str, uploaded_file) -> t
     if uploaded_file is None:
         return None, None
     return uploaded_file.getvalue(), None
+
+
+def _render_workflow_c_slurm_status(tr, he_image_file=None) -> None:
+    """Render one non-blocking status card backed only by status.json."""
+    runs = recent_runs(WORKFLOW_C_RUNS_DIR)
+    active = st.session_state.get(ACTIVE_RUN_KEY)
+    with st.expander(tr("GPU job status / 履歴", "GPU job status / history"), expanded=bool(active)):
+        if runs:
+            run_ids = [row["run_id"] for row in runs]
+            selected = st.selectbox(
+                tr("最近のrunを選択", "Select a recent run"), run_ids,
+                index=run_ids.index(active["run_id"]) if active and active.get("run_id") in run_ids else 0,
+                key="workflow-c-slurm-run-selector",
+            )
+            if st.button(tr("このrunを表示", "Open selected run"), key="workflow-c-slurm-open-run"):
+                row = next(item for item in runs if item["run_id"] == selected)
+                activate_run(st.session_state, Path(row["run_dir"]), str(row.get("slurm_job_id", "")))
+                active = st.session_state[ACTIVE_RUN_KEY]
+        recovery = st.text_input(
+            tr("Run IDで復元", "Recover by Run ID"), key="workflow-c-slurm-recover-id",
+            help=tr("runs/直下のRun IDだけを指定できます。", "Only a direct child Run ID under runs/ is accepted."),
+        )
+        if st.button(tr("Run IDを復元", "Recover Run ID"), key="workflow-c-slurm-recover"):
+            try:
+                view = load_run_view(WORKFLOW_C_RUNS_DIR, recovery)
+                activate_run(st.session_state, Path(view["run_dir"]), str(view["status"].get("slurm_job_id", "")))
+                active = st.session_state[ACTIVE_RUN_KEY]
+            except (OSError, ValueError, KeyError) as exc:
+                st.error(str(exc))
+        st.button(tr("状態を更新", "Refresh job status"), key="workflow-c-slurm-refresh")
+        if not active:
+            st.info(tr("このセッションで選択中のGPU runはありません。", "No GPU run is selected in this session."))
+            return
+        try:
+            view = load_run_view(WORKFLOW_C_RUNS_DIR, active["run_id"])
+        except (OSError, ValueError, KeyError) as exc:
+            st.error(f"GPU run status error: {exc}")
+            return
+        status = view["status"]
+        st.json({
+            "run_id": view["run_id"], "slurm_job_id": status.get("slurm_job_id"),
+            "state": view["state"], "created_at": status.get("created_at"),
+            "updated_at": status.get("updated_at"),
+        })
+        if view["state"] == "failed":
+            st.error(status.get("error", "GPU job failed."))
+            with st.expander("stderr.log / stdout.log"):
+                st.code(view.get("stderr.log", "") or "(stderr empty)")
+                st.code(view.get("stdout.log", "") or "(stdout empty)")
+        elif view["state"] == "completed":
+            if view.get("artifact_error"):
+                st.error(view["artifact_error"])
+                return
+            artifact = view["artifact"]
+            provenance = artifact.provenance
+            st.json({
+                "fine_method": artifact.fine_method,
+                "fine_status": "applied" if artifact.applied else "rejected",
+                "backend": provenance.get("backend", provenance.get("compute_backend")),
+                "node": provenance.get("hostname"), "gpu": provenance.get("gpu_model"),
+                "runtime_breakdown": artifact.metrics.get("runtime_breakdown", {}),
+                "point_metrics": artifact.metrics.get("attempted", artifact.metrics.get("point_metrics", {})),
+                "safety": artifact.metrics.get("safety", {}),
+            })
+            st.download_button(
+                tr("Workflow C registration resultをダウンロード", "Download Workflow C registration result"),
+                data=view["artifact_bytes"], file_name="workflow_c_registration_result.zip",
+                mime="application/zip", key="workflow-c-slurm-download",
+            )
+            if st.button(tr("Workflow Dへ進む", "Continue to Workflow D"), key="workflow-c-slurm-continue-d"):
+                he_image = read_uploaded_image(he_image_file) if he_image_file is not None else None
+                _store_current_workflow_c_result(
+                    st.session_state, artifact_bytes=view["artifact_bytes"], run_id=view["run_id"],
+                    registration_status="applied" if artifact.applied else "rejected",
+                    method=artifact.fine_method, preset="Slurm GPU", he_image=he_image,
+                    registration_metadata={"metrics": artifact.metrics, "provenance": provenance},
+                )
+                _continue_to_workflow_d(st.session_state)
+                st.rerun()
 
 
 def show_he_geojson_preparation() -> None:
@@ -1385,6 +1472,7 @@ def show_he_geojson_preparation() -> None:
         }
     )
     st.dataframe(input_status, use_container_width=True, hide_index=True)
+    _render_workflow_c_slurm_status(tr, he_image_file)
 
     local_preset = st.session_state.get("workflow-c-local-preset", "balanced")
     local_presets = {
@@ -2227,6 +2315,173 @@ def show_he_geojson_preparation() -> None:
         st.json(ui_parameter_summary)
 
     required_inputs_ready = he_centers_file is not None and geojson_file is not None
+    gpu_method_supported = fine_alignment_method in {
+        "tissue-aware density flow", "joint density + tissue-structure flow",
+    }
+    gpu_inputs_supported = required_inputs_ready and (
+        fine_alignment_method != "joint density + tissue-structure flow" or he_image_file is not None
+    )
+    with st.container(border=True):
+        st.subheader(tr("GPU / Slurm実行", "GPU / Slurm execution"))
+        gpu_info_a, gpu_info_b, gpu_info_c, gpu_info_d = st.columns(4)
+        gpu_info_a.metric(tr("実行", "Execution"), "Slurm GPU")
+        gpu_info_b.metric("Partition", "mib-dbia")
+        gpu_info_c.metric("GPU", "1")
+        gpu_info_d.metric(tr("精度", "Precision"), "float64")
+        if not gpu_method_supported:
+            st.warning(tr(
+                "GPU workerは現在Density FlowとJoint Flowだけをサポートします。選択中の方式はローカルCPUで実行してください。",
+                "The GPU worker currently supports only Density Flow and Joint Flow. Use local CPU for the selected method.",
+            ))
+        elif fine_alignment_method == "joint density + tissue-structure flow" and he_image_file is None:
+            st.warning(tr("Joint Flow GPU実行にはHE画像が必要です。", "Joint Flow GPU execution requires an HE image."))
+        run_gpu = st.button(
+            tr("Workflow CをGPUで実行", "Run Workflow C on GPU"),
+            key="workflow-c-run-on-gpu", use_container_width=True,
+            disabled=not (gpu_method_supported and gpu_inputs_supported),
+        )
+        if run_gpu:
+            try:
+                he_table = load_npy_centers(
+                    he_centers_file, point_source="he_npy", coordinate_order=he_coordinate_order,
+                )
+                fixed_table = load_geojson_centroids(
+                    geojson_file, point_source="fluorescence_geojson",
+                )
+                original_moving = _points_from_table(he_table)
+                fixed_all = _points_from_table(fixed_table)
+                raw_he_image = read_uploaded_image(he_image_file) if he_image_file is not None else None
+                image_height = float(raw_he_image.shape[0]) if raw_he_image is not None else float(np.ceil(original_moving[:, 1].max()))
+                image_width = float(raw_he_image.shape[1]) if raw_he_image is not None else float(np.ceil(original_moving[:, 0].max()))
+                flip_candidates = {
+                    "auto": None, "none": ((False, False),), "x": ((True, False),),
+                    "y": ((False, True),), "x+y": ((True, True),),
+                }[flip_mode]
+                prepared_affine = estimate_affine_with_y_flip(
+                    original_moving, fixed_all, image_height_px=image_height,
+                    image_width_px=image_width, flip_candidates=flip_candidates,
+                    similarity_trim_quantile=similarity_trim, affine_trim_quantile=affine_trim,
+                )
+                prepared_image = prepared_mask = prepared_metadata = None
+                fixed_for_flow = fixed_all
+                metric_fixed = fixed_all
+                metric_moving = prepared_affine.transformed_points
+                if raw_he_image is not None:
+                    tissue_points = np.vstack([fixed_all, prepared_affine.transformed_points])
+                    lower = np.min(tissue_points, axis=0) - 30.0
+                    upper = np.max(tissue_points, axis=0) + 30.0
+                    prepared_image, prepared_metadata = warp_he_image_to_world(
+                        raw_he_image, prepared_affine, None,
+                        output_pixel_size_um=warped_he_pixel_size,
+                        bounds=(float(lower[0]), float(lower[1]), float(upper[0]), float(upper[1])),
+                        output_origin=warped_he_output_origin,
+                    )
+                    prepared_mask = _tissue_mask_from_image(prepared_image, tissue_mask_threshold)
+                    _, fixed_weights, fixed_classes, _ = _point_tissue_validity(
+                        fixed_all, prepared_metadata, prepared_mask, edge_margin=edge_margin,
+                        valid_weight=valid_geojson_weight,
+                        edge_candidate_weight=edge_candidate_weight if use_edge_candidates_for_anchors else 0.0,
+                        moving_points=prepared_affine.transformed_points,
+                        max_nearest_he_distance=cluster_patch_radius + cluster_search_radius,
+                    )
+                    anchor_mask = fixed_classes == "valid"
+                    if use_edge_candidates_for_anchors:
+                        anchor_mask |= fixed_classes == "edge_candidate"
+                    fixed_for_flow = fixed_all[anchor_mask]
+                    valid_fixed = fixed_all[fixed_classes == "valid"]
+                    metric_fixed = valid_fixed if len(valid_fixed) else fixed_for_flow
+                    fixed_for_flow = metric_fixed
+                    _, _, moving_classes, _ = _point_tissue_validity(
+                        prepared_affine.transformed_points, prepared_metadata, prepared_mask,
+                        edge_margin=edge_margin, valid_weight=1.0, edge_candidate_weight=1.0,
+                        moving_points=None, max_nearest_he_distance=None,
+                    )
+                    valid_moving = moving_classes == "valid"
+                    metric_moving = prepared_affine.transformed_points[valid_moving] if np.any(valid_moving) else prepared_affine.transformed_points
+                if len(fixed_for_flow) < 3:
+                    raise ValueError("Fewer than 3 fixed points are valid for GPU fine registration.")
+                blur_scales = [float(value.strip()) for value in density_flow_blur_scales_text.split(",") if value.strip()]
+                parameters = {
+                    "density_pixel_size": float(density_flow_pixel_size),
+                    "density_blur_scales": blur_scales,
+                    "optimization_levels": int(density_flow_levels),
+                    "iterations_per_level": int(density_flow_iterations),
+                    "learning_rate": float(density_flow_learning_rate),
+                    "update_smoothing_sigma": float(density_flow_update_smoothing),
+                    "smoothness_weight": float(density_flow_smoothness_weight),
+                    "magnitude_weight": float(density_flow_magnitude_weight),
+                    "jacobian_barrier_weight": float(density_flow_jacobian_weight),
+                    "tissue_boundary_weight": float(density_flow_boundary_weight),
+                    "inverse_consistency_weight": float(density_flow_inverse_weight),
+                    "jacobian_min_threshold": float(jacobian_min_limit),
+                    "jacobian_max_threshold": float(jacobian_max_limit),
+                    "max_displacement": float(max_final_displacement_um),
+                    "displacement_p95_limit": float(displacement_p95_limit_um) if enable_displacement_p95_limit else None,
+                    "global_translation_initialization": density_flow_global_initialization,
+                    "objective_tolerance": float(density_flow_objective_tolerance),
+                    "early_stopping_patience": int(density_flow_early_stopping_patience),
+                    "point_metric_patience": int(density_flow_point_metric_patience),
+                    "max_backtracking_steps": int(density_flow_max_backtracking_steps),
+                    "minimum_absolute_median_improvement": float(density_flow_min_absolute_improvement),
+                    "minimum_relative_median_improvement": float(density_flow_min_relative_improvement),
+                    "maximum_mutual_nearest_decrease": float(density_flow_max_mutual_decrease),
+                    "maximum_within_fraction_decrease": float(density_flow_max_within_decrease),
+                    "minimum_jacobian_p05": float(density_flow_min_jacobian_p05),
+                    "maximum_jacobian_p95": float(density_flow_max_jacobian_p95),
+                    "local_region_block_size": float(density_flow_local_region_size),
+                    "detect_axis_reversal": bool(density_flow_detect_axis_reversal),
+                    "retain_research_diagnostic_fields": bool(retain_research_diagnostic_fields),
+                }
+                if fine_alignment_method == "joint density + tissue-structure flow":
+                    parameters.update({
+                        "density_weight": float(joint_density_weight), "support_weight": float(joint_support_weight),
+                        "structure_weight": float(joint_structure_weight), "soft_jacobian_weight": float(joint_soft_jacobian_weight),
+                        "stage_a_scales_um": [float(v.strip()) for v in joint_stage_a_scales_text.split(",") if v.strip()],
+                        "stage_b_scales_um": [float(v.strip()) for v in joint_stage_b_scales_text.split(",") if v.strip()],
+                        "stage_a_iterations": int(joint_stage_a_iterations), "stage_b_iterations": int(joint_stage_b_iterations),
+                        "stage_a_learning_rate": float(joint_stage_a_learning_rate), "stage_b_learning_rate": float(joint_stage_b_learning_rate),
+                        "stage_a_update_smoothing": float(joint_stage_a_smoothing), "stage_b_update_smoothing": float(joint_stage_b_smoothing),
+                        "stage_a_density_weight": float(joint_stage_a_density_weight),
+                        "exploratory_max_displacement": float(joint_exploratory_max_displacement),
+                        "exploratory_p95_displacement": float(joint_exploratory_p95_displacement) if joint_exploratory_p95_displacement is not None else None,
+                        "exploratory_jacobian_min": float(joint_exploratory_jacobian_min),
+                        "exploratory_jacobian_max": float(joint_exploratory_jacobian_max),
+                        "stage_a_checkpoint_policy": joint_stage_a_checkpoint_policy,
+                        "stage_a_max_absolute_median_worsening_um": float(joint_stage_a_max_absolute_worsening),
+                        "stage_a_max_relative_median_worsening": float(joint_stage_a_max_relative_worsening),
+                        "stage_a_max_mutual_nearest_decrease": float(joint_stage_a_max_mutual_decrease),
+                        "stage_a_max_within_fraction_decrease": float(joint_stage_a_max_within_decrease),
+                        "joint_preset": joint_preset,
+                        "stage_a_ablation_config": joint_stage_a_ablation_config.to_dict(),
+                        "stage_b_ablation_config": joint_stage_b_ablation_config.to_dict(),
+                    })
+                else:
+                    parameters["ablation_config"] = density_flow_ablation_config.to_dict()
+                arrays = {
+                    "fixed_points": fixed_for_flow, "original_fixed_points": fixed_all,
+                    "moving_points": prepared_affine.transformed_points,
+                    "original_moving_points": original_moving,
+                    "success_metric_fixed_points": metric_fixed,
+                    "success_metric_moving_points": metric_moving,
+                }
+                if prepared_image is not None:
+                    arrays.update(he_image=prepared_image, tissue_mask=prepared_mask, metadata=prepared_metadata)
+                config = {
+                    "fine_method": fine_alignment_method, "parameters": parameters,
+                    "inverse_iterations": int(density_flow_inverse_iterations),
+                    "inverse_tolerance_pixels": float(density_flow_inverse_tolerance_pixels),
+                    "affine": {
+                        "matrix": prepared_affine.affine_matrix.tolist(),
+                        "translation": prepared_affine.translation.tolist(),
+                        "flip_x": prepared_affine.flip_x, "flip_y": prepared_affine.flip_y,
+                        "image_width": prepared_affine.image_width, "image_height": prepared_affine.image_height,
+                    },
+                }
+                run_dir, job_id = submit_prepared_workflow_c(config, arrays, WORKFLOW_C_RUNS_DIR)
+                activate_run(st.session_state, run_dir, job_id)
+                st.success(f"Submitted GPU run {run_dir.name} / Slurm job {job_id}")
+            except Exception as exc:
+                st.error(f"GPU submission failed: {exc}")
     run_registration = st.button(
         tr("REGISTRATIONを実行", "RUN REGISTRATION"),
         type="primary",

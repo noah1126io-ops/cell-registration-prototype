@@ -10,9 +10,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 
 VALID_STATES = {"queued", "running", "completed", "failed"}
-INPUT_KEYS = {"fixed_points", "moving_points", "he_image", "tissue_mask", "metadata"}
+INPUT_KEYS = {
+    "fixed_points", "original_fixed_points", "moving_points", "original_moving_points",
+    "success_metric_fixed_points", "success_metric_moving_points",
+    "he_image", "tissue_mask", "metadata",
+}
 
 
 def utc_now() -> str:
@@ -100,3 +106,25 @@ def submit_workflow_c(config_path: Path, runs_dir: Path, *, run_id: str | None =
     except BaseException as exc:
         update_status(run_dir, "failed", error=f"sbatch submission failed: {exc}")
         raise
+
+
+def submit_prepared_workflow_c(
+    config: dict[str, Any], arrays: dict[str, Any], runs_dir: Path,
+) -> tuple[Path, str]:
+    """Stage UI-prepared arrays through the existing file-based submit API."""
+    temporary = Path(tempfile.mkdtemp(prefix="cellreg-submit-"))
+    try:
+        inputs = {}
+        for key, values in arrays.items():
+            if key == "metadata":
+                path = temporary / "metadata.json"
+                write_json_atomic(path, dict(values))
+            else:
+                path = temporary / f"{key}.npy"
+                np.save(path, np.asarray(values), allow_pickle=False)
+            inputs[key] = str(path)
+        source = temporary / "config.json"
+        write_json_atomic(source, {**config, "inputs": inputs})
+        return submit_workflow_c(source, runs_dir)
+    finally:
+        shutil.rmtree(temporary)
