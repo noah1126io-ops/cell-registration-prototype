@@ -1,0 +1,10 @@
+{
+  "base_config": "workflow_c_synthetic_gpu.json",
+  "method": "grid",
+  "parameters": {
+    "stage_a_learning_rate": [0.10, 0.15],
+    "stage_b_learning_rate": [0.05, 0.075]
+  },
+  "max_trials": 100,
+  "concurrency": 2
+}

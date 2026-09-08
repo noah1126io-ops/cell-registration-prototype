@@ -251,6 +251,18 @@ runs/<run_id>/
 
 workerはSlurm allocationとCUDA GPUを必須とし、直接実行やGPU未割当時は明示的に失敗します。batch resourceは `mib-dbia`、1 node、1 task、1 GPU、4 CPU、16 GB、30分です。
 
+## Workflow C Joint Flow GPU parameter sweep
+
+CLIから決定的なgrid searchを作成し、Slurm job array（既定の同時実行数2、1試行1GPU）で実行できます。基準試行を必ず含め、入力を一度だけ共有領域へ保存し、完全な試行設定・チェックサム・結果CSVを残します。安全判定を通った試行だけをランキングします。
+
+```bash
+python scripts/create_workflow_c_sweep.py --sweep-config examples/workflow_c_sweep_synthetic.json
+python scripts/submit_workflow_c_sweep.py --sweep-dir sweeps/<sweep_id>
+python scripts/summarize_workflow_c_sweep.py --sweep-dir sweeps/<sweep_id>
+```
+
+探索対象の8パラメータ、100試行の上限、baseline、scratch・失敗時の扱い、CSV指標は [Workflow C sweeps](docs/WORKFLOW_C_SWEEPS.md) を参照してください。数値アルゴリズム・安全閾値は変更せず、Streamlit sweep UIはこの段階には含めません。
+
 ## segmentation source の方針
 
 このアプリは Cellpose 前提ではありません。segmentation source は抽象化し、外部ツール由来のデータを normalized point table に変換して扱います。
