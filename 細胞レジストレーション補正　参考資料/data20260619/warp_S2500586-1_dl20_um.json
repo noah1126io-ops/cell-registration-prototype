@@ -1,0 +1,13 @@
+{
+  "he": "sample4_cropped.jpg",
+  "geojson": "S2500586-1_dl20_um.geojson",
+  "flip": true,
+  "image_bounds": [
+    -25.644292,
+    -27.788350000000037,
+    1046.1522840000002,
+    1046.606542
+  ],
+  "jac_min": 0.3799794759324829,
+  "warped_png": "warpedHE_S2500586-1_dl20_um_yflip.png"
+}

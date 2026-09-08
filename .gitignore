@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+.streamlit-*.stdout.log
+.streamlit-*.stderr.log
+
+tests/Untitled-*.ipynb
