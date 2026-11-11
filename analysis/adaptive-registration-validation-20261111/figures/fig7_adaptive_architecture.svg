@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" font-family="Helvetica, Arial, sans-serif" font-size="12">
+  <style>
+    .box{fill:#fcfcfb;stroke:#52514e;stroke-width:1.2}
+    .new{fill:#eaf2fc;stroke:#2a78d6;stroke-width:1.5}
+    .gate{fill:#fdf0e9;stroke:#eb6834;stroke-width:1.5}
+    .t{fill:#0b0b0b;font-weight:bold}
+    .s{fill:#52514e;font-size:10.5px}
+    .a{stroke:#52514e;stroke-width:1.3;fill:none;marker-end:url(#ar)}
+  </style>
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#52514e"/></marker></defs>
+  <rect width="980" height="560" fill="#ffffff"/>
+  <text x="20" y="28" class="t" font-size="15">Adaptive Registration Engine (proposal, research mode) — blue = new, orange = safety gate (unchanged semantics)</text>
+
+  <rect class="box" x="20" y="60" width="150" height="110" rx="6"/>
+  <text x="32" y="82" class="t">Input</text>
+  <text x="32" y="102" class="s">HE / IF images + spacing</text>
+  <text x="32" y="118" class="s">nuclei (both sides)</text>
+  <text x="32" y="134" class="s">provenance: section ids,</text>
+  <text x="32" y="150" class="s">relation SAME/DIFF/UNKNOWN</text>
+
+  <rect class="new" x="200" y="60" width="180" height="110" rx="6"/>
+  <text x="212" y="82" class="t">Data Profiler (pre-search)</text>
+  <text x="212" y="102" class="s">availability, coordinates</text>
+  <text x="212" y="118" class="s">image quality, channel check</text>
+  <text x="212" y="134" class="s">cleft / boundary / repetition</text>
+  <text x="212" y="150" class="s">relation evidence (no SAME guess)</text>
+
+  <rect class="new" x="410" y="60" width="190" height="110" rx="6"/>
+  <text x="422" y="82" class="t">Strategy Planner (rules)</text>
+  <text x="422" y="102" class="s">sources = every usable one</text>
+  <text x="422" y="118" class="s">primary (display / ranking)</text>
+  <text x="422" y="134" class="s">gate: same | adjacent | both</text>
+  <text x="422" y="150" class="s">ICP final? review flags</text>
+
+  <rect class="box" x="630" y="45" width="160" height="65" rx="6"/>
+  <text x="642" y="67" class="t">Image search</text>
+  <text x="642" y="85" class="s">occ+cleft, all rotations</text>
+  <text x="642" y="100" class="s">candidates kept (top-6)</text>
+  <rect class="box" x="630" y="120" width="160" height="65" rx="6"/>
+  <text x="642" y="142" class="t">Point search</text>
+  <text x="642" y="160" class="s">E0x density, union canvas</text>
+  <text x="642" y="175" class="s">candidates kept (top-6)</text>
+  <text x="808" y="92" class="s">Global Search</text>
+  <text x="808" y="106" class="s">(sources run</text>
+  <text x="808" y="120" class="s">independently,</text>
+  <text x="808" y="134" class="s">never discarded</text>
+  <text x="808" y="148" class="s">for a low score)</text>
+
+  <path class="a" d="M170,115 H198"/>
+  <path class="a" d="M380,115 H408"/>
+  <path class="a" d="M600,100 L628,80"/>
+  <path class="a" d="M600,130 L628,150"/>
+
+  <rect class="box" x="630" y="225" width="330" height="80" rx="6"/>
+  <text x="642" y="247" class="t">Refinement</text>
+  <text x="642" y="266" class="s">nuclear ICP: final only if relation SAME (confirmed) and trusted</text>
+  <text x="642" y="282" class="s">otherwise diagnostic (search pose kept, move recorded)</text>
+  <text x="642" y="298" class="s">tissue-level refinement: v1.1 (not in v1.0)</text>
+  <path class="a" d="M710,185 V223"/>
+
+  <rect class="new" x="20" y="340" width="940" height="120" rx="6"/>
+  <text x="32" y="362" class="t">Validation — five separate evidence channels (no channel may be the search score itself)</text>
+  <rect class="box" x="32" y="375" width="170" height="72" rx="5"/>
+  <text x="42" y="395" class="t" font-size="11">Tissue-level</text>
+  <text x="42" y="412" class="s">quadrant (local) +</text>
+  <text x="42" y="427" class="s">global per-quarter search</text>
+  <rect class="box" x="214" y="375" width="170" height="72" rx="5"/>
+  <text x="224" y="395" class="t" font-size="11">Nuclear-level</text>
+  <text x="224" y="412" class="s">≤3 µm proximity vs</text>
+  <text x="224" y="427" class="s">mirror null (both frames)</text>
+  <rect class="box" x="396" y="375" width="170" height="72" rx="5"/>
+  <text x="406" y="395" class="t" font-size="11">Transform plausibility</text>
+  <text x="406" y="412" class="s">scale / anisotropy /</text>
+  <text x="406" y="427" class="s">overlap fraction / ICP move</text>
+  <rect class="box" x="578" y="375" width="170" height="72" rx="5"/>
+  <text x="588" y="395" class="t" font-size="11">Candidate uniqueness</text>
+  <text x="588" y="412" class="s">margin, top-k spread,</text>
+  <text x="588" y="427" class="s">small-field / repetition flags</text>
+  <rect class="box" x="760" y="375" width="188" height="72" rx="5"/>
+  <text x="770" y="395" class="t" font-size="11">Independent evidence</text>
+  <text x="770" y="412" class="s">image vs points agreement,</text>
+  <text x="770" y="427" class="s">landmarks / visual review</text>
+  <path class="a" d="M795,305 V338"/>
+
+  <rect class="gate" x="20" y="485" width="600" height="62" rx="6"/>
+  <text x="32" y="507" class="t">Decision (production gates unchanged)</text>
+  <text x="32" y="525" class="s">ACCEPTED (cell level) only: confirmed SAME + nuclear rule (10-19) + UNIQUE; UNKNOWN/CONFLICT → review</text>
+  <text x="32" y="540" class="s">TISSUE_LEVEL: accepted=False, never auto-exported; NOT_ACCEPTED / AMBIGUOUS / CONFLICT with reasons</text>
+  <path class="a" d="M320,460 V483"/>
+
+  <rect class="box" x="650" y="485" width="310" height="62" rx="6"/>
+  <text x="662" y="507" class="t">Artifact</text>
+  <text x="662" y="525" class="s">profile + plan + all candidates + every evidence</text>
+  <text x="662" y="540" class="s">channel + decision reason; Workflow D only if accepted</text>
+  <path class="a" d="M620,516 H648"/>
+</svg>

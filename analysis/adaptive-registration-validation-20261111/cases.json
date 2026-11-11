@@ -1,0 +1,685 @@
+{
+ "created_at": "2026-11-11T05:46:20.598060+00:00",
+ "note": "written before any engine run of this study; derived from development data (NOT independent)",
+ "correct_region_threshold_um": 100.0,
+ "references": {
+  "031-8_6": {
+   "M": [
+    [
+     0.9210033890751982,
+     -0.21820821105620078
+    ],
+    [
+     0.21820821105620058,
+     0.9210033890751982
+    ]
+   ],
+   "t": [
+    674.5780893550392,
+    747.255119896459
+   ],
+   "source": "landmark fit (8 pairs, user 2026-10-27; LOO median 23.7 um)",
+   "params": {
+    "scale": 0.9464999028316634,
+    "theta_deg": 13.328997979978435,
+    "reflect": false
+   }
+  },
+  "031-6_2": {
+   "M": [
+    [
+     0.9846983486114077,
+     -0.004492208834814493
+    ],
+    [
+     0.00378839361963696,
+     0.9798627233242705
+    ]
+   ],
+   "t": [
+    541.8709742279991,
+    493.7813441161543
+   ],
+   "source": "accepted automatic transform tf-20261022082737-404825d8 (not independent)",
+   "params": {
+    "scale": 0.9822862229404288,
+    "theta_deg": 0.2204308506530445,
+    "reflect": false
+   }
+  }
+ },
+ "cases": [
+  {
+   "case_id": "P8_6_orig",
+   "he_sample": "031-8_6",
+   "if_sample": "031-8_6",
+   "he_ops": [],
+   "if_ops": [],
+   "expected": "POSITIVE",
+   "reference_sample": "031-8_6",
+   "kind": "original pair (development data)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9210033890751982,
+      -0.21820821105620078
+     ],
+     [
+      0.21820821105620058,
+      0.9210033890751982
+     ]
+    ],
+    "t": [
+     674.5780893550392,
+     747.255119896459
+    ],
+    "source": "landmark fit (8 pairs, user 2026-10-27; LOO median 23.7 um)",
+    "landmarks": [
+     {
+      "fixed": [
+       1024.235173108239,
+       921.8286958080033
+      ],
+      "moving": [
+       397.66879007999376,
+       118.88614272529469
+      ]
+     },
+     {
+      "fixed": [
+       785.8915364326202,
+       937.9329676894732
+      ],
+      "moving": [
+       131.83528140613873,
+       152.55594144404665
+      ]
+     },
+     {
+      "fixed": [
+       615.1860185862597,
+       1425.8931502661592
+      ],
+      "moving": [
+       121.42288046762326,
+       694.013572340225
+      ]
+     },
+     {
+      "fixed": [
+       990.4161505534192,
+       1195.6018338303222
+      ],
+      "moving": [
+       452.48043836170143,
+       374.66836242455963
+      ]
+     },
+     {
+      "fixed": [
+       1267.4100987202607,
+       1603.0404358408025
+      ],
+      "moving": [
+       827.6238381543659,
+       730.4016762574804
+      ]
+     },
+     {
+      "fixed": [
+       1394.633942419377,
+       1111.859369399975
+      ],
+      "moving": [
+       842.9713923810033,
+       211.2940963356465
+      ]
+     },
+     {
+      "fixed": [
+       836.5608664378155,
+       1077.5236387958878
+      ],
+      "moving": [
+       236.7644847141927,
+       305.60106434390514
+      ]
+     },
+     {
+      "fixed": [
+       1199.7216347657666,
+       1350.5872592873363
+      ],
+      "moving": [
+       671.049050046859,
+       499.2386599498982
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "case_id": "P8_6_IFhalfL",
+   "he_sample": "031-8_6",
+   "if_sample": "031-8_6",
+   "he_ops": [],
+   "if_ops": [
+    [
+     "crop",
+     0,
+     0,
+     512,
+     1026.048
+    ]
+   ],
+   "expected": "POSITIVE",
+   "reference_sample": "031-8_6",
+   "kind": "IF field = left half (FOV ratio x2)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9210033890751982,
+      -0.21820821105620078
+     ],
+     [
+      0.21820821105620058,
+      0.9210033890751982
+     ]
+    ],
+    "t": [
+     674.5780893550392,
+     747.255119896459
+    ],
+    "source": "landmark fit (8 pairs, user 2026-10-27; LOO median 23.7 um)",
+    "landmarks": [
+     {
+      "fixed": [
+       1024.235173108239,
+       921.8286958080033
+      ],
+      "moving": [
+       397.66879007999376,
+       118.88614272529469
+      ]
+     },
+     {
+      "fixed": [
+       785.8915364326202,
+       937.9329676894732
+      ],
+      "moving": [
+       131.83528140613873,
+       152.55594144404665
+      ]
+     },
+     {
+      "fixed": [
+       615.1860185862597,
+       1425.8931502661592
+      ],
+      "moving": [
+       121.42288046762326,
+       694.013572340225
+      ]
+     },
+     {
+      "fixed": [
+       990.4161505534192,
+       1195.6018338303222
+      ],
+      "moving": [
+       452.48043836170143,
+       374.66836242455963
+      ]
+     },
+     {
+      "fixed": [
+       836.5608664378155,
+       1077.5236387958878
+      ],
+      "moving": [
+       236.7644847141927,
+       305.60106434390514
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "case_id": "P8_6_IF500",
+   "he_sample": "031-8_6",
+   "if_sample": "031-8_6",
+   "he_ops": [],
+   "if_ops": [
+    [
+     "crop",
+     262,
+     262,
+     500,
+     500
+    ]
+   ],
+   "expected": "POSITIVE",
+   "reference_sample": "031-8_6",
+   "kind": "IF field = central 500x500 um (FOV ratio ~18)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9210033890751982,
+      -0.21820821105620078
+     ],
+     [
+      0.21820821105620058,
+      0.9210033890751982
+     ]
+    ],
+    "t": [
+     858.7104259960165,
+     1045.7285591308855
+    ],
+    "source": "landmark fit (8 pairs, user 2026-10-27; LOO median 23.7 um)",
+    "landmarks": [
+     {
+      "fixed": [
+       990.4161505534192,
+       1195.6018338303222
+      ],
+      "moving": [
+       190.48043836170143,
+       112.66836242455963
+      ]
+     },
+     {
+      "fixed": [
+       1199.7216347657666,
+       1350.5872592873363
+      ],
+      "moving": [
+       409.04905004685895,
+       237.2386599498982
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "case_id": "P8_6_HEpartial60",
+   "he_sample": "031-8_6",
+   "if_sample": "031-8_6",
+   "he_ops": [
+    [
+     "crop",
+     0.0,
+     0,
+     1132.0,
+     2151.4182125
+    ]
+   ],
+   "if_ops": [],
+   "expected": "POSITIVE",
+   "reference_sample": "031-8_6",
+   "kind": "HE cropped: 0.60 of the IF footprint inside the HE field (partial overlap)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9210033890751982,
+      -0.21820821105620078
+     ],
+     [
+      0.21820821105620058,
+      0.9210033890751982
+     ]
+    ],
+    "t": [
+     674.5780893550392,
+     747.255119896459
+    ],
+    "source": "landmark fit (8 pairs, user 2026-10-27; LOO median 23.7 um)",
+    "landmarks": [
+     {
+      "fixed": [
+       1024.235173108239,
+       921.8286958080033
+      ],
+      "moving": [
+       397.66879007999376,
+       118.88614272529469
+      ]
+     },
+     {
+      "fixed": [
+       785.8915364326202,
+       937.9329676894732
+      ],
+      "moving": [
+       131.83528140613873,
+       152.55594144404665
+      ]
+     },
+     {
+      "fixed": [
+       615.1860185862597,
+       1425.8931502661592
+      ],
+      "moving": [
+       121.42288046762326,
+       694.013572340225
+      ]
+     },
+     {
+      "fixed": [
+       990.4161505534192,
+       1195.6018338303222
+      ],
+      "moving": [
+       452.48043836170143,
+       374.66836242455963
+      ]
+     },
+     {
+      "fixed": [
+       836.5608664378155,
+       1077.5236387958878
+      ],
+      "moving": [
+       236.7644847141927,
+       305.60106434390514
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "case_id": "N8_6_IFmirror",
+   "he_sample": "031-8_6",
+   "if_sample": "031-8_6",
+   "he_ops": [],
+   "if_ops": [
+    [
+     "mirror_x"
+    ]
+   ],
+   "expected": "NEGATIVE",
+   "reference_sample": null,
+   "kind": "IF mirrored (search is proper-only: no valid pose exists)",
+   "note": "",
+   "reference": null
+  },
+  {
+   "case_id": "N8_6_HEexclude",
+   "he_sample": "031-8_6",
+   "if_sample": "031-8_6",
+   "he_ops": [
+    [
+     "crop",
+     0.0,
+     0.0,
+     2116.0,
+     686.0
+    ]
+   ],
+   "if_ops": [],
+   "expected": "NEGATIVE",
+   "reference_sample": null,
+   "kind": "HE strip 'top' 2116x686 um that excludes the reference footprint (same tissue, wrong region)",
+   "note": "",
+   "reference": null
+  },
+  {
+   "case_id": "N8_6_IF500xHEexclude",
+   "he_sample": "031-8_6",
+   "if_sample": "031-8_6",
+   "he_ops": [
+    [
+     "crop",
+     0.0,
+     0.0,
+     2116.0,
+     686.0
+    ]
+   ],
+   "if_ops": [
+    [
+     "crop",
+     262,
+     262,
+     500,
+     500
+    ]
+   ],
+   "expected": "NEGATIVE",
+   "reference_sample": null,
+   "kind": "IF central 500x500 um vs HE strip 'top' without the reference region (full overlap possible, wrong region)",
+   "note": "",
+   "reference": null
+  },
+  {
+   "case_id": "P6_2_orig",
+   "he_sample": "031-6_2",
+   "if_sample": "031-6_2",
+   "he_ops": [],
+   "if_ops": [],
+   "expected": "POSITIVE",
+   "reference_sample": "031-6_2",
+   "kind": "original pair (development data)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9846983486114077,
+      -0.004492208834814493
+     ],
+     [
+      0.00378839361963696,
+      0.9798627233242705
+     ]
+    ],
+    "t": [
+     541.8709742279991,
+     493.7813441161543
+    ],
+    "source": "accepted automatic transform tf-20261022082737-404825d8 (not independent)"
+   }
+  },
+  {
+   "case_id": "P6_2_IFhalfL",
+   "he_sample": "031-6_2",
+   "if_sample": "031-6_2",
+   "he_ops": [],
+   "if_ops": [
+    [
+     "crop",
+     0,
+     0,
+     512,
+     1026.048
+    ]
+   ],
+   "expected": "POSITIVE",
+   "reference_sample": "031-6_2",
+   "kind": "IF field = left half (FOV ratio x2)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9846983486114077,
+      -0.004492208834814493
+     ],
+     [
+      0.00378839361963696,
+      0.9798627233242705
+     ]
+    ],
+    "t": [
+     541.8709742279991,
+     493.7813441161543
+    ],
+    "source": "accepted automatic transform tf-20261022082737-404825d8 (not independent)"
+   }
+  },
+  {
+   "case_id": "P6_2_IF500",
+   "he_sample": "031-6_2",
+   "if_sample": "031-6_2",
+   "he_ops": [],
+   "if_ops": [
+    [
+     "crop",
+     262,
+     262,
+     500,
+     500
+    ]
+   ],
+   "expected": "POSITIVE",
+   "reference_sample": "031-6_2",
+   "kind": "IF field = central 500x500 um (FOV ratio ~18)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9846983486114077,
+      -0.004492208834814493
+     ],
+     [
+      0.00378839361963696,
+      0.9798627233242705
+     ]
+    ],
+    "t": [
+     798.6849828494665,
+     751.4979367554581
+    ],
+    "source": "accepted automatic transform tf-20261022082737-404825d8 (not independent)"
+   }
+  },
+  {
+   "case_id": "P6_2_HEpartial60",
+   "he_sample": "031-6_2",
+   "if_sample": "031-6_2",
+   "he_ops": [
+    [
+     "crop",
+     0.0,
+     0,
+     1146.0,
+     2153.494142354167
+    ]
+   ],
+   "if_ops": [],
+   "expected": "POSITIVE",
+   "reference_sample": "031-6_2",
+   "kind": "HE cropped: 0.60 of the IF footprint inside the HE field (partial overlap)",
+   "note": "",
+   "reference": {
+    "M": [
+     [
+      0.9846983486114077,
+      -0.004492208834814493
+     ],
+     [
+      0.00378839361963696,
+      0.9798627233242705
+     ]
+    ],
+    "t": [
+     541.8709742279991,
+     493.7813441161543
+    ],
+    "source": "accepted automatic transform tf-20261022082737-404825d8 (not independent)"
+   }
+  },
+  {
+   "case_id": "N6_2_IFmirror",
+   "he_sample": "031-6_2",
+   "if_sample": "031-6_2",
+   "he_ops": [],
+   "if_ops": [
+    [
+     "mirror_x"
+    ]
+   ],
+   "expected": "NEGATIVE",
+   "reference_sample": null,
+   "kind": "IF mirrored (search is proper-only: no valid pose exists)",
+   "note": "",
+   "reference": null
+  },
+  {
+   "case_id": "N6_2_HEexclude",
+   "he_sample": "031-6_2",
+   "if_sample": "031-6_2",
+   "he_ops": [
+    [
+     "crop",
+     0.0,
+     1562.0,
+     2120.0,
+     590.0
+    ]
+   ],
+   "if_ops": [],
+   "expected": "NEGATIVE",
+   "reference_sample": null,
+   "kind": "HE strip 'bottom' 2120x590 um that excludes the reference footprint (same tissue, wrong region)",
+   "note": "",
+   "reference": null
+  },
+  {
+   "case_id": "N6_2_IF500xHEexclude",
+   "he_sample": "031-6_2",
+   "if_sample": "031-6_2",
+   "he_ops": [
+    [
+     "crop",
+     0.0,
+     1562.0,
+     2120.0,
+     590.0
+    ]
+   ],
+   "if_ops": [
+    [
+     "crop",
+     262,
+     262,
+     500,
+     500
+    ]
+   ],
+   "expected": "NEGATIVE",
+   "reference_sample": null,
+   "kind": "IF central 500x500 um vs HE strip 'bottom' without the reference region (full overlap possible, wrong region)",
+   "note": "",
+   "reference": null
+  },
+  {
+   "case_id": "Ncross_HE6_2xIF8_6",
+   "he_sample": "031-6_2",
+   "if_sample": "031-8_6",
+   "he_ops": [],
+   "if_ops": [],
+   "expected": "PRESUMED_NEGATIVE",
+   "reference_sample": null,
+   "kind": "HE 031-6 XY02 x IF 031-8_6 (different stage positions; correspondence not verified)",
+   "note": "",
+   "reference": null
+  },
+  {
+   "case_id": "Ncross_HE8_6xIF6_2",
+   "he_sample": "031-8_6",
+   "if_sample": "031-6_2",
+   "he_ops": [],
+   "if_ops": [],
+   "expected": "PRESUMED_NEGATIVE",
+   "reference_sample": null,
+   "kind": "HE 031-7 XY06 x IF 031-6_2 (different stage positions; correspondence not verified)",
+   "note": "",
+   "reference": null
+  }
+ ]
+}

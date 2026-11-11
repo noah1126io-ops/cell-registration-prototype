@@ -1,0 +1,914 @@
+{
+ "P8_6_orig": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2116.5048467708334,
+    2151.4182125
+   ],
+   "area_mm2": 4.553487074187293,
+   "image_usable": true,
+   "tissue_fraction": 0.6312631323743333,
+   "envelope_fraction": 0.8870932038425591,
+   "boundary_info": 0.11290679615744093,
+   "occ_mean": 0.7333158850669861,
+   "cleft_strength": 0.23476235568523407,
+   "occ_nuclear_corr": 0.5006271785834906,
+   "repetitiveness": 0.05264393240213394,
+   "n_nuclei": 4800,
+   "nuclei_per_mm2": 1054.1371748280858,
+   "nuclear_map_auc": 0.9182071622185154,
+   "nuclei_in_tissue_fraction": 0.8196413678065054,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.39864117734231613,
+   "envelope_fraction": 0.8486333876710402,
+   "boundary_info": 0.15136661232895976,
+   "occ_mean": 0.6443042159080505,
+   "cleft_strength": 0.28430691361427307,
+   "occ_nuclear_corr": -0.2035709369098905,
+   "repetitiveness": 0.06495438516139984,
+   "n_nuclei": 1552,
+   "nuclei_per_mm2": 1474.1998428915622,
+   "nuclear_map_auc": 0.8489637975499678,
+   "nuclei_in_tissue_fraction": 0.7878787878787878,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "DIFFERENT",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 4.325225469958548,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 1.3984895686199308
+ },
+ "P8_6_IFhalfL": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2116.5048467708334,
+    2151.4182125
+   ],
+   "area_mm2": 4.553487074187293,
+   "image_usable": true,
+   "tissue_fraction": 0.6312631323743333,
+   "envelope_fraction": 0.8870932038425591,
+   "boundary_info": 0.11290679615744093,
+   "occ_mean": 0.7333158850669861,
+   "cleft_strength": 0.23476235568523407,
+   "occ_nuclear_corr": 0.5006271785834906,
+   "repetitiveness": 0.05264393240213394,
+   "n_nuclei": 4800,
+   "nuclei_per_mm2": 1054.1371748280858,
+   "nuclear_map_auc": 0.9182071622185154,
+   "nuclei_in_tissue_fraction": 0.8196413678065054,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    512.0,
+    1026.0
+   ],
+   "area_mm2": 0.525312,
+   "image_usable": true,
+   "tissue_fraction": 0.3925438596491228,
+   "envelope_fraction": 0.8564738669590644,
+   "boundary_info": 0.14352613304093564,
+   "occ_mean": 0.6386901140213013,
+   "cleft_strength": 0.2795558571815491,
+   "occ_nuclear_corr": -0.18550935173294833,
+   "repetitiveness": 0.07116615027189255,
+   "n_nuclei": 775,
+   "nuclei_per_mm2": 1475.3137183235867,
+   "nuclear_map_auc": 0.87139682230869,
+   "nuclei_in_tissue_fraction": 0.7859922178988327,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "DIFFERENT",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 8.668157350655026,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 1.399546238907843
+ },
+ "P8_6_IF500": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2116.5048467708334,
+    2151.4182125
+   ],
+   "area_mm2": 4.553487074187293,
+   "image_usable": true,
+   "tissue_fraction": 0.6312631323743333,
+   "envelope_fraction": 0.8870932038425591,
+   "boundary_info": 0.11290679615744093,
+   "occ_mean": 0.7333158850669861,
+   "cleft_strength": 0.23476235568523407,
+   "occ_nuclear_corr": 0.5006271785834906,
+   "repetitiveness": 0.05264393240213394,
+   "n_nuclei": 4800,
+   "nuclei_per_mm2": 1054.1371748280858,
+   "nuclear_map_auc": 0.9182071622185154,
+   "nuclei_in_tissue_fraction": 0.8196413678065054,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    500.0,
+    500.0
+   ],
+   "area_mm2": 0.25,
+   "image_usable": true,
+   "tissue_fraction": 0.47376,
+   "envelope_fraction": 0.9964,
+   "boundary_info": 0.0,
+   "occ_mean": 0.6934496760368347,
+   "cleft_strength": 0.2769244611263275,
+   "occ_nuclear_corr": -0.23253016597326862,
+   "repetitiveness": 0.07343301177024841,
+   "n_nuclei": 385,
+   "nuclei_per_mm2": 1540.0,
+   "nuclear_map_auc": 0.848011227154047,
+   "nuclei_in_tissue_fraction": 0.8407310704960835,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "DIFFERENT",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 18.213948296749173,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 1.4609104363017567
+ },
+ "P8_6_HEpartial60": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    1132.0,
+    2152.0
+   ],
+   "area_mm2": 2.436064,
+   "image_usable": true,
+   "tissue_fraction": 0.6580894426419011,
+   "envelope_fraction": 0.8457478949649927,
+   "boundary_info": 0.1542521050350073,
+   "occ_mean": 0.7350733876228333,
+   "cleft_strength": 0.220183327794075,
+   "occ_nuclear_corr": 0.4957888605610163,
+   "repetitiveness": 0.06557922065258026,
+   "n_nuclei": 2730,
+   "nuclei_per_mm2": 1120.660212539572,
+   "nuclear_map_auc": 0.912833626696003,
+   "nuclei_in_tissue_fraction": 0.8584525119178584,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.39864117734231613,
+   "envelope_fraction": 0.8486333876710402,
+   "boundary_info": 0.15136661232895976,
+   "occ_mean": 0.6443042159080505,
+   "cleft_strength": 0.28430691361427307,
+   "occ_nuclear_corr": -0.2035709369098905,
+   "repetitiveness": 0.06495438516139984,
+   "n_nuclei": 1552,
+   "nuclei_per_mm2": 1474.1998428915622,
+   "nuclear_map_auc": 0.8489637975499678,
+   "nuclei_in_tissue_fraction": 0.7878787878787878,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "DIFFERENT",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 2.313946627624865,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 1.3154744198072492
+ },
+ "N8_6_IFmirror": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2116.5048467708334,
+    2151.4182125
+   ],
+   "area_mm2": 4.553487074187293,
+   "image_usable": true,
+   "tissue_fraction": 0.6312631323743333,
+   "envelope_fraction": 0.8870932038425591,
+   "boundary_info": 0.11290679615744093,
+   "occ_mean": 0.7333158850669861,
+   "cleft_strength": 0.23476235568523407,
+   "occ_nuclear_corr": 0.5006271785834906,
+   "repetitiveness": 0.05264393240213394,
+   "n_nuclei": 4800,
+   "nuclei_per_mm2": 1054.1371748280858,
+   "nuclear_map_auc": 0.9182071622185154,
+   "nuclei_in_tissue_fraction": 0.8196413678065054,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.39864117734231613,
+   "envelope_fraction": 0.8486333876710402,
+   "boundary_info": 0.15136661232895976,
+   "occ_mean": 0.6443041563034058,
+   "cleft_strength": 0.28430691361427307,
+   "occ_nuclear_corr": -0.20357093690989048,
+   "repetitiveness": 0.06495438516139984,
+   "n_nuclei": 1552,
+   "nuclei_per_mm2": 1474.1998428915622,
+   "nuclear_map_auc": 0.8564810567010309,
+   "nuclei_in_tissue_fraction": 0.7822164948453608,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "DIFFERENT",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 4.325225469958548,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 1.3984895686199308
+ },
+ "N8_6_HEexclude": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2116.0,
+    686.0
+   ],
+   "area_mm2": 1.451576,
+   "image_usable": true,
+   "tissue_fraction": 0.543844759075653,
+   "envelope_fraction": 0.7558901497406957,
+   "boundary_info": 0.24410985025930432,
+   "occ_mean": 0.627804160118103,
+   "cleft_strength": 0.26705268025398254,
+   "occ_nuclear_corr": 0.5653031988184074,
+   "repetitiveness": 0.0929461270570755,
+   "n_nuclei": 1401,
+   "nuclei_per_mm2": 965.1578697911787,
+   "nuclear_map_auc": 0.8829348214285714,
+   "nuclei_in_tissue_fraction": 0.8664285714285714,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.39864117734231613,
+   "envelope_fraction": 0.8486333876710402,
+   "boundary_info": 0.15136661232895976,
+   "occ_mean": 0.6443042159080505,
+   "cleft_strength": 0.28430691361427307,
+   "occ_nuclear_corr": -0.2035709369098905,
+   "repetitiveness": 0.06495438516139984,
+   "n_nuclei": 1552,
+   "nuclei_per_mm2": 1474.1998428915622,
+   "nuclear_map_auc": 0.8489637975499678,
+   "nuclei_in_tissue_fraction": 0.7878787878787878,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "DIFFERENT",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 1.3788099942945633,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 1.5274183519951194
+ },
+ "N8_6_IF500xHEexclude": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2116.0,
+    686.0
+   ],
+   "area_mm2": 1.451576,
+   "image_usable": true,
+   "tissue_fraction": 0.543844759075653,
+   "envelope_fraction": 0.7558901497406957,
+   "boundary_info": 0.24410985025930432,
+   "occ_mean": 0.627804160118103,
+   "cleft_strength": 0.26705268025398254,
+   "occ_nuclear_corr": 0.5653031988184074,
+   "repetitiveness": 0.0929461270570755,
+   "n_nuclei": 1401,
+   "nuclei_per_mm2": 965.1578697911787,
+   "nuclear_map_auc": 0.8829348214285714,
+   "nuclei_in_tissue_fraction": 0.8664285714285714,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    500.0,
+    500.0
+   ],
+   "area_mm2": 0.25,
+   "image_usable": true,
+   "tissue_fraction": 0.47376,
+   "envelope_fraction": 0.9964,
+   "boundary_info": 0.0,
+   "occ_mean": 0.6934496760368347,
+   "cleft_strength": 0.2769244611263275,
+   "occ_nuclear_corr": -0.23253016597326862,
+   "repetitiveness": 0.07343301177024841,
+   "n_nuclei": 385,
+   "nuclei_per_mm2": 1540.0,
+   "nuclear_map_auc": 0.848011227154047,
+   "nuclei_in_tissue_fraction": 0.8407310704960835,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "DIFFERENT",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 5.806304,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 1.5955938900785154
+ },
+ "P6_2_orig": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2121.7890318541668,
+    2153.494142354167
+   ],
+   "area_mm2": 4.5692602514092675,
+   "image_usable": true,
+   "tissue_fraction": 0.18179262041491334,
+   "envelope_fraction": 0.17618400260678535,
+   "boundary_info": 0.8238159973932146,
+   "occ_mean": 0.18979544937610626,
+   "cleft_strength": 0.19998283684253693,
+   "occ_nuclear_corr": 0.24921752287724533,
+   "repetitiveness": 0.19938868284225464,
+   "n_nuclei": 1242,
+   "nuclei_per_mm2": 271.8164279692622,
+   "nuclear_map_auc": 0.9334720564516129,
+   "nuclei_in_tissue_fraction": 0.9629032258064516,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.3576143086761739,
+   "envelope_fraction": 0.41110085154406484,
+   "boundary_info": 0.5888991484559352,
+   "occ_mean": 0.327339231967926,
+   "cleft_strength": 0.24087966978549957,
+   "occ_nuclear_corr": 0.2852203899526349,
+   "repetitiveness": 0.10947306454181671,
+   "n_nuclei": 1091,
+   "nuclei_per_mm2": 1036.309296774932,
+   "nuclear_map_auc": 0.9062661778185152,
+   "nuclei_in_tissue_fraction": 0.9376718606782768,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "SAME",
+   "value": "DIFFERENT",
+   "confidence": "CONFLICT",
+   "conflict": true
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 4.34020795409678,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 3.8125337181317125
+ },
+ "P6_2_IFhalfL": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2121.7890318541668,
+    2153.494142354167
+   ],
+   "area_mm2": 4.5692602514092675,
+   "image_usable": true,
+   "tissue_fraction": 0.18179262041491334,
+   "envelope_fraction": 0.17618400260678535,
+   "boundary_info": 0.8238159973932146,
+   "occ_mean": 0.18979544937610626,
+   "cleft_strength": 0.19998283684253693,
+   "occ_nuclear_corr": 0.24921752287724533,
+   "repetitiveness": 0.19938868284225464,
+   "n_nuclei": 1242,
+   "nuclei_per_mm2": 271.8164279692622,
+   "nuclear_map_auc": 0.9334720564516129,
+   "nuclei_in_tissue_fraction": 0.9629032258064516,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    512.0,
+    1026.0
+   ],
+   "area_mm2": 0.525312,
+   "image_usable": true,
+   "tissue_fraction": 0.374901011208577,
+   "envelope_fraction": 0.39813291910331383,
+   "boundary_info": 0.6018670808966862,
+   "occ_mean": 0.33407607674598694,
+   "cleft_strength": 0.20762965083122253,
+   "occ_nuclear_corr": 0.32437279851382506,
+   "repetitiveness": 0.1508568674325943,
+   "n_nuclei": 580,
+   "nuclei_per_mm2": 1104.1057504873295,
+   "nuclear_map_auc": 0.9045546875,
+   "nuclei_in_tissue_fraction": 0.9739583333333334,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "SAME",
+   "value": "DIFFERENT",
+   "confidence": "CONFLICT",
+   "conflict": true
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 8.698183653541642,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 4.061953719045212
+ },
+ "P6_2_IF500": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2121.7890318541668,
+    2153.494142354167
+   ],
+   "area_mm2": 4.5692602514092675,
+   "image_usable": true,
+   "tissue_fraction": 0.18179262041491334,
+   "envelope_fraction": 0.17618400260678535,
+   "boundary_info": 0.8238159973932146,
+   "occ_mean": 0.18979544937610626,
+   "cleft_strength": 0.19998283684253693,
+   "occ_nuclear_corr": 0.24921752287724533,
+   "repetitiveness": 0.19938868284225464,
+   "n_nuclei": 1242,
+   "nuclei_per_mm2": 271.8164279692622,
+   "nuclear_map_auc": 0.9334720564516129,
+   "nuclei_in_tissue_fraction": 0.9629032258064516,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    500.0,
+    500.0
+   ],
+   "area_mm2": 0.25,
+   "image_usable": true,
+   "tissue_fraction": 0.772624,
+   "envelope_fraction": 0.804512,
+   "boundary_info": 0.195488,
+   "occ_mean": 0.6985434889793396,
+   "cleft_strength": 0.20433486998081207,
+   "occ_nuclear_corr": 0.07504465474153349,
+   "repetitiveness": 0.17148137092590332,
+   "n_nuclei": 471,
+   "nuclei_per_mm2": 1884.0,
+   "nuclear_map_auc": 0.9178956289978678,
+   "nuclei_in_tissue_fraction": 0.9872068230277186,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "SAME",
+   "value": "DIFFERENT",
+   "confidence": "CONFLICT",
+   "conflict": true
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 18.27704100563707,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 6.931148400688454
+ },
+ "P6_2_HEpartial60": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    1146.0,
+    2154.0
+   ],
+   "area_mm2": 2.468484,
+   "image_usable": true,
+   "tissue_fraction": 0.15806230820633593,
+   "envelope_fraction": 0.14704289041566918,
+   "boundary_info": 0.8529571095843308,
+   "occ_mean": 0.17429210245609283,
+   "cleft_strength": 0.1964927762746811,
+   "occ_nuclear_corr": 0.30700845601125165,
+   "repetitiveness": 0.3089559078216553,
+   "n_nuclei": 743,
+   "nuclei_per_mm2": 300.99445651663126,
+   "nuclear_map_auc": 0.903165899864682,
+   "nuclei_in_tissue_fraction": 0.9580514208389715,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.3576143086761739,
+   "envelope_fraction": 0.41110085154406484,
+   "boundary_info": 0.5888991484559352,
+   "occ_mean": 0.327339231967926,
+   "cleft_strength": 0.24087966978549957,
+   "occ_nuclear_corr": 0.2852203899526349,
+   "repetitiveness": 0.10947306454181671,
+   "n_nuclei": 1091,
+   "nuclei_per_mm2": 1036.309296774932,
+   "nuclear_map_auc": 0.9062661778185152,
+   "nuclei_in_tissue_fraction": 0.9376718606782768,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "SAME",
+   "value": "DIFFERENT",
+   "confidence": "CONFLICT",
+   "conflict": true
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 2.344741446507948,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 3.442951437604537
+ },
+ "N6_2_IFmirror": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2121.7890318541668,
+    2153.494142354167
+   ],
+   "area_mm2": 4.5692602514092675,
+   "image_usable": true,
+   "tissue_fraction": 0.18179262041491334,
+   "envelope_fraction": 0.17618400260678535,
+   "boundary_info": 0.8238159973932146,
+   "occ_mean": 0.18979544937610626,
+   "cleft_strength": 0.19998283684253693,
+   "occ_nuclear_corr": 0.24921752287724533,
+   "repetitiveness": 0.19938868284225464,
+   "n_nuclei": 1242,
+   "nuclei_per_mm2": 271.8164279692622,
+   "nuclear_map_auc": 0.9334720564516129,
+   "nuclei_in_tissue_fraction": 0.9629032258064516,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.3576143086761739,
+   "envelope_fraction": 0.41110085154406484,
+   "boundary_info": 0.5888991484559352,
+   "occ_mean": 0.327339231967926,
+   "cleft_strength": 0.24087966978549957,
+   "occ_nuclear_corr": 0.2852203899526349,
+   "repetitiveness": 0.10947303473949432,
+   "n_nuclei": 1091,
+   "nuclei_per_mm2": 1036.309296774932,
+   "nuclear_map_auc": 0.9074067827681026,
+   "nuclei_in_tissue_fraction": 0.9349220898258478,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "SAME",
+   "value": "DIFFERENT",
+   "confidence": "CONFLICT",
+   "conflict": true
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 4.34020795409678,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 3.8125337181317125
+ },
+ "N6_2_HEexclude": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2120.0,
+    590.0
+   ],
+   "area_mm2": 1.2508,
+   "image_usable": true,
+   "tissue_fraction": 0.2851295171090502,
+   "envelope_fraction": 0.2747745442916533,
+   "boundary_info": 0.7252254557083466,
+   "occ_mean": 0.2759856581687927,
+   "cleft_strength": 0.20168828964233398,
+   "occ_nuclear_corr": 0.1802717634752653,
+   "repetitiveness": 0.2569875419139862,
+   "n_nuclei": 363,
+   "nuclei_per_mm2": 290.2142628717621,
+   "nuclear_map_auc": 0.9459627423822715,
+   "nuclei_in_tissue_fraction": 0.9529085872576177,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.3576143086761739,
+   "envelope_fraction": 0.41110085154406484,
+   "boundary_info": 0.5888991484559352,
+   "occ_mean": 0.327339231967926,
+   "cleft_strength": 0.24087966978549957,
+   "occ_nuclear_corr": 0.2852203899526349,
+   "repetitiveness": 0.10947306454181671,
+   "n_nuclei": 1091,
+   "nuclei_per_mm2": 1036.309296774932,
+   "nuclear_map_auc": 0.9062661778185152,
+   "nuclei_in_tissue_fraction": 0.9376718606782768,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "SAME",
+   "value": "DIFFERENT",
+   "confidence": "CONFLICT",
+   "conflict": true
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 1.1880986878149264,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 3.570842061724751
+ },
+ "N6_2_IF500xHEexclude": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2120.0,
+    590.0
+   ],
+   "area_mm2": 1.2508,
+   "image_usable": true,
+   "tissue_fraction": 0.2851295171090502,
+   "envelope_fraction": 0.2747745442916533,
+   "boundary_info": 0.7252254557083466,
+   "occ_mean": 0.2759856581687927,
+   "cleft_strength": 0.20168828964233398,
+   "occ_nuclear_corr": 0.1802717634752653,
+   "repetitiveness": 0.2569875419139862,
+   "n_nuclei": 363,
+   "nuclei_per_mm2": 290.2142628717621,
+   "nuclear_map_auc": 0.9459627423822715,
+   "nuclei_in_tissue_fraction": 0.9529085872576177,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    500.0,
+    500.0
+   ],
+   "area_mm2": 0.25,
+   "image_usable": true,
+   "tissue_fraction": 0.772624,
+   "envelope_fraction": 0.804512,
+   "boundary_info": 0.195488,
+   "occ_mean": 0.6985434889793396,
+   "cleft_strength": 0.20433486998081207,
+   "occ_nuclear_corr": 0.07504465474153349,
+   "repetitiveness": 0.17148137092590332,
+   "n_nuclei": 471,
+   "nuclei_per_mm2": 1884.0,
+   "nuclear_map_auc": 0.9178956289978678,
+   "nuclei_in_tissue_fraction": 0.9872068230277186,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "SAME",
+   "value": "DIFFERENT",
+   "confidence": "CONFLICT",
+   "conflict": true
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 5.0032,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 6.491755371900825
+ },
+ "Ncross_HE6_2xIF8_6": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2121.7890318541668,
+    2153.494142354167
+   ],
+   "area_mm2": 4.5692602514092675,
+   "image_usable": true,
+   "tissue_fraction": 0.18179262041491334,
+   "envelope_fraction": 0.17618400260678535,
+   "boundary_info": 0.8238159973932146,
+   "occ_mean": 0.18979544937610626,
+   "cleft_strength": 0.19998283684253693,
+   "occ_nuclear_corr": 0.24921752287724533,
+   "repetitiveness": 0.19938868284225464,
+   "n_nuclei": 1242,
+   "nuclei_per_mm2": 271.8164279692622,
+   "nuclear_map_auc": 0.9334720564516129,
+   "nuclei_in_tissue_fraction": 0.9629032258064516,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.39864117734231613,
+   "envelope_fraction": 0.8486333876710402,
+   "boundary_info": 0.15136661232895976,
+   "occ_mean": 0.6443042159080505,
+   "cleft_strength": 0.28430691361427307,
+   "occ_nuclear_corr": -0.2035709369098905,
+   "repetitiveness": 0.06495438516139984,
+   "n_nuclei": 1552,
+   "nuclei_per_mm2": 1474.1998428915622,
+   "nuclear_map_auc": 0.8489637975499678,
+   "nuclei_in_tissue_fraction": 0.7878787878787878,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "UNKNOWN",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 4.34020795409678,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 5.423512676938971
+ },
+ "Ncross_HE8_6xIF6_2": {
+  "profile_version": "data_profiler 0.1 (2026-11-11, research prototype)",
+  "fixed": {
+   "pixel_um": 0.18872089583333335,
+   "extent_um": [
+    2116.5048467708334,
+    2151.4182125
+   ],
+   "area_mm2": 4.553487074187293,
+   "image_usable": true,
+   "tissue_fraction": 0.6312631323743333,
+   "envelope_fraction": 0.8870932038425591,
+   "boundary_info": 0.11290679615744093,
+   "occ_mean": 0.7333158850669861,
+   "cleft_strength": 0.23476235568523407,
+   "occ_nuclear_corr": 0.5006271785834906,
+   "repetitiveness": 0.05264393240213394,
+   "n_nuclei": 4800,
+   "nuclei_per_mm2": 1054.1371748280858,
+   "nuclear_map_auc": 0.9182071622185154,
+   "nuclei_in_tissue_fraction": 0.8196413678065054,
+   "points_inside_extent_fraction": 1.0
+  },
+  "moving": {
+   "pixel_um": 0.1002,
+   "extent_um": [
+    1026.048,
+    1026.048
+   ],
+   "area_mm2": 1.052774498304,
+   "image_usable": true,
+   "tissue_fraction": 0.3576143086761739,
+   "envelope_fraction": 0.41110085154406484,
+   "boundary_info": 0.5888991484559352,
+   "occ_mean": 0.327339231967926,
+   "cleft_strength": 0.24087966978549957,
+   "occ_nuclear_corr": 0.2852203899526349,
+   "repetitiveness": 0.10947306454181671,
+   "n_nuclei": 1091,
+   "nuclei_per_mm2": 1036.309296774932,
+   "nuclear_map_auc": 0.9062661778185152,
+   "nuclei_in_tissue_fraction": 0.9376718606782768,
+   "points_inside_extent_fraction": 1.0
+  },
+  "relation": {
+   "metadata": "DIFFERENT",
+   "filename_hint": "UNKNOWN",
+   "value": "DIFFERENT",
+   "confidence": "CONFIRMED_METADATA",
+   "conflict": false
+  },
+  "images_both": true,
+  "nuclei_both": true,
+  "fov_area_ratio": 4.325225469958548,
+  "coordinates_consistent": true,
+  "nuclei_density_ratio": 0.9830877057759951
+ }
+}

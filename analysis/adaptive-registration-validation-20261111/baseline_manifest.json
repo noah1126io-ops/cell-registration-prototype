@@ -1,0 +1,225 @@
+{
+ "created_at": "2026-11-11T05:45:28.259161+00:00",
+ "purpose": "engine freeze before external validation (Phase A)",
+ "git": {
+  "branch": "feature/gpu-slurm",
+  "head": "f66ecbe5bfb691dd18695d34702a3fd13c3dcf7a",
+  "status_porcelain": [
+   " M README.md",
+   " M app.py",
+   "?? analysis/",
+   "?? scripts/run_registration_explorer_job.py",
+   "?? slurm/registration_explorer_cpu.sbatch",
+   "?? src/registration_core/",
+   "?? src/registration_explorer/",
+   "?? src/research_store.py",
+   "?? src/workflow_c_research.py",
+   "?? tests/test_registration_core.py",
+   "?? tests/test_registration_explorer.py",
+   "?? tests/test_research_store.py"
+  ],
+  "tracked_diff_sha256": "993a7a0c842f799598767911d69725af1258c7b0b7bb157a40ab1044ca32bfd3",
+  "tracked_diff_file": "cache/baseline_tracked.diff"
+ },
+ "code_sha256": {
+  "app.py": "73f2fda841e68b06e96da1509f57589125bad28f723f5fd6da708d06609b1c30",
+  "src/registration_core/__init__.py": "93eb20a3b321b39c41b5f1f609add0d25797d6e28aa80dd86774f137dd0111a3",
+  "src/registration_core/a2.py": "31f175fb66e325d405ba0fa206165e0bd0c33464f32b9f4e76a5eef822256282",
+  "src/registration_core/features.py": "c13847c5b0364a8380068c3776969eda7bace664a6d474f96f2372b8bba25cfa",
+  "src/registration_core/frames.py": "9f8005a7ed9a39f2408bf7d5ef906751715f7786fdb315e354bd3bbdbf7e947c",
+  "src/registration_core/metrics.py": "927b9c0d7107c29ebceb76f0a3f82ada67ebe9d18c807a7dc128d86ca929f076",
+  "src/registration_core/pipeline.py": "7a114a4f17bef8b1809fddbdcce4e67057ec743eeea289a2942c6f8eb7f74e0e",
+  "src/registration_core/reference.py": "95aba8bd7420699baab9abf44673c2e8766d06189980ab00af49c32134098aee",
+  "src/registration_core/search.py": "507f4a6b83a14fd0eefb3703ede33404b71df14ba8208e53e6150069a233376c",
+  "src/registration_core/workflow.py": "b04d1005df4cd7469e6d42670cd1035d20e7a7a90911e9606090b9eaa250f444",
+  "src/registration_core/workflow_d_bridge.py": "1a35528c0a9386a78ff9426fe426d64fbd1a79c4d11cd00684f837024343573b",
+  "src/registration_explorer/__init__.py": "01a12d25680b7a26b9d7c7fb3df5907bf1a2f4a620a48c8fdc89297735491567",
+  "src/registration_explorer/catalog.py": "2e00b32c8431fd8bc7ca33d2b8849fdcf75014e923220518dc696cb44cbb8e0c",
+  "src/registration_explorer/imaging.py": "9ea7ca0ef139b6916436dc239c14cda7dbef5ecdb46fd49fa386722c7a056a57",
+  "src/registration_explorer/jobs.py": "fc0e7bb3b001bee0a3c157efc7ba9d2f38a324c1980af3956af1c45c33202773",
+  "src/registration_explorer/manual.py": "c076f2cf1ecde4d14e57b354b906a066371a02c1ac690ef109875d6667c1c40a",
+  "src/registration_explorer/page.py": "512d9487c1a2aa04cca0284536a1d86f4e04e37c8a5b677c937cbc9d8085ecf6",
+  "src/registration_explorer/reference_ui.py": "d2c5506ca5dbde213b89e352d9bbf61e33b473fc43fc66e09aa550077f73bad2",
+  "src/registration_explorer/research_ui.py": "5216c23251d60ffcade74adee8c7eda604fe411308fba5759cd0c33d1a6dad5b",
+  "src/registration_explorer/results.py": "b7bba4a1e4510bd023cb16c6eb59e3014e5f6ffb476c01fec3e8ccc38dc1eb6e",
+  "src/registration_explorer/scene.py": "647fe74e2f4da75bfbe75a1dc68a365ee31d6e75fb415e0fbeb85dc1883f37ce",
+  "src/registration_explorer/viewer.py": "57ec55db193f1cce2e1d7171530dc8ecab69a99670c7992d1e5fd133e0b7405d",
+  "src/research_store.py": "a1ac4997bdd945e1b6304661a1760ff7cdb119ab7aa082baa6296e0496c28b99",
+  "src/workflow_c_research.py": "59778028551dece7afe8b0a54b59adb680a56f89d29cc85fe3078933709cb3cf"
+ },
+ "core_version": "registration_core 1.2 (2026-11-10)",
+ "artifact_schema": "cellreg-registration-artifact/1",
+ "workflow_config_defaults": {
+  "localization": "auto",
+  "image_feature": "occ+cleft",
+  "image_combine": "zsum",
+  "feature_res_um": 2.0,
+  "n_candidates": 6,
+  "search": {},
+  "run_points_with_images": true,
+  "local_half_deg": 10.0,
+  "local_step_deg": 1.0,
+  "local_scales": [
+   0.95,
+   0.975,
+   1.0,
+   1.025,
+   1.05
+  ],
+  "local_window_um": 150.0,
+  "section_relation": "auto"
+ },
+ "search_config_defaults": {
+  "res_coarse": 8.0,
+  "res_fine": 4.0,
+  "rot_step": 4.0,
+  "rot_range": [
+   0.0,
+   360.0
+  ],
+  "scales": [
+   0.95,
+   1.0,
+   1.05
+  ],
+  "fine_rot_half": 4.0,
+  "fine_rot_step": 1.0,
+  "fine_scales": [
+   0.97,
+   0.985,
+   1.0,
+   1.015,
+   1.03
+  ],
+  "fine_window_um": 40.0,
+  "chiralities": [
+   "proper"
+  ],
+  "min_overlap_frac": 0.5,
+  "peaks_per_pose": 3,
+  "n_fine": 6,
+  "combine": "zsum",
+  "distinct_um": 40.0,
+  "distinct_deg": 8.0,
+  "ambiguous_margin": 0.1,
+  "min_peak_z": 6.0
+ },
+ "feature_extraction": {
+  "features": [
+   "tissue",
+   "nuclear",
+   "edt",
+   "occ",
+   "cleft"
+  ],
+  "image_feature_default": "occ+cleft",
+  "extract_defaults": {
+   "res_um": 2.0,
+   "tissue_sigma_um": 6.0,
+   "nuc_sigma_um": 2.0,
+   "edt_clip_um": 60.0,
+   "level": null,
+   "cleft_bandpass_um": 60.0
+  },
+  "res_um": 2.0,
+  "pyramid_level_rule": "largest level with ds*pixel_um <= 0.75*res_um"
+ },
+ "icp": {
+  "method": "cropped_icp (overlap-restricted, similarity -> affine)",
+  "trust_region_image": {
+   "max_scale_change": 0.03,
+   "max_rot_change_deg": 2.0,
+   "max_shift_um": 15.0
+  },
+  "relocation_flag_um": 40.0,
+  "adjacent": "diagnostic only (search pose kept)"
+ },
+ "c3_rules": {
+  "same_or_unknown": {
+   "ACCEPT": {
+    "inlier_radius_um": 3.0,
+    "min_inlier": 0.25,
+    "min_inlier_over_null": 3.0
+   },
+   "search_verdict": "UNIQUE",
+   "frames": "fixed and IF frame"
+  },
+  "adjacent": {
+   "QUADRANT_RULE": {
+    "min_agree": 3,
+    "max_shift_um": 30.0,
+    "max_dtheta_deg": 2.0,
+    "half_deg": 4.0,
+    "step_deg": 1.0,
+    "scales": [
+     0.97,
+     1.0,
+     1.03
+    ],
+    "window_um": 100.0
+   },
+   "status": "TISSUE_LEVEL, accepted=False"
+  }
+ },
+ "candidates": {
+  "n_candidates_refined": 6,
+  "n_fine": 6
+ },
+ "section_relation_inference": "def infer_section_relation(sample_id: str, fixed_in: SideInput, moving_in: SideInput, requested: str = \"auto\") -> dict:\n    \"\"\"Same vs adjacent section from the file names (e.g. sample 031-8_6, HE '031-8_6_HE_reference_031-7_XY06' -> 031-7 vs\n    031-8 = adjacent; '031-6_2_HE_031-6_XY02' -> same).  An explicit setting always wins; unparseable -> unknown.\"\"\"\n    if requested != \"auto\":\n        return {\"value\": requested, \"source\": \"config\", \"text\": SECTION_RELATION_TEXT.get(requested, requested)}\n    import re\n    m = re.match(r\"(\\d+-\\d+)_\", sample_id + \"_\")\n    sections = {}\n    for side in (fixed_in, moving_in):\n        name = Path(side.image_path).name if side.image_path else \"\"\n        h = re.search(r\"_HE_(?:reference_)?(\\d+-\\d+)_\", name)\n        if h:\n            sections[side.key] = h.group(1)\n        elif m and name.startswith(sample_id):\n            sections[side.key] = m.group(1)\n    if len(sections) < 2:\n        return {\"value\": \"unknown\", \"source\": \"filename\", \"sections\": sections, \"text\": SECTION_RELATION_TEXT[\"unknown\"]}\n    val = \"same\" if len(set(sections.values())) == 1 else \"adjacent\"\n    return {\"value\": val, \"source\": \"filename\", \"sections\": sections, \"text\": SECTION_RELATION_TEXT[val]}\n",
+ "inputs": {
+  "031-6_2:HE": {
+   "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_HE_031-6_XY02.ome.tif",
+   "image_sha256": "653b78ad432d072fd289bbfd5576c40f01032926aaac789dac4c398c38e79464",
+   "image_bytes": 272033742,
+   "nuclei_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/he-stardist-seqif-registration-20261019/out/031-6_2/he_nuclei.csv",
+   "nuclei_sha256": "de2e8ba868bbeb3b84c73829a3c661d42db5894230c0b5b9220516ab9983c373",
+   "pixel_um": 0.18872089583333335,
+   "shape_px": [
+    11411,
+    11243
+   ],
+   "feature_npz_sha256": "aaae8a73080382f2f76dc8e0e1144858233d8329fcc621d5e6950c18121d8065"
+  },
+  "031-6_2:IF": {
+   "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seqif.ome.tif",
+   "image_sha256": "ac5d875abdf4b7c836ec2760e27fb107f22b47de0e459c8d6f770be7510d45bc",
+   "image_bytes": 218248191,
+   "nuclei_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seg_seqif_level0.geojson",
+   "nuclei_sha256": "494cf5b117e116f45cc94202580e44bb4718bf17ffeff336c083ab0739fc4692",
+   "pixel_um": 0.1002,
+   "shape_px": [
+    10240,
+    10240
+   ],
+   "feature_npz_sha256": "69242a28c3ced4c622d7d54d0d0644817c3748ca66995b383bac0ee5436619ab"
+  },
+  "031-8_6:HE": {
+   "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_HE_reference_031-7_XY06.ome.tif",
+   "image_sha256": "3729d7a1811ebb17627e80f253748d53ed9af78cecc875af50c390515eb892cb",
+   "image_bytes": 413637784,
+   "nuclei_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/he-stardist-seqif-registration-20261019/out/031-8_6/he_nuclei.csv",
+   "nuclei_sha256": "db1a8a4ec1791134f32c5a931c6b8e378f9562cc32fe044b51d80afed70137a8",
+   "pixel_um": 0.18872089583333335,
+   "shape_px": [
+    11400,
+    11215
+   ],
+   "feature_npz_sha256": "cdd620fee8f9e57a61aa855773e9b50ddb79c1e8b4df6a8e38dfaa9c671ce20f"
+  },
+  "031-8_6:IF": {
+   "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_seqif.ome.tif",
+   "image_sha256": "9a9fbd63766e863e7e9d977a4ebf282bcd3fb08c18522348ac8852496a8f5742",
+   "image_bytes": 298844833,
+   "nuclei_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_seg_seqif_level0.geojson",
+   "nuclei_sha256": "22d14527f577eb93075a157c5e50a63360127b934ad359f384f90310c93cd321",
+   "pixel_um": 0.1002,
+   "shape_px": [
+    10240,
+    10240
+   ],
+   "feature_npz_sha256": "c2bd64c6c1b3d0b360a0ce237d4e761073d4f6856358c147c497ddb68b73303a"
+  }
+ },
+ "correct_region_threshold_um": 100.0,
+ "rule_of_this_study": "no default parameter or threshold is changed after seeing results; any variant is a separate run"
+}

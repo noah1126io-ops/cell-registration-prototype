@@ -1,0 +1,17 @@
+case_id,sources,primary,relation,relation_confidence,gate,icp_final,cell_auto_allowed,risk_flags,human_review
+P8_6_orig,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,,
+P8_6_IFhalfL,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,,
+P8_6_IF500,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,SMALL_MOVING_FIELD|NO_TISSUE_BOUNDARY_IN_FIELD,"moving field small relative to fixed: uniqueness of any region is weak, confirm visually"
+P8_6_HEpartial60,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,,
+N8_6_IFmirror,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,,
+N8_6_HEexclude,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,,
+N8_6_IF500xHEexclude,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,NO_TISSUE_BOUNDARY_IN_FIELD,
+P6_2_orig,image+points,image,DIFFERENT,CONFLICT,both,False,False,SPARSE_NUCLEI,section relation records conflict (metadata DIFFERENT vs file name SAME): confirm provenance
+P6_2_IFhalfL,image+points,image,DIFFERENT,CONFLICT,both,False,False,SPARSE_NUCLEI,section relation records conflict (metadata DIFFERENT vs file name SAME): confirm provenance
+P6_2_IF500,image+points,image,DIFFERENT,CONFLICT,both,False,False,SPARSE_NUCLEI|SMALL_MOVING_FIELD,"moving field small relative to fixed: uniqueness of any region is weak, confirm visually / section relation records conflict (metadata DIFFERENT vs file name SAME): confirm provenance"
+P6_2_HEpartial60,image+points,image,DIFFERENT,CONFLICT,both,False,False,,section relation records conflict (metadata DIFFERENT vs file name SAME): confirm provenance
+N6_2_IFmirror,image+points,image,DIFFERENT,CONFLICT,both,False,False,SPARSE_NUCLEI,section relation records conflict (metadata DIFFERENT vs file name SAME): confirm provenance
+N6_2_HEexclude,image+points,image,DIFFERENT,CONFLICT,both,False,False,SPARSE_NUCLEI,section relation records conflict (metadata DIFFERENT vs file name SAME): confirm provenance
+N6_2_IF500xHEexclude,image+points,image,DIFFERENT,CONFLICT,both,False,False,SPARSE_NUCLEI,section relation records conflict (metadata DIFFERENT vs file name SAME): confirm provenance
+Ncross_HE6_2xIF8_6,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,SPARSE_NUCLEI,
+Ncross_HE8_6xIF6_2,image+points,image,DIFFERENT,CONFIRMED_METADATA,adjacent,False,False,,

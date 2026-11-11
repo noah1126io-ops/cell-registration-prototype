@@ -1,0 +1,129 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "cellreg adaptive strategy plan (research)",
+ "type": "object",
+ "required": [
+  "planner_version",
+  "sources",
+  "primary_source",
+  "section_relation",
+  "validation",
+  "refinement",
+  "auto_decision",
+  "reasons"
+ ],
+ "properties": {
+  "planner_version": {
+   "type": "string"
+  },
+  "sources": {
+   "type": "array",
+   "items": {
+    "enum": [
+     "image",
+     "points"
+    ]
+   },
+   "description": "every source with usable input; candidates of all are kept"
+  },
+  "primary_source": {
+   "enum": [
+    "image",
+    "points",
+    null
+   ]
+  },
+  "engine_options": {
+   "type": "object",
+   "description": "registration_core.WorkflowConfig overrides that realise the plan"
+  },
+  "section_relation": {
+   "type": "object",
+   "properties": {
+    "value": {
+     "enum": [
+      "SAME",
+      "DIFFERENT",
+      "UNKNOWN"
+     ]
+    },
+    "confidence": {
+     "type": "string"
+    },
+    "gate": {
+     "enum": [
+      "same",
+      "adjacent",
+      "both"
+     ]
+    }
+   }
+  },
+  "validation": {
+   "type": "object",
+   "properties": {
+    "tissue_level": {
+     "type": "boolean"
+    },
+    "nuclear_level": {
+     "type": "boolean"
+    },
+    "transform_plausibility": {
+     "type": "boolean"
+    },
+    "candidate_uniqueness": {
+     "type": "boolean"
+    },
+    "independent_evidence": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "refinement": {
+   "type": "object",
+   "properties": {
+    "nuclear_icp_final": {
+     "type": "boolean"
+    },
+    "tissue_refine": {
+     "type": "boolean"
+    }
+   }
+  },
+  "auto_decision": {
+   "type": "object",
+   "properties": {
+    "cell_level_auto_accept_allowed": {
+     "type": "boolean"
+    },
+    "tissue_level_auto_accept_allowed": {
+     "const": false
+    },
+    "workflow_d_export_allowed_without_review": {
+     "type": "boolean"
+    }
+   }
+  },
+  "risk_flags": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "human_review": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "reasons": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ }
+}
