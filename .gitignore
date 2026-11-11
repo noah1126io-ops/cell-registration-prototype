@@ -3,3 +3,28 @@ __pycache__/
 runs/
 
 sweeps/
+
+# research analysis: keep code / reports / small tables and figures; large or derived binary data stays on the lab server
+analysis/**/cache/
+analysis/**/runs/
+analysis/**/out/
+analysis/**/pre_edit/
+analysis/**/logs/
+*.npz
+*.npy
+*.tif
+*.tiff
+*.sqlite
+*.sqlite-*
+*.diff
+
+# files >= 5 MB (kept on the lab server only)
+/analysis/contextual-graph-uot-20261008/correspondence_results.csv
+/analysis/contextual-graph-uot-20261008/graph_candidate_diagnostics.csv
+/analysis/contextual-graph-uot-diagnostics-20261008/negative_control_per_nucleus.csv
+/analysis/contextual-uot-cost-ablation-20261008/cost_components.csv
+/analysis/contextual-uot-cost-ablation-20261008/per_nucleus_cost_mass.csv
+/analysis/contextual-uot-cost-ablation-20261008/synthetic_per_nucleus.csv
+/analysis/graph-matching-adoption-separation-20261014/per_nucleus_results.csv
+/analysis/real-affine-candidate-audit-20261014/candidate_source_audit.csv
+/analysis/uot-adoption-validation-20260911/full_field_he_point_overlay.png
