@@ -1,0 +1,70 @@
+{
+  "subset_filter": {
+    "fixed": true,
+    "moving": true,
+    "fixed_exclusion_reasons": {
+      "outside_he_footprint": 77,
+      "within_edge_margin": 72
+    },
+    "moving_exclusion_reasons": {
+      "within_edge_margin": 83,
+      "outside_he_footprint": 5
+    },
+    "edge_margin_px": 10.0,
+    "near_he_um": 43.0
+  },
+  "tissue_mask_semantics": {
+    "mask_fraction_of_canvas": 0.8480944116626171,
+    "mask_equals_nonblack_footprint_fraction": 1.0,
+    "nonblack_fraction": 0.8480944116626171,
+    "he_white_fraction_inside_mask": 0.07652986051993975,
+    "interpretation": "gray>0.05 threshold on an H&E image keeps bright glass/lumen; the mask is the HE image footprint, not tissue."
+  },
+  "saved": {
+    "he_image_footprint_world_polygon": [
+      [
+        14.91867541394629,
+        1006.1875416781548
+      ],
+      [
+        1002.81039098349,
+        1013.4960908456746
+      ],
+      [
+        1014.9414437172367,
+        22.074033259794874
+      ],
+      [
+        27.049728147692917,
+        14.765484092275074
+      ]
+    ],
+    "fixed_inside_he_footprint_fraction": 0.9626073774633653,
+    "fixed_outside_he_footprint_n": 74,
+    "fixed_hull_area_um2": 999826.5786704418
+  },
+  "diagnostic_refit": {
+    "he_image_footprint_world_polygon": [
+      [
+        -7.248939753204354,
+        946.7447181883458
+      ],
+      [
+        989.5228724111882,
+        978.194855047728
+      ],
+      [
+        1020.6789835744182,
+        -19.169526045284556
+      ],
+      [
+        23.907171410025626,
+        -50.61966290466671
+      ]
+    ],
+    "fixed_inside_he_footprint_fraction": 0.9454269833249116,
+    "fixed_outside_he_footprint_n": 108,
+    "fixed_hull_area_um2": 999826.5786704418
+  },
+  "note": "HE image footprint under the re-fit is displaced ~50 um in -y relative to the fluorescence field; the fluorescence acquisition polygon is unknown, so true common area is not certified from point hulls."
+}

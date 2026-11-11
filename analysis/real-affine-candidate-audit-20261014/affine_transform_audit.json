@@ -1,0 +1,96 @@
+{
+  "source_run": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/runs/20260904-161247-698fe6c9",
+  "transform_direction": "normalized HE pixel xy -> fluorescence GeoJSON world xy (um)",
+  "application_order": "optional x/y image-axis flip, then row-vector points @ affine_matrix.T + translation",
+  "estimation_inputs": {
+    "moving": "1,842 normalized HE nucleus centers in image-pixel xy",
+    "fixed": "1,979 fluorescence GeoJSON nucleus centers in application world-um xy",
+    "image_values_used_in_objective": false,
+    "image_dimensions_used_for_flip": [
+      901.0,
+      901.0
+    ]
+  },
+  "estimation_initialization": "Each of 4 x/y flip candidates; within each, rotations 0..330 degrees in 30-degree steps with centroid/RMS-radius scale initialization.",
+  "similarity_stage": {
+    "method": "nearest-neighbor trimmed similarity ICP followed by Umeyama refit",
+    "trim_quantile": 0.8,
+    "max_iterations": 80,
+    "convergence_tolerance": 0.0001
+  },
+  "affine_stage": {
+    "method": "nearest-neighbor trimmed ICP with full 2x2 affine least-squares refit",
+    "trim_quantile": 0.7,
+    "max_iterations": 80,
+    "convergence_tolerance": 0.0001,
+    "reestimated_pairs_used": 1289,
+    "reestimated_mean_trimmed_residual_um": 7.5371674474076436,
+    "reestimated_final_all_point_median_nn_residual_um": 9.838212693968341
+  },
+  "flip_candidate_selection": "Similarity-stage orientation error + target-span penalty when fitted affine determinant < 0 + 0.001 per explicit flip; final affine median residual is only a tie-breaker.",
+  "reestimation_exactly_matches_saved_matrix": true,
+  "reestimation_exactly_matches_saved_translation": true,
+  "reestimated_flip_matches_saved": true,
+  "affine_matrix_after_explicit_flip": [
+    [
+      -1.0964391959706368,
+      0.013463987495834218
+    ],
+    [
+      -0.008111597300243944,
+      -1.1003574446014204
+    ]
+  ],
+  "affine_translation_after_explicit_flip": [
+    1002.81039098349,
+    1013.4960908456746
+  ],
+  "flip_x": true,
+  "flip_y": false,
+  "image_width_px": 901.0,
+  "image_height_px": 901.0,
+  "effective_raw_pixel_to_world_matrix": [
+    [
+      1.0964391959706368,
+      0.013463987495834218
+    ],
+    [
+      0.008111597300243944,
+      -1.1003574446014204
+    ]
+  ],
+  "effective_raw_pixel_to_world_translation": [
+    14.91867541394629,
+    1006.1875416781548
+  ],
+  "determinant_after_explicit_flip": 1.2065842462837078,
+  "effective_determinant_including_flip": -1.2065842462837078,
+  "singular_scales_um_per_input_pixel": [
+    1.1017679477131104,
+    1.0951346413626932
+  ],
+  "effective_x_axis_scale_um_per_pixel": 1.0964692008768406,
+  "effective_y_axis_scale_um_per_pixel": 1.1004398142783893,
+  "polar_rotation_degrees_after_flip": -179.43729420313613,
+  "symmetric_stretch_matrix": [
+    [
+      1.0964659820299796,
+      -0.002656825649249306
+    ],
+    [
+      -0.002656825649249316,
+      1.100436607045824
+    ]
+  ],
+  "shear_indicator_off_diagonal": -0.002656825649249306,
+  "saved_affine_reconstruction_max_abs_error_um": 0.0,
+  "inverse_roundtrip_max_abs_error_px": 1.7053025658242404e-13,
+  "correct_direction_nn_median_um_proxy": 9.895033458833023,
+  "inverse_direction_nn_median_mixed_units_proxy": 11.155732098030732,
+  "independent_landmarks_available": false,
+  "tre_um": null,
+  "raw_he_pixel_spacing_metadata": "UNKNOWN",
+  "raw_he_crop_offset_metadata": "UNKNOWN",
+  "raw_he_downsampling_metadata": "UNKNOWN",
+  "geojson_crs_and_unit_metadata": "UNKNOWN (world-um is an application convention, not retained source CRS metadata)"
+}

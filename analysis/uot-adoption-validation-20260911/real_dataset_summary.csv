@@ -1,0 +1,6 @@
+method,datasets,pass_rate,failure_count,median_symmetric_nn_um,best_symmetric_nn_um,worst_symmetric_nn_um,variance_symmetric_nn_um2,iqr_symmetric_nn_um,warning
+Affine only,1,1.0,0,10.02373079911429,10.02373079911429,10.02373079911429,0.0,0.0,n=1; variance and IQR are mechanically zero and do not establish robustness
+Density Flow baseline,1,1.0,0,9.823836632504275,9.823836632504275,9.823836632504275,0.0,0.0,n=1; variance and IQR are mechanically zero and do not establish robustness
+UOT conservative,1,1.0,0,8.640460045026416,8.640460045026416,8.640460045026416,0.0,0.0,n=1; variance and IQR are mechanically zero and do not establish robustness
+UOT primary,1,1.0,0,8.336520645818148,8.336520645818148,8.336520645818148,0.0,0.0,n=1; variance and IQR are mechanically zero and do not establish robustness
+Joint Flow,1,1.0,0,9.413397659686584,9.413397659686584,9.413397659686584,0.0,0.0,n=1; variance and IQR are mechanically zero and do not establish robustness

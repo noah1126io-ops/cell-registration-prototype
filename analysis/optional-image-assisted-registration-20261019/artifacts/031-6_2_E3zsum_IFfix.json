@@ -1,0 +1,151 @@
+{
+  "sample": "031-6_2",
+  "method": "E3zsum_IFfix",
+  "mode": "P2",
+  "source_frame": {
+    "name": "031-6_2:HE",
+    "modality": "HE",
+    "pixel_um": 0.18872089583333335,
+    "shape_px": [
+      11411,
+      11243
+    ],
+    "origin_um": "UNKNOWN (frame-local (0,0) used)",
+    "origin_known": false,
+    "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_HE_031-6_XY02.ome.tif",
+    "pyramid_downsamples": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ],
+    "axis": "x right, y down (image)"
+  },
+  "target_frame": {
+    "name": "031-6_2:IF",
+    "modality": "IF",
+    "pixel_um": 0.1002,
+    "shape_px": [
+      10240,
+      10240
+    ],
+    "origin_um": "UNKNOWN (frame-local (0,0) used)",
+    "origin_known": false,
+    "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seqif.ome.tif",
+    "pyramid_downsamples": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ],
+    "axis": "x right, y down (image)"
+  },
+  "forward_transform": {
+    "M": [
+      [
+        1.0151440825461113,
+        0.004972777663938555
+      ],
+      [
+        -0.0041294049752026414,
+        1.0199423930962959
+      ]
+    ],
+    "t": [
+      -552.542808435537,
+      -500.9723773641158
+    ],
+    "source_frame": "031-6_2:HE",
+    "target_frame": "031-6_2:IF",
+    "params": {
+      "scale": 1.0175504997308245,
+      "reflect": false,
+      "rotation_deg": -0.23306659228631316,
+      "anisotropy": 1.0047993107860793,
+      "det": 1.0354090195024506
+    }
+  },
+  "inverse_transform": {
+    "M": [
+      [
+        0.9850623028051398,
+        -0.004802718124213507
+      ],
+      [
+        0.0039881871776498165,
+        0.9804280853511619
+      ]
+    ],
+    "t": [
+      541.8830621594324,
+      493.371032896625
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+      "scale": 0.9827522076442722,
+      "reflect": false,
+      "rotation_deg": 0.23197014444112857,
+      "anisotropy": 1.0047993107860793,
+      "det": 0.9658019016296906
+    }
+  },
+  "transform_direction": "computed HE->IF (moving->fixed); inverse stored for image resampling",
+  "output_frame": "031-6_2:IF",
+  "model": "similarity ICP -> affine ICP (cropped)",
+  "roi": {
+    "evaluation": "IF nuclei inside mapped HE footprint (10 um inset)",
+    "origin": "frame-local (UNKNOWN stage origin)"
+  },
+  "validity_region_target_um": [
+    [
+      -552.542808435537,
+      -500.9723773641158
+    ],
+    [
+      1601.378771662463,
+      -509.7341035485848
+    ],
+    [
+      1612.0876192329843,
+      1686.7058655229794
+    ],
+    [
+      -541.8339608650157,
+      1695.4675917074483
+    ]
+  ],
+  "inputs": {
+    "points": true,
+    "visible_images": [
+      "HE",
+      "IF"
+    ],
+    "images_used_in_search": [
+      "HE:tissue",
+      "IF:tissue"
+    ],
+    "point_used_in_search": true
+  },
+  "image_status": [
+    "IMAGE_AVAILABLE",
+    "IMAGE_USABLE"
+  ],
+  "confidence": {
+    "search_verdict": "UNIQUE",
+    "search_margin": 0.5221340732909376,
+    "geometric_pass": true,
+    "inlier_over_null": 12.557692307692307
+  },
+  "failure_reasons": [],
+  "accepted": true,
+  "resampling": {
+    "mapping": "inverse (target pixel -> source pixel)",
+    "interpolation": "bilinear (order 1)",
+    "outside": "constant 0 (no extrapolation)",
+    "validity": "source footprint polygon in target frame"
+  },
+  "schema": "oir-transform-artifact/0.1 (research)"
+}

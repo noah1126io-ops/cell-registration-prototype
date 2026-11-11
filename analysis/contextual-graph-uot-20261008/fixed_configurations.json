@@ -1,0 +1,116 @@
+{
+  "uot": {
+    "cost_scale_um": 10.0,
+    "entropic_regularization": 0.1,
+    "mass_relaxation_kl": 0.5,
+    "minimum_row_mass_ratio": 0.25,
+    "solver": "sinkhorn_translation_invariant",
+    "reg_type": "kl",
+    "max_iterations": 2000,
+    "stop_threshold": 1e-07,
+    "source_trial": "coarse_09 / cost10_e0.1_m0.5"
+  },
+  "regional": {
+    "pixel_size_um": 2.0,
+    "gaussian_sigmas_um": [
+      6.0,
+      12.0
+    ],
+    "dog_sigmas_um": [
+      6.0,
+      18.0
+    ],
+    "region_spacing_um": 42.0,
+    "patch_radius_um": 34.0,
+    "search_radius_um": 18.0,
+    "search_step_um": 3.0,
+    "correct_region_tolerance_um": 7.5
+  },
+  "fingerprint": {
+    "knn_k": 20,
+    "distance_ranks": [
+      1,
+      2,
+      3,
+      5,
+      8,
+      12,
+      16,
+      20
+    ],
+    "radial_radii_um": [
+      12.0,
+      24.0,
+      40.0,
+      64.0
+    ],
+    "angular_harmonics": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "covariance_neighbors": 12,
+    "pairwise_neighbors": 8
+  },
+  "candidates": {
+    "top_k": 30,
+    "source_k": 20,
+    "fingerprint_spatial_pool": 80,
+    "position_scale_um": 10.0,
+    "region_residual_scale_um": 10.0,
+    "outside_cost": 25.0,
+    "weights_without_region": {
+      "position": 0.55,
+      "fingerprint": 0.9
+    },
+    "weights_full": {
+      "position": 0.45,
+      "fingerprint": 0.85,
+      "region": 0.7
+    },
+    "graph_weight": 0.75
+  },
+  "graph": {
+    "mutual_knn": 10,
+    "length_tolerance_um": 5.0,
+    "angle_tolerance_radians": 0.45
+  },
+  "difficulties": {
+    "Easy": {
+      "amplitude_um": 4.0,
+      "missing_fraction": 0.1,
+      "unmatched_fraction": 0.05,
+      "overlap_fraction": 1.0,
+      "noise_um": 0.35,
+      "local_missing_strength": 0.1
+    },
+    "Medium": {
+      "amplitude_um": 8.0,
+      "missing_fraction": 0.3,
+      "unmatched_fraction": 0.15,
+      "overlap_fraction": 0.85,
+      "noise_um": 0.75,
+      "local_missing_strength": 0.22
+    },
+    "Hard": {
+      "amplitude_um": 12.0,
+      "missing_fraction": 0.5,
+      "unmatched_fraction": 0.3,
+      "overlap_fraction": 0.7,
+      "noise_um": 1.25,
+      "local_missing_strength": 0.35
+    }
+  },
+  "seeds": [
+    1101,
+    1102,
+    1103,
+    1104,
+    1105
+  ],
+  "source_of_truth": "/mnt/mib-dbia08_1/users/noa.ganeko/analysis/cpd-uot-comparison-20260909/trials/uot/coarse_09/result.json",
+  "primary_outcome": "persistent cell correspondence recovery",
+  "parameter_sweep_performed": false,
+  "field_reconstruction_performed": false
+}

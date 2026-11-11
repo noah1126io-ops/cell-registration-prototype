@@ -1,0 +1,134 @@
+{
+ "031-6_2": {
+  "n_random": 269,
+  "occ_corr": {
+   "reference": 0.8899850249290466,
+   "random_mean": -0.03553997985711391,
+   "random_sd": 0.19659249605671866,
+   "z_vs_random": 4.707834853061423,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.7574028968811035,
+   "independent_of_search": false
+  },
+  "cleft_corr": {
+   "reference": 0.5692211985588074,
+   "random_mean": -0.00048423003780544773,
+   "random_sd": 0.030733752310040288,
+   "z_vs_random": 18.53680028554463,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.208047017455101,
+   "independent_of_search": false
+  },
+  "tissue_corr": {
+   "reference": 0.8525015711784363,
+   "random_mean": -0.03096691475961302,
+   "random_sd": 0.1824273465410207,
+   "z_vs_random": 4.842851155209848,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.6920632719993591,
+   "independent_of_search": true
+  },
+  "nuclear_corr": {
+   "reference": 0.7972562909126282,
+   "random_mean": -0.005287010442169312,
+   "random_sd": 0.04659678679570635,
+   "z_vs_random": 17.223146842149802,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.21798917651176453,
+   "independent_of_search": true
+  },
+  "edt_corr": {
+   "reference": 0.9894384145736694,
+   "random_mean": -0.047342841511723834,
+   "random_sd": 0.2563681492409268,
+   "z_vs_random": 4.04411101439539,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.9053047299385071,
+   "independent_of_search": true
+  },
+  "tissue_dice": {
+   "reference": 0.9013619440019753,
+   "random_mean": 0.18860725529153136,
+   "random_sd": 0.20867438718128384,
+   "z_vs_random": 3.415630918284405,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.815766907223448,
+   "independent_of_search": true
+  },
+  "env_chamfer_um": {
+   "reference": 6.324555320336759,
+   "random_mean": 174.9268631486935,
+   "random_sd": 82.92285976781287,
+   "z_vs_random": 2.0332428030153515,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 24.08318915758459,
+   "independent_of_search": true
+  }
+ },
+ "031-8_6": {
+  "n_random": 273,
+  "occ_corr": {
+   "reference": 0.21278569102287292,
+   "random_mean": -0.0021247294437841276,
+   "random_sd": 0.0325345051487703,
+   "z_vs_random": 6.605615161009449,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.20408214628696442,
+   "independent_of_search": false
+  },
+  "cleft_corr": {
+   "reference": 0.17019109427928925,
+   "random_mean": -0.0018950842815364333,
+   "random_sd": 0.024712458581399026,
+   "z_vs_random": 6.963539382129882,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.1727418303489685,
+   "independent_of_search": false
+  },
+  "tissue_corr": {
+   "reference": 0.15107864141464233,
+   "random_mean": -0.0036120272944662156,
+   "random_sd": 0.029055686278268864,
+   "z_vs_random": 5.323937876655964,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.2061675637960434,
+   "independent_of_search": true
+  },
+  "nuclear_corr": {
+   "reference": 0.005385247059166431,
+   "random_mean": -0.0013030488580658703,
+   "random_sd": 0.011372292800240215,
+   "z_vs_random": 0.5881220291031397,
+   "frac_random_beating_ref": 0.2893772893772894,
+   "best_wrong_candidate": 0.04251948371529579,
+   "independent_of_search": true
+  },
+  "edt_corr": {
+   "reference": 0.0,
+   "random_mean": 0.029525219844466575,
+   "random_sd": 0.13860351032536045,
+   "z_vs_random": -0.21301927905836243,
+   "frac_random_beating_ref": 0.6556776556776557,
+   "best_wrong_candidate": 0.40316709876060486,
+   "independent_of_search": true
+  },
+  "tissue_dice": {
+   "reference": 0.5477111914880155,
+   "random_mean": 0.4934221764577385,
+   "random_sd": 0.02739899063033012,
+   "z_vs_random": 1.9814239058200989,
+   "frac_random_beating_ref": 0.0,
+   "best_wrong_candidate": 0.5658742748117006,
+   "independent_of_search": true
+  },
+  "env_chamfer_um": {
+   "reference": 30.0,
+   "random_mean": 30.17134577684726,
+   "random_sd": 1.2267560429735676,
+   "z_vs_random": 0.139673880417113,
+   "frac_random_beating_ref": 0.9743589743589743,
+   "best_wrong_candidate": 30.0,
+   "independent_of_search": true
+  }
+ }
+}

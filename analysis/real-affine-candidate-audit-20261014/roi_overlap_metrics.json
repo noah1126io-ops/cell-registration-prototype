@@ -1,0 +1,40 @@
+{
+  "original_counts": {
+    "fixed": 1979,
+    "moving": 1842
+  },
+  "subset_counts": {
+    "fixed": 1830,
+    "moving": 1754
+  },
+  "excluded_counts": {
+    "fixed": 149,
+    "moving": 88
+  },
+  "reconstructed_filter_assumptions": {
+    "edge_margin_px": 10.0,
+    "fixed_nearest_he_max_um": 43.0
+  },
+  "saved_fixed_subset_exactly_reproduced": true,
+  "saved_moving_subset_exactly_reproduced": true,
+  "warped_he_valid_tissue_area_um2": 977344.0,
+  "eroded_10um_tissue_area_um2": 941935.0,
+  "fixed_subset_convex_hull_area_um2": 931616.6782567091,
+  "moving_subset_convex_hull_area_um2": 933421.3027315503,
+  "convex_hull_intersection_area_um2_proxy": 929033.2438047174,
+  "convex_hull_iou_proxy": 0.9925518610089497,
+  "fixed_hull_covered_by_intersection_proxy": 0.9972269340896451,
+  "moving_hull_covered_by_intersection_proxy": 0.9952989513802699,
+  "authoritative_fluorescence_acquisition_polygon_available": false,
+  "roi_interpretation": "HE-derived tissue mask is authoritative for saved subset filtering; hull metrics are geometric proxies, not acquisition-FOV proof.",
+  "fixed_feature_counts": {
+    "outside_image": 0,
+    "outside_tissue_or_background": 77,
+    "within_10px_tissue_boundary": 72
+  },
+  "moving_feature_counts": {
+    "outside_image": 0,
+    "outside_tissue_or_background": 5,
+    "within_10px_tissue_boundary": 83
+  }
+}

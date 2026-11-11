@@ -1,0 +1,37 @@
+sample,check,value,unit,p95,verdict
+031-6_2,IF GeoJSON centroid property vs polygon area centroid,4.836638989558731,px L0 (median),11.014044262127705,CHECK
+031-6_2,IF level1 GeoJSON x2 vs level0 centroid,0.7071067811865476,px L0 (median),0.7071067811871906,level1 = level0/2
+031-6_2,IF nuclei centroids inside IF image,1.0,fraction,,all inside
+031-6_2,IF polygon vertex range x/y,9981.5,px L0 (x max; y max 10062; min 44); image 10240x10240,,within image
+031-6_2,IF channel R (Desmoplakin): AUC nuclei-vs-ring (10 px L1),0.428673775975,AUC,,not nuclear
+031-6_2,IF channel G (Dystrophin1): AUC nuclei-vs-ring (10 px L1),0.3739745296,AUC,,not nuclear
+031-6_2,IF channel B (Hoechst+Desmoplakin): AUC nuclei-vs-ring (10 px L1),0.86144158145,AUC,,nuclear-like
+031-6_2,IF channel B-R (Hoechst estimate): AUC nuclei-vs-ring (10 px L1),0.893136893625,AUC,,nuclear-like
+031-6_2,IF B-R signal under nuclear mask: offset of maximum,0.2004,"um (dx,dy)=(np.int64(0), np.int64(-1)) px L1",,GeoJSON registered to image
+031-6_2,HE StarDist centroids inside HE image,1.0,fraction,,all inside
+031-6_2,HE hematoxylin under StarDist centroids: offset of maximum,0.0,"um (dx,dy)=(np.int64(0), np.int64(0)) px L1",,xy order / frame consistent
+031-6_2,seg_he.geojson = affine(seqIF L0 px) fit residual,0.005065392450369491,"HE px (median); M diag=0.52321,0.52314 off-diag=-4.1e-08,-3.9e-08",0.009467891145416955,pure scale+translation
+031-6_2,seg_he scale vs pixel-spacing ratio (IF/HE),0.9854376454191414,ratio (1 = physical spacing only),,provider scale 0.9850
+031-6_2,provider json reproduces seg_he (a_x/10 per IF L0 px),8.45965956573007,HE px (median),,approximately (convention of a_* UNKNOWN)
+031-6_2,IF footprint inside HE image under provider placement,1.0,area fraction,,IF field contained in HE field
+031-6_2,HE physical extent,2121.7890318541668,um x (y 2153.5),,image size x spacing
+031-6_2,IF physical extent,1026.048,um x (y 1026.0),,image size x spacing
+031-6_2,Stage/crop origin in OME,0.0,bool,,UNKNOWN: frame-local origins only
+031-8_6,IF GeoJSON centroid property vs polygon area centroid,5.720712783515627,px L0 (median),14.315585840727108,CHECK
+031-8_6,IF level1 GeoJSON x2 vs level0 centroid,0.7071067811865476,px L0 (median),0.7071067811871906,level1 = level0/2
+031-8_6,IF nuclei centroids inside IF image,1.0,fraction,,all inside
+031-8_6,IF polygon vertex range x/y,10239.5,px L0 (x max; y max 10176; min -0); image 10240x10240,,within image
+031-8_6,IF channel R (Desmoplakin): AUC nuclei-vs-ring (10 px L1),0.4791302285,AUC,,not nuclear
+031-8_6,IF channel G (Dystrophin1): AUC nuclei-vs-ring (10 px L1),0.3494349589,AUC,,not nuclear
+031-8_6,IF channel B (Hoechst+Desmoplakin): AUC nuclei-vs-ring (10 px L1),0.88049712475,AUC,,nuclear-like
+031-8_6,IF channel B-R (Hoechst estimate): AUC nuclei-vs-ring (10 px L1),0.90396614135,AUC,,nuclear-like
+031-8_6,IF B-R signal under nuclear mask: offset of maximum,0.2004,"um (dx,dy)=(np.int64(-1), np.int64(0)) px L1",,GeoJSON registered to image
+031-8_6,HE StarDist centroids inside HE image,1.0,fraction,,all inside
+031-8_6,HE hematoxylin under StarDist centroids: offset of maximum,0.0,"um (dx,dy)=(np.int64(0), np.int64(0)) px L1",,xy order / frame consistent
+031-8_6,seg_he.geojson = affine(seqIF L0 px) fit residual,0.3728902935488456,"HE px (median); M diag=0.52165,0.52165 off-diag=-6.9e-07,6.8e-07",0.8811097622255518,pure scale+translation
+031-8_6,seg_he scale vs pixel-spacing ratio (IF/HE),0.9825008069722282,ratio (1 = physical spacing only),,provider scale 0.9825
+031-8_6,provider json reproduces seg_he (a_x/10 per IF L0 px),7.621137042290419,HE px (median),,approximately (convention of a_* UNKNOWN)
+031-8_6,IF footprint inside HE image under provider placement,1.0,area fraction,,IF field contained in HE field
+031-8_6,HE physical extent,2116.5048467708334,um x (y 2151.4),,image size x spacing
+031-8_6,IF physical extent,1026.048,um x (y 1026.0),,image size x spacing
+031-8_6,Stage/crop origin in OME,0.0,bool,,UNKNOWN: frame-local origins only

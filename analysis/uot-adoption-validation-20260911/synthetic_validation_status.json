@@ -1,0 +1,45 @@
+{
+  "state": "completed",
+  "rows": 250,
+  "scenarios": 50,
+  "seeds": [
+    1101,
+    1102,
+    1103,
+    1104,
+    1105
+  ],
+  "methods": [
+    "Affine only",
+    "Density Flow baseline",
+    "UOT conservative",
+    "UOT primary",
+    "Joint Flow"
+  ],
+  "exception_count": 0,
+  "affine_reconstruction_error_max_um": 6.355287432313019e-14,
+  "uot_vs_joint": {
+    "UOT conservative": {
+      "field_error_delta_vs_joint_um": -0.6344824660998412,
+      "independent_tre_delta_vs_joint_um": -0.800266647837593,
+      "unmatched_movement_delta_vs_joint_um": 0.04954954909568743,
+      "pass_rate_delta_vs_joint": 0.12,
+      "field_error_wins": 46,
+      "field_error_losses": 3,
+      "field_error_ties": 1,
+      "nn_better_but_field_error_worse_count": 1
+    },
+    "UOT primary": {
+      "field_error_delta_vs_joint_um": 0.0,
+      "independent_tre_delta_vs_joint_um": 0.0,
+      "unmatched_movement_delta_vs_joint_um": 0.32790738339847825,
+      "pass_rate_delta_vs_joint": -0.17999999999999994,
+      "field_error_wins": 17,
+      "field_error_losses": 29,
+      "field_error_ties": 4,
+      "nn_better_but_field_error_worse_count": 19
+    }
+  },
+  "runtime_is_formal_benchmark": false,
+  "parameter_tuning_performed": false
+}

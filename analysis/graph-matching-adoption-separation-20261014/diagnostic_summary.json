@@ -1,0 +1,312 @@
+{
+  "purpose": "graph_matching_adoption_separation_analysis_only",
+  "branch": "feature/gpu-slurm",
+  "elapsed_seconds": 179.61600279808044,
+  "decision": "A. SEPARATED MATCHING SUPPORTED",
+  "decision_facts": {
+    "graph_auc": 0.9853436568229623,
+    "graph_top1_gain_vs_position": 0.05292479108635095,
+    "separated_coverage_gain_at_95_precision": 0.03075489282385835,
+    "uot_top1_gain_vs_raw_graph": 0.01114206128133699,
+    "relative_uot_top1_gain_vs_raw_graph": 0.0013927576601671099,
+    "uot_duplicate_rate_change_vs_raw_graph": -0.04473438956197576
+  },
+  "split_policy": {
+    "group_key": "base point pattern seed",
+    "train_seeds": [
+      2101,
+      2102,
+      2103,
+      2104,
+      2105
+    ],
+    "validation_seeds": [
+      3101,
+      3102,
+      3103,
+      3104,
+      3105
+    ],
+    "test_seeds": [
+      4101,
+      4102,
+      4103,
+      4104,
+      4105
+    ],
+    "test_used_for_training_or_threshold_selection": false,
+    "real_used_for_training_or_threshold_selection": false
+  },
+  "b2_match_model": {
+    "feature_names": [
+      "log1p_absolute_min_cost",
+      "absolute_cost_margin",
+      "top1_graph_support",
+      "graph_support_margin",
+      "normalized_top1_mass",
+      "top1_top2_mass_margin",
+      "selection_certainty",
+      "reciprocal_numeric",
+      "log1p_row_mass_ratio",
+      "log1p_spatial_distance_um"
+    ],
+    "center": [
+      0.37789119348444444,
+      0.6201263733087305,
+      0.5652831760688768,
+      0.2659524036976912,
+      0.8324100258547966,
+      0.6979449595119982,
+      0.8868031251987365,
+      0.7604456824512534,
+      0.4433562738336556,
+      1.8719779965867676
+    ],
+    "scale": [
+      0.2821598415158668,
+      0.6544155737328144,
+      0.2832568262704232,
+      0.2409375514597906,
+      0.1942180335842254,
+      0.3418406648204243,
+      0.11590301052569371,
+      0.42681148823866116,
+      0.0907644544581035,
+      0.6784722728787246
+    ],
+    "coefficients": [
+      -0.5609976935242641,
+      -0.01706868379419972,
+      0.4506267386431953,
+      0.3558235488466831,
+      0.15775289383469498,
+      0.13705956410628956,
+      0.1037677696306447,
+      0.3239505110375255,
+      0.2945706345416606,
+      -0.8284693422280875
+    ],
+    "intercept": 0.6289896704575573,
+    "training_rows": 1077,
+    "positive_fraction": 0.6137418755803157,
+    "converged": true
+  },
+  "b2_unmatched_model": {
+    "feature_names": [
+      "log1p_absolute_min_cost",
+      "absolute_cost_margin",
+      "top1_graph_support",
+      "graph_support_margin",
+      "normalized_top1_mass",
+      "top1_top2_mass_margin",
+      "selection_certainty",
+      "reciprocal_numeric",
+      "log1p_row_mass_ratio",
+      "log1p_spatial_distance_um"
+    ],
+    "center": [
+      0.37789119348444444,
+      0.6201263733087305,
+      0.5652831760688768,
+      0.2659524036976912,
+      0.8324100258547966,
+      0.6979449595119982,
+      0.8868031251987365,
+      0.7604456824512534,
+      0.4433562738336556,
+      1.8719779965867676
+    ],
+    "scale": [
+      0.2821598415158668,
+      0.6544155737328144,
+      0.2832568262704232,
+      0.2409375514597906,
+      0.1942180335842254,
+      0.3418406648204243,
+      0.11590301052569371,
+      0.42681148823866116,
+      0.0907644544581035,
+      0.6784722728787246
+    ],
+    "coefficients": [
+      0.6616195521326066,
+      0.013789784626174284,
+      -0.4903367052257488,
+      -0.15649475643444133,
+      -0.01763799582697637,
+      0.028488482893857928,
+      -0.15114652959504876,
+      -0.3403274269065099,
+      -0.36899075142037513,
+      0.8484125260024016
+    ],
+    "intercept": -0.8824654358469014,
+    "training_rows": 1077,
+    "positive_fraction": 0.3491179201485608,
+    "converged": true
+  },
+  "b2_thresholds": {
+    "match": {
+      "threshold": 0.8086750699201961,
+      "validation_precision": 0.950381679389313,
+      "validation_coverage": 0.46371681415929206,
+      "selected_n": 524,
+      "achieved": true
+    },
+    "unmatched": {
+      "threshold": 0.4331617778398369,
+      "validation_f1": 0.8556430446194226
+    },
+    "source_method": "Relative-cost Graph-UOT",
+    "output_method": "Separated Matching / Adoption"
+  },
+  "raw_graph_match_model": {
+    "feature_names": [
+      "log1p_absolute_min_cost",
+      "absolute_cost_margin",
+      "top1_graph_support",
+      "graph_support_margin",
+      "normalized_top1_mass",
+      "top1_top2_mass_margin",
+      "selection_certainty",
+      "reciprocal_numeric",
+      "log1p_spatial_distance_um"
+    ],
+    "center": [
+      0.37789119348444444,
+      0.6201263733087305,
+      0.5670214972649201,
+      0.2630220054789202,
+      0.3891078725702281,
+      0.18053589421594304,
+      0.48033250775148684,
+      0.7000928505106778,
+      1.8544661883689566
+    ],
+    "scale": [
+      0.2821598415158668,
+      0.6544155737328144,
+      0.2816637680673432,
+      0.2331949452628394,
+      0.16078456851123313,
+      0.183063704346984,
+      0.1398928780906665,
+      0.45821703501126143,
+      0.6766696668690036
+    ],
+    "coefficients": [
+      -0.5024482656706705,
+      0.027453315016873987,
+      0.44787327131861804,
+      0.39090004112490534,
+      -0.0072536694020111,
+      0.007413637258788993,
+      -0.025613390010005784,
+      0.9384676985817931,
+      -0.5954352811147399
+    ],
+    "intercept": 0.5924885972019801,
+    "training_rows": 1077,
+    "positive_fraction": 0.6202414113277623,
+    "converged": true
+  },
+  "raw_graph_unmatched_model": {
+    "feature_names": [
+      "log1p_absolute_min_cost",
+      "absolute_cost_margin",
+      "top1_graph_support",
+      "graph_support_margin",
+      "normalized_top1_mass",
+      "top1_top2_mass_margin",
+      "selection_certainty",
+      "reciprocal_numeric",
+      "log1p_spatial_distance_um"
+    ],
+    "center": [
+      0.37789119348444444,
+      0.6201263733087305,
+      0.5670214972649201,
+      0.2630220054789202,
+      0.3891078725702281,
+      0.18053589421594304,
+      0.48033250775148684,
+      0.7000928505106778,
+      1.8544661883689566
+    ],
+    "scale": [
+      0.2821598415158668,
+      0.6544155737328144,
+      0.2816637680673432,
+      0.2331949452628394,
+      0.16078456851123313,
+      0.183063704346984,
+      0.1398928780906665,
+      0.45821703501126143,
+      0.6766696668690036
+    ],
+    "coefficients": [
+      0.5447584625070682,
+      0.0335499644447778,
+      -0.4783615300557101,
+      -0.1843718145310827,
+      0.04548080394308092,
+      0.06049814742780922,
+      0.022096074359649262,
+      -0.9461005388658422,
+      0.6947559663550399
+    ],
+    "intercept": -0.8495989275153694,
+    "training_rows": 1077,
+    "positive_fraction": 0.3491179201485608,
+    "converged": true
+  },
+  "raw_graph_thresholds": {
+    "match": {
+      "threshold": 0.7941408945278139,
+      "validation_precision": 0.9502487562189055,
+      "validation_coverage": 0.5336283185840708,
+      "selected_n": 603,
+      "achieved": true
+    },
+    "unmatched": {
+      "threshold": 0.4615444642103089,
+      "validation_f1": 0.887434554973822
+    },
+    "source_method": "Graph ranking only + separated adoption",
+    "output_method": "Graph ranking only + separated adoption"
+  },
+  "candidate_hash_by_case": {
+    "real_like_train_weak_2101": "3299ac15b3ab776d35d09dc9022f14d8d11d6a461e8b1c7097195ba86dce7ec6",
+    "real_like_train_moderate_2102": "e4cef17ea9b4092d523cf404818fe3e1cdbe11e8ffdf52c58fd8cc9ac60df0e0",
+    "real_like_train_strong_2103": "98fcf94de66cfd6a5423b93a713a927b7dd310f0fc0da0f3c93a6bd0d4f54776",
+    "real_like_train_weak_2104": "2f93b8e8c5f675a94fe5576e14730b7f429a33237d7cce70b9e515cf3a475724",
+    "real_like_train_moderate_2105": "1fd88bd9258ea54a96c0db3c90bb56058dc4b71aae7692a613f6e34b88aeb32f",
+    "real_like_validation_weak_3101": "602b921614f02ee3c8453471baef52a6d606b827e26a2a7ec43ee42e2127cd29",
+    "real_like_validation_moderate_3102": "4c4cb84d0597c63f18e7fa30c0aca00ddd6964d2fa40ca319ae9973c3af5d2ea",
+    "real_like_validation_strong_3103": "d78f8cdffc7b89d84afe77e719b25bf4154e9258a9f4a7b6f63c0392fb6f34af",
+    "real_like_validation_weak_3104": "be8ce016940ac2687d50c11adc0dff4119b5a82d25e879fae4e49002530cda2c",
+    "real_like_validation_moderate_3105": "130445223243babd02738b32a80339245bdd75c3e1b13a456b8f4d36ba40c3b6",
+    "real_like_test_weak_4101": "339fb6d076d141adbf4f9b90e68642d1ddd9cf60820135219415d72ddfd881a4",
+    "real_like_test_moderate_4102": "b6e9c4c2ab965eba200150bcb58f015184b1c54f51b991b443867d4e9e7730fe",
+    "real_like_test_strong_4103": "b4c4f62889eeae77f6117af9887f27b9332fb7bccb2c475f1d10875b65cb8a3c",
+    "real_like_test_weak_4104": "e2add6425b87732c60f838232daacb414510d7e6a8b4352392dd7bd79e432f8c",
+    "real_like_test_moderate_4105": "efa152414c1d4beadeb6066bd83ee04d87808f5a9db88421d90a1aa2a8505d45"
+  },
+  "existing_baseline_reproduced": true,
+  "negative_controls": [
+    "identity_permutation",
+    "unrelated_pattern",
+    "translated_disjoint"
+  ],
+  "real_has_ground_truth": false,
+  "warping_performed": false,
+  "production_modified": false,
+  "source_sha256": {
+    "analysis/contextual-graph-uot-20261008/config.py": "9a6bee0afbe32a98ceee2893663f96ae30307cc10a5a669ef78782135425ce0e",
+    "analysis/contextual-graph-uot-20261008/candidate_generation.py": "38a8920098023413e9ead153899d838d90bb358cf3f90eddf28f850eb0651ed6",
+    "analysis/contextual-graph-uot-20261008/graph_consistency.py": "c82785101591fec563671dbb8dae2c02cf1d43a41a2269705a61fe9635a5d643",
+    "analysis/contextual-graph-uot-20261008/contextual_uot.py": "5029298da2efed6c4d9bd591b9a09a78b44dc56400ffdc677879ec466c52223c",
+    "analysis/contextual-uot-cost-ablation-20261008/run_cost_ablation.py": "dcd9709a68a21cb269998ab6a3a3f98c5f85ab21d1eda3f1789975b3a0944da6"
+  },
+  "deterministic_test_trace_sha256": "770e48c9470a561caa134f61152e465a46a3dcc5fadf8627fe964684e42a353f"
+}

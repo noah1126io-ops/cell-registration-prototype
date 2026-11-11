@@ -1,0 +1,174 @@
+{
+  "samples": {
+    "031-6_2": {
+      "he": {
+        "name": "031-6_2:HE",
+        "modality": "HE",
+        "pixel_um": 0.18872089583333335,
+        "shape_px": [
+          11411,
+          11243
+        ],
+        "origin_um": "UNKNOWN (frame-local (0,0) used)",
+        "origin_known": false,
+        "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_HE_031-6_XY02.ome.tif",
+        "pyramid_downsamples": [
+          1,
+          2,
+          4,
+          8,
+          16
+        ],
+        "axis": "x right, y down (image)",
+        "description": "HE shown in the 031-6_2 view: 031-6 XY02, level 0, whole HE set (registered to this field: scale 0.985, NCC 0.706; transform in work/031-6_2/assets.json).",
+        "channels": "RGB brightfield H&E (uint8)",
+        "nuclei": {
+          "n": 1242,
+          "source": "StarDist 2D_versatile_he (generated 2026-10-19, analysis he-stardist-seqif-registration-20261019)",
+          "coords": "HE level-0 px (x right, y down); world = px * pixel_um"
+        }
+      },
+      "if": {
+        "name": "031-6_2:IF",
+        "modality": "IF",
+        "pixel_um": 0.1002,
+        "shape_px": [
+          10240,
+          10240
+        ],
+        "origin_um": "UNKNOWN (frame-local (0,0) used)",
+        "origin_known": false,
+        "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seqif.ome.tif",
+        "pyramid_downsamples": [
+          1,
+          2,
+          4,
+          8,
+          16
+        ],
+        "axis": "x right, y down (image)",
+        "description": "031-6_2 seqIF background, zarr level 0. R=Desmoplakin, G=Dystrophin1, B=Hoechst+Desmoplakin",
+        "channels": "uint8 RGB display rendering (provider contrast in assets.json): R=Desmoplakin, G=Dystrophin1, B=Hoechst+Desmoplakin; raw channel intensities not available",
+        "nuclear_channel": "no pure nuclear channel; B-R used as Hoechst estimate after empirical test (coordinate_consistency.csv)",
+        "nuclei": {
+          "n": 1091,
+          "source": "provider GeoJSON *_seg_seqif_level0.geojson (fluorescence segmentation)",
+          "ids": "segment_id (float)",
+          "coords": "seqIF level-0 px; level1 file = level0/2"
+        }
+      },
+      "relationship": {
+        "same_section": true,
+        "provider_note": "HE shown in the 031-6_2 view: 031-6 XY02, level 0, whole HE set (registered to this field: scale 0.985, NCC 0.706; transform in work/031-6_2/assets.json).",
+        "provider_reference_transform": "image NCC, rotation fixed 0, scale grid 0.975-0.995 (he_scan.json)",
+        "use_in_this_study": "dual-image same-section pair; provider transform = non-independent reference (not ground truth)"
+      },
+      "he_nuclei_detection": {
+        "image": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_HE_031-6_XY02.ome.tif",
+        "shape": [
+          11411,
+          11243,
+          3
+        ],
+        "pixel_size_um": 0.18872089583333335,
+        "model": "2D_versatile_he",
+        "normalize": [
+          1.0,
+          99.8
+        ],
+        "downsample": 2,
+        "prob_thresh": 0.6924782541382084,
+        "nms_thresh": 0.3,
+        "n_nuclei": 1242,
+        "area_um2_median": 36.80367340267178,
+        "runtime_s": 78.38716220855713
+      }
+    },
+    "031-8_6": {
+      "he": {
+        "name": "031-8_6:HE",
+        "modality": "HE",
+        "pixel_um": 0.18872089583333335,
+        "shape_px": [
+          11400,
+          11215
+        ],
+        "origin_um": "UNKNOWN (frame-local (0,0) used)",
+        "origin_known": false,
+        "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_HE_reference_031-7_XY06.ome.tif",
+        "pyramid_downsamples": [
+          1,
+          2,
+          4,
+          8,
+          16
+        ],
+        "axis": "x right, y down (image)",
+        "description": "HE shown in the 031-8_6 view: 031-7 XY06, level 0. REFERENCE ONLY - 031-8 has no HE; not registered to this field.",
+        "channels": "RGB brightfield H&E (uint8)",
+        "nuclei": {
+          "n": 4800,
+          "source": "StarDist 2D_versatile_he (generated 2026-10-19, analysis he-stardist-seqif-registration-20261019)",
+          "coords": "HE level-0 px (x right, y down); world = px * pixel_um"
+        }
+      },
+      "if": {
+        "name": "031-8_6:IF",
+        "modality": "IF",
+        "pixel_um": 0.1002,
+        "shape_px": [
+          10240,
+          10240
+        ],
+        "origin_um": "UNKNOWN (frame-local (0,0) used)",
+        "origin_known": false,
+        "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_seqif.ome.tif",
+        "pyramid_downsamples": [
+          1,
+          2,
+          4,
+          8,
+          16
+        ],
+        "axis": "x right, y down (image)",
+        "description": "031-8_6 seqIF background, zarr level 0. R=Desmoplakin, G=Dystrophin1, B=Hoechst+Desmoplakin",
+        "channels": "uint8 RGB display rendering (provider contrast in assets.json): R=Desmoplakin, G=Dystrophin1, B=Hoechst+Desmoplakin; raw channel intensities not available",
+        "nuclear_channel": "no pure nuclear channel; B-R used as Hoechst estimate after empirical test (coordinate_consistency.csv)",
+        "nuclei": {
+          "n": 1552,
+          "source": "provider GeoJSON *_seg_seqif_level0.geojson (fluorescence segmentation)",
+          "ids": "segment_id (float)",
+          "coords": "seqIF level-0 px; level1 file = level0/2"
+        }
+      },
+      "relationship": {
+        "same_section": false,
+        "provider_note": "HE shown in the 031-8_6 view: 031-7 XY06, level 0. REFERENCE ONLY - 031-8 has no HE; not registered to this field.",
+        "provider_reference_transform": "approximate field-centre placement, not registered",
+        "use_in_this_study": "serial-section pair (HE 031-7 vs IF 031-8, spacing UNKNOWN); region-correspondence test, no cell-identity expectation"
+      },
+      "he_nuclei_detection": {
+        "image": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_HE_reference_031-7_XY06.ome.tif",
+        "shape": [
+          11400,
+          11215,
+          3
+        ],
+        "pixel_size_um": 0.18872089583333335,
+        "model": "2D_versatile_he",
+        "normalize": [
+          1.0,
+          99.8
+        ],
+        "downsample": 2,
+        "prob_thresh": 0.6924782541382084,
+        "nms_thresh": 0.3,
+        "n_nuclei": 4800,
+        "area_um2_median": 54.217398705495214,
+        "runtime_s": 55.745179891586304
+      }
+    }
+  },
+  "generated": "2026-10-19",
+  "note": "Frame origins are frame-local (no stage coordinates in OME). Point-cloud bounding boxes are not used as imaged extents."
+}

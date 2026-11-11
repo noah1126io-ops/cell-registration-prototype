@@ -1,0 +1,608 @@
+[
+ {
+  "test": "H",
+  "check": "completed explorer run listed with A2 detector verdict",
+  "pass": true,
+  "detail": "PREVIEW ONLY — FAIL。Workflow Dへ渡しません\nAfter: A2_HEfix@20261020-161149-dc935f. 表示座標 = H&E (Fixed) のframe-local world。原点はUNKNOWN（推測で補完しない）。\n表示モード\n重ね合わせ\nFixed画像のみ\nMoving画像のみ\nチェッカーボード\nMoving画像の透明度\nチェッカー幅 (µm)\n画像\nH&E (fixed, level 3, 1.51 µm/px)\n蛍光 (seqIF) (moving, level 3, 0.80 µm/px)\n核点群\nH&E 核 (fixed) ("
+ },
+ {
+  "test": "H",
+  "check": "IF-frame ≤3 µm of the new A2 run equals the saved Legacy A2 value (0.0532)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "H",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "A",
+  "check": "UNIQUE / Accepted shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "A",
+  "check": "H&E and fluorescence images available",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "A",
+  "check": "saved NN median 1.91 µm displayed",
+  "pass": true,
+  "detail": "metrics table"
+ },
+ {
+  "test": "A",
+  "check": "viewer banner accepted",
+  "pass": true,
+  "detail": "UNIQUE / Accepted（研究artifactで採択）"
+ },
+ {
+  "test": "A",
+  "check": "image + point layers present",
+  "pass": true,
+  "detail": "H&E (fixed, level 3, 1.51 µm/px) 蛍光 (seqIF) (moving, level 3, 0.80 µm/px) H&E 核 (fixed) (1242) 蛍光 (seqIF) 核 (moving, mapped) (1091) 残留変位ベクトル (mutual NN ≤10) Image FOV: H&E (fixed) Image FOV: 蛍光 (seqIF"
+ },
+ {
+  "test": "A",
+  "check": "zoom/pan updates the viewer (HUD coordinates)",
+  "pass": true,
+  "detail": "031-6_2:HE (fixed frame)  x=1171.4  y=1483.2 µm"
+ },
+ {
+  "test": "A",
+  "check": "Before view labelled, same fixed frame",
+  "pass": true,
+  "detail": "BEFORE — 変換なし。座標系はAfterと同じFixed frame"
+ },
+ {
+  "test": "A",
+  "check": "warp preview accepted label + inverse mapping record",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "A",
+  "check": "warp uses the stored moving->fixed transform (not inverted)",
+  "pass": true,
+  "detail": "forward_used_moving_to_target\":{\n\"M\":[\n0:[\n0:0.984698\n1:-0.004492\n]\n1:[\n0:0.003788\n1:0.979863\n]\n]\n\"t\":[\n0:541.871\n1:493.781\n]\n}\n}"
+ },
+ {
+  "test": "A",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "B",
+  "check": "AMBIGUOUS shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "PREVIEW ONLY + not passed to Workflow D",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "no Workflow D hand-off control",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "FOV of both sides + candidate regions drawn",
+  "pass": true,
+  "detail": "H&E (fixed, level 3, 1.51 µm/px) 蛍光 (seqIF) (moving, level 3, 0.80 µm/px) H&E 核 (fixed) (4800) 蛍光 (seqIF) 核 (moving, mapped) (1552) 残留変位ベクトル (mutual NN ≤10) Image FOV: H&E (fixed) Image FOV: 蛍光 (seqIF) (moving, mapped) 核検出範囲: H&E 核検出範囲: 蛍光 (seqIF) (mapped) 組織領域: H&E 組織領域: 蛍光 (seqIF) 候補 E0x_HEfix#c0 "
+ },
+ {
+  "test": "B",
+  "check": "candidate switch -> preview-only banner",
+  "pass": true,
+  "detail": "候補プレビュー — 候補の選択は採択ではありません PREVIEW ONLY — AMBIGUOUS。Workflow Dへ渡しません"
+ },
+ {
+  "test": "B",
+  "check": "candidate list (map) with IDs; candidates are PREVIEW ONLY",
+  "pass": true,
+  "detail": "['E0x_HEfix#c0', 'E0x_HEfix#c1', 'E0x_HEfix#c2', 'E0x_HEfix#c3', 'E0x_HEfix#c4', 'E0x_HEfix#c5']"
+ },
+ {
+  "test": "B",
+  "check": "ablation X3 candidates listed (with ICP-refined regions)",
+  "pass": true,
+  "detail": "['X3_HEfix#c0', 'X3_HEfix#c1', 'X3_HEfix#c2', 'X3_HEfix#c3', 'X3_HEfix#c4', 'X3_HEfix#c5']"
+ },
+ {
+  "test": "B",
+  "check": "ablation candidate preview banner",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "C",
+  "check": "point-only sample: images absent, nuclei present",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "C",
+  "check": "image methods disabled with reason",
+  "pass": true,
+  "detail": "研究Workflow C：対応領域の探索 → 精密化 → 検証（利用不可: 保存済み結果なし） 視野サイズの違いに対応した核探索（利用不可: 保存済み結果なし） 核密度による対応領域探索（従来法） 片側画像を使った補助解析（利用不可: 画像が1枚必要（利用可能 0）） 両画像からの対応領域探索（利用不可: 画像が2枚必要（利用可能 0）） 画像と核配置の統合探索（利用不可: 画像が2枚必要（利用可能 0）） 核探索の構成要素の比較（2026-10-20 ablation）（利用不可: 保存済み結果なし） Explorerから実行した結果（旧Runner）（利用不可: 保存済み結果なし） 陰性対"
+ },
+ {
+  "test": "C",
+  "check": "points shown without images",
+  "pass": true,
+  "detail": "PREVIEW ONLY — UNVERIFIED。Workflow Dへ渡しません\nこの結果は HE→IF で計算。表示方向に合わせ逆変換を使用\nAfter: Legacy A2 R2 (analysis real-registration-incremental-value-20261015). 表示座標 = H&E (Fixed) のframe-local world。原点はUNKNOWN（"
+ },
+ {
+  "test": "C",
+  "check": "H&E frame shown in px (spacing UNKNOWN), unit mismatch noted",
+  "pass": true,
+  "detail": "定対応・残留変位\n残留変位ベクトル (mutual NN ≤10)\n色: ≤3 ≤5 >5 px\n推定対応は同一細胞の証明ではありません\n領域\nImage FOV: H&E (fixed)\n核検出範囲: H&E\n核検出範囲: 蛍光 (mapped)\n表示をリセット\nホイール: ズーム / ドラッグ: パン\n座標: serial_section_pair_20260904:HE (fixed frame) (px)\nクリック操作（保存用）\n表示（ズーム・パン）\n対応点（ランドマーク）を指定\n領域（ROI）を指定\n候補をクリックで選択\nホイール: ズーム / ドラッグ: パン\n送信\n1つ戻す\n消去"
+ },
+ {
+  "test": "C",
+  "check": "transform shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "C",
+  "check": "031-6_2 point-only view: E0x still available",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "C",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "D",
+  "check": "image methods unusable -> point-only result kept",
+  "pass": true,
+  "detail": "Cell Registration Prototype\n\nResearch prototype for point-based registration, matching, and QC. Not for diagnostic use.\n\nRegistration Explorer（研究モード）\n\n対応する組織領域の探索・候補の比較・位置合わせの検証・修正・保存を行う研究用の画面です。Productionの処理には適用されません。推定した核の対応は、生物学的に同じ細胞であることを示すものではありません。\n\nSample\n\nFixed / Moving\n\n画像を使わない（Point-only表示）\n\n画像読み込み失敗を再現（テスト）\n\n実験セッション（保存先）\n\n新しいセッション名\n\n作成\n\nmodality\n\n\t\n\n画像\n\n\t\n\n核座標\n\n\t\n\n画像サイズ (px, level0)\n\n\t"
+ },
+ {
+  "test": "D",
+  "check": "E2 saved POINT_ONLY_FALLBACK with reason",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "D",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "E",
+  "check": "IF-fixed result selected by default",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "viewer frame is IF",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "swap consistency table (E0x 0.23 µm)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "inverse warp HE->IF recorded",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "IF-fixed warp uses stored HE->IF map of E0x_IFfix (not inverted)",
+  "pass": true,
+  "detail": "transform_direction_used\":\"HE->IF\"\n\"accepted\":true\n\"source_level\":2\n\"valid_fraction\":1\n\"forward_used_moving_to_target\":{\n\"M\":[\n0:[\n0:1.015144\n1:0.004973\n]\n1:[\n0"
+ },
+ {
+  "test": "E",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow A page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow B page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow C page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow D page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "I",
+  "check": "manual mode shows MANUAL / unverified / not passed to Workflow D",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "I",
+  "check": "viewer banner MANUAL",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "I",
+  "check": "identity adjustment keeps base transform",
+  "pass": true,
+  "detail": "\n\t\n\n20.4\n\n\n\n\ntranslation_he_to_if_um\n\n\t\n\n(2909.7, 1592.8)\n\nUI再計算の診断（表示中の変換、参考値・採択には使わない）\n\nfixed nuclei inside the mapped moving footprint (fixed frame), UI-recomputed\n\n指標\n\n\t\n\n値\n\n\n\n\nn_eval\n\n\t\n\n698\n\n\n\n\nnn_median\n\n\t\n\n11.7\n\n\n\n\nnn_p95\n\n\t\n\n26.9\n\n\n\n\nle_1\n\n\t\n\n0.00143\n\n\n\n\nle_3\n\n\t\n\n0.0444\n\n\n\n\nle_5\n\n\t\n\n0.123\n\n\n\n\nnull_le_3\n\n\t\n\n0.0387\n\n表示中の変換 (IF→HE): scale 1.0500, 回転 -144.00°, reflect False, t=(421.4, 2788.1)"
+ },
+ {
+  "test": "I",
+  "check": "rotation +2° and scale x1.02 applied to the displayed transform",
+  "pass": true,
+  "detail": "(('1.0500', '-144.00'), ('1.0710', '-142.00'))"
+ },
+ {
+  "test": "I",
+  "check": "zoom kept across reruns while adjusting",
+  "pass": true,
+  "detail": "(0.15187799017635525, 0.37355957715402804, 0.37355957715402804)"
+ },
+ {
+  "test": "I",
+  "check": "four manual sliders shown",
+  "pass": true,
+  "detail": "4"
+ },
+ {
+  "test": "I",
+  "check": "slider mirrors typed rotation",
+  "pass": true,
+  "detail": "2"
+ },
+ {
+  "test": "I",
+  "check": "slider arrow key moves rotation by one step (+1°) and syncs the number box",
+  "pass": true,
+  "detail": "('3.000', ('1.0710', '-141.00'))"
+ },
+ {
+  "test": "I",
+  "check": "translation slider moves Δx down to the step grid (15 → 10)",
+  "pass": true,
+  "detail": "10.00"
+ },
+ {
+  "test": "I",
+  "check": "changing step keeps the adjustment",
+  "pass": true,
+  "detail": "10.00"
+ },
+ {
+  "test": "I",
+  "check": "safety metric MANUAL (UNVERIFIED)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "I",
+  "check": "warp preview offers and labels the manual transform",
+  "pass": true,
+  "detail": "PREVIEW ONLY — この変換は正式に採択されていません。Workflow Dへは渡しません。 | Viewer（重ね合わせ・手動調整） | Viewerで手動調整中の変換（未検証）を使う | 手動調整（基準: After: 候補 #1 (探索pose)） | PREVIEW ONLY（MANUAL (UNVERIFIED)）— 不確かな変換による画像です。正式出力として扱いません。 | \"transform\":\"MANUAL\" | \"transform_direction_used\":\"IF->HE\""
+ },
+ {
+  "test": "I",
+  "check": "saved to the research store (append-only)",
+  "pass": true,
+  "detail": "ei inside the mapped moving footprint (fixed frame), UI-recomputed\n\n指標\n\n\t\n\n値\n\n\n\n\nn_eval\n\n\t\n\n724\n\n\n\n\nnn_median\n\n\t\n\n12.5\n\n\n\n\nnn_p95\n\n\t\n\n27.1\n\n\n\n\nle_1\n\n\t\n\n0.00414\n\n\n\n\nle_3\n\n\t\n\n0.0345\n\n\n\n\nle_5\n\n\t\n\n0.112\n\n\n\n\nnull_le_3\n\n\t\n\n0.0359\n\n表示中の変換 (IF→HE): scale 1.0710, 回転 -141.00°, reflect False, t=(393.5, 2808.5)"
+ },
+ {
+  "test": "I",
+  "check": "saved transform listed as Manual adjustment, MANUAL (UNVERIFIED), PREVIEW ONLY",
+  "pass": true,
+  "detail": "e2e-manual-test（手動）（IF→HE） — MANUAL (UNVERIFIED)"
+ },
+ {
+  "test": "I",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "J",
+  "check": "engine run listed (newest first) and decision shown",
+  "pass": true,
+  "detail": "auto_HEfix@20261022-155543-fd1a6e（IF→HE） — UNIQUE / Accepted"
+ },
+ {
+  "test": "J",
+  "check": "both searches recorded separately (image + points)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "J",
+  "check": "image-vs-point top candidate difference reported",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "J",
+  "check": "internal ids moved to details",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "J",
+  "check": "031-8_6 not accepted, failure stage shown (C1)",
+  "pass": true,
+  "detail": "Cell Registration Prototype\n\nResearch prototype for point-based registration, matching, and QC. Not for diagnostic use.\n\nRegistration Explorer（研究モード）\n\n対応する組織領域の探索・候補の比較・位置合わせの検証・修正・保存を行う研究用の画面です。Productionの処理には適用されません。推定した核の対応は、生物学的に同じ細胞であることを示すものではありません。\n\nSample\n\nFixed / Moving\n\n画像を使わない（Point-only表示）\n\n画像読み込み失敗を再現（テスト）\n\n実験セッション（保存先）\n\n新しいセッション名\n\n作成\n\n保存先：/mnt/mib-dbia08_1/users/noa.ganeko/projects/c"
+ },
+ {
+  "test": "J",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "K",
+  "check": "map shows every candidate of every source",
+  "pass": true,
+  "detail": "['image#0', 'image#1', 'image#2', 'image#3', 'points#0', 'points#1', 'points#2', 'points#3', 'points#4', 'points#5']"
+ },
+ {
+  "test": "K",
+  "check": "click on points#3 selects it in the Viewer",
+  "pass": true,
+  "detail": "［視野サイズの違いに対応した核探索］ 候補 points#3: θ=256.0°, s=1.050, z=6, 1位との差=0.12 [PREVIEW ONLY]"
+ },
+ {
+  "test": "K",
+  "check": "viewer shows the picked candidate as PREVIEW ONLY",
+  "pass": true,
+  "detail": "候補プレビュー — 候補の選択は採択ではありません PREVIEW ONLY — NOT_ACCEPTED。Workflow Dへ渡しません"
+ },
+ {
+  "test": "K",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "L",
+  "check": "landmark table shown",
+  "pass": true,
+  "detail": "_deg\n\n\t\n\n-0.222\n\n\n\n\ntranslation_he_to_if_um\n\n\t\n\n(-552.6, -501.8)\n\nUI再計算の診断（表示中の変換、参考値・採択には使わない）\n\nfixed nuclei inside the mapped moving footprint (fixed frame), UI-recomputed\n\n指標\n\n\t\n\n値\n\n\n\n\nn_eval\n\n\t\n\n840\n\n\n\n\nnn_median\n\n\t\n\n1.36\n\n\n\n\nnn_p95\n\n\t\n\n14.6\n\n\n\n\nle_1\n\n\t\n\n0.344\n\n\n\n\nle_3\n\n\t\n\n0.773\n\n\n\n\nle_5\n\n\t\n\n0.824\n\n\n\n\nnull_le_3\n\n\t\n\n0.0726\n\n表示中の変換 (IF→HE): scale 0.9823, 回転 0.22°, reflect False, t=(541.9, 493.8)"
+ },
+ {
+  "test": "L",
+  "check": "landmark table present",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "L",
+  "check": "clicked fixed / back-mapped moving coordinates match the nuclei (tol 6.87 um)",
+  "pass": true,
+  "detail": "([907.5, 1254.7, 201.8, 525.6, 1347.6, 1108.3, 626.2, 419.0], [907.5, 1254.7, 201.8, 525.6, 1347.6, 1108.3, 626.2, 419.0])"
+ },
+ {
+  "test": "L",
+  "check": "landmarks saved as annotation",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "L",
+  "check": "similarity from landmarks shown with residual",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "L",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "M",
+  "check": "dragged ROI arrives in fixed-frame um",
+  "pass": true,
+  "detail": "('300', '400', '1300', '1500')"
+ },
+ {
+  "test": "M",
+  "check": "ROI saved as search-restriction annotation",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "M",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "N",
+  "check": "review saved as Review Annotation",
+  "pass": true,
+  "detail": "53\n\n\t\n\n間違っていると思う\n\n\t\n\n対応領域が違う, Rotationが違う\n\n\t\n\ne2e: 腺管の配置が合わない\n\n\t\n\n20261022-155543-dfafb7\n\n\t\n\n \n\n\t\n\nnoa.ganeko\n\nこのサンプルの注釈（『新規実行』の注釈を使った探索で再利用できます）\n\nID\n\n\t\n\n種類\n\n\t\n\n名前\n\n\t\n\nframe\n\n\t\n\n作成\n\n\t\n\n作成者\n\n\n\n\nann-20261027075236-76d73982\n\n\t\n\n探索範囲の制限（ROI）\n\n\t\n\ne2e roi\n\n\t\n\n031-8_6:HE\n\n\t\n\n2026-10-27T07:52\n\n\t\n\nnoa.ganeko"
+ },
+ {
+  "test": "N",
+  "check": "review listed with judgement / problems / comment",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "N",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "N2",
+  "check": "review persisted (new browser page)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "N2",
+  "check": "annotations persisted (ROI)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "N2",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "O",
+  "check": "JSON export has reviews / annotations / events for this sample only",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "O",
+  "check": "CSV export (zip of 5 tables)",
+  "pass": true,
+  "detail": "['runs.csv', 'transforms.csv', 'reviews.csv', 'annotations.csv', 'events.csv']"
+ },
+ {
+  "test": "O",
+  "check": "store integrity ok",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "O",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "P",
+  "check": "assisted run needs explicit annotation selection",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "P",
+  "check": "selected ROI annotation accepted as a constraint (no validation error)",
+  "pass": true,
+  "detail": "ません。\n\nSlurm（mib-dbia、CPU 4コア・12G・最長01:30:00）にジョブを1件投入することを確認しました\n\n研究Workflow Cを投入\n\nkeyboard_arrow_right\n\n旧Runner：核探索の構成要素の比較（2026-10-20 ablation X0–X3 / A2）\n\nログを見るrun\n\n処理段階（C1 → C2 → C3 → C4）\n\nC1: image search (structural maps: occ+cleft)\nC1: point search (union canvas, nuclei density)\nC2/C3: image: 6 candidates refined and validated\nC2/C3: points: 6 candidates refined and validated\n(stderr empty)"
+ },
+ {
+  "test": "P",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "Q",
+  "check": "accepted run offers Workflow D hand-off",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "Q",
+  "check": "download is a Workflow C result zip",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "Q",
+  "check": "unaccepted run refused for Workflow D",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "Q",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "R",
+  "check": "research global option is off by default",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "R",
+  "check": "only accepted automatic runs listed",
+  "pass": true,
+  "detail": "031-6_2 / 20261022-155543-fd1a6e / ACCEPTED / image#0"
+ },
+ {
+  "test": "R",
+  "check": "no exception on Workflow C page",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "R",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "S",
+  "check": "moving nuclei drawn at T(provider nuclei): max |d| 0.0099 um",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "S",
+  "check": "moving image pixel of a nucleus lands on the drawn nucleus: max |d| 0.000 um",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "S",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ }
+]

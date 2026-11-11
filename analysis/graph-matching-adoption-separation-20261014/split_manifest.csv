@@ -1,0 +1,16 @@
+scenario_id,split,seed,strength,template_group,amplitude_um,fixed_missing_fraction,moving_missing_fraction,overlap_fraction,noise_um,local_missing_strength
+real_like_train_weak_2101,Train,2101,Weak,base_pattern_2101,6.0,0.25,0.28,0.95,0.6,0.45
+real_like_train_moderate_2102,Train,2102,Moderate,base_pattern_2102,10.0,0.28,0.32,0.88,1.0,0.6
+real_like_train_strong_2103,Train,2103,Strong,base_pattern_2103,14.0,0.32,0.38,0.8,1.4,0.75
+real_like_train_weak_2104,Train,2104,Weak,base_pattern_2104,6.0,0.25,0.28,0.95,0.6,0.45
+real_like_train_moderate_2105,Train,2105,Moderate,base_pattern_2105,10.0,0.28,0.32,0.88,1.0,0.6
+real_like_validation_weak_3101,Validation,3101,Weak,base_pattern_3101,6.0,0.25,0.28,0.95,0.6,0.45
+real_like_validation_moderate_3102,Validation,3102,Moderate,base_pattern_3102,10.0,0.28,0.32,0.88,1.0,0.6
+real_like_validation_strong_3103,Validation,3103,Strong,base_pattern_3103,14.0,0.32,0.38,0.8,1.4,0.75
+real_like_validation_weak_3104,Validation,3104,Weak,base_pattern_3104,6.0,0.25,0.28,0.95,0.6,0.45
+real_like_validation_moderate_3105,Validation,3105,Moderate,base_pattern_3105,10.0,0.28,0.32,0.88,1.0,0.6
+real_like_test_weak_4101,Test,4101,Weak,base_pattern_4101,6.0,0.25,0.28,0.95,0.6,0.45
+real_like_test_moderate_4102,Test,4102,Moderate,base_pattern_4102,10.0,0.28,0.32,0.88,1.0,0.6
+real_like_test_strong_4103,Test,4103,Strong,base_pattern_4103,14.0,0.32,0.38,0.8,1.4,0.75
+real_like_test_weak_4104,Test,4104,Weak,base_pattern_4104,6.0,0.25,0.28,0.95,0.6,0.45
+real_like_test_moderate_4105,Test,4105,Moderate,base_pattern_4105,10.0,0.28,0.32,0.88,1.0,0.6

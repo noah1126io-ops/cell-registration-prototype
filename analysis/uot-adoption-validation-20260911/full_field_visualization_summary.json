@@ -1,0 +1,122 @@
+{
+  "source": "frozen outputs from UOT adoption validation 2026-09-11",
+  "registration_rerun": false,
+  "fixed_count": 1830,
+  "moving_count": 1842,
+  "affine_input_exactly_matches_joint_artifact": true,
+  "vector_display_magnification": 8.0,
+  "alignment_metrics": {
+    "Affine": {
+      "moving_to_fixed_nn_median_um": 10.084282147656833,
+      "moving_to_fixed_nn_p95_um": 26.389815778421372,
+      "moving_within_5_um_fraction": 0.16666666666666666
+    },
+    "UOT conservative": {
+      "moving_to_fixed_nn_median_um": 8.937119864795363,
+      "moving_to_fixed_nn_p95_um": 26.192136346486162,
+      "moving_within_5_um_fraction": 0.24158523344191096
+    },
+    "Joint": {
+      "moving_to_fixed_nn_median_um": 9.360499035170836,
+      "moving_to_fixed_nn_p95_um": 26.34080828768803,
+      "moving_within_5_um_fraction": 0.20249728555917482
+    }
+  },
+  "movement_metrics": {
+    "UOT conservative": {
+      "displacement_median_um": 1.2829579301048175,
+      "displacement_p95_um": 2.5827221300294614,
+      "displacement_max_um": 3.9395186111795026
+    },
+    "Joint": {
+      "displacement_median_um": 0.9139075951676102,
+      "displacement_p95_um": 1.9158808035964263,
+      "displacement_max_um": 2.8254912566109995
+    }
+  },
+  "raster_inverse_diagnostics": {
+    "UOT conservative": {
+      "requested_max_iterations": 30,
+      "iterations_used": 4,
+      "convergence_tolerance_pixels": 0.05,
+      "converged": true,
+      "median_residual_pixels": 1.7350290314528402e-06,
+      "p95_residual_pixels": 7.867964261437379e-05,
+      "max_residual_pixels": 0.028554862478155217,
+      "fraction_above_0_1_pixel": 0.0,
+      "fraction_above_0_25_pixel": 0.0,
+      "fraction_above_0_5_pixel": 0.0,
+      "fraction_above_1_pixel": 0.0,
+      "history": [
+        {
+          "iteration": 1,
+          "median_residual_pixels": 0.03723532203813054,
+          "p95_residual_pixels": 0.13426723978417104,
+          "max_residual_pixels": 0.646936495245001
+        },
+        {
+          "iteration": 2,
+          "median_residual_pixels": 0.00123580024269668,
+          "p95_residual_pixels": 0.009884009873668392,
+          "max_residual_pixels": 0.18204965677790766
+        },
+        {
+          "iteration": 3,
+          "median_residual_pixels": 4.640304568657808e-05,
+          "p95_residual_pixels": 0.0008664917305141031,
+          "max_residual_pixels": 0.07117414864953492
+        },
+        {
+          "iteration": 4,
+          "median_residual_pixels": 1.7350290314528402e-06,
+          "p95_residual_pixels": 7.867964261437379e-05,
+          "max_residual_pixels": 0.028554862478155217
+        }
+      ]
+    },
+    "Joint": {
+      "requested_max_iterations": 30,
+      "iterations_used": 4,
+      "convergence_tolerance_pixels": 0.05,
+      "converged": true,
+      "median_residual_pixels": 2.620955713832953e-05,
+      "p95_residual_pixels": 0.0007885845291497811,
+      "max_residual_pixels": 0.047030665721459905,
+      "fraction_above_0_1_pixel": 0.0,
+      "fraction_above_0_25_pixel": 0.0,
+      "fraction_above_0_5_pixel": 0.0,
+      "fraction_above_1_pixel": 0.0,
+      "history": [
+        {
+          "iteration": 1,
+          "median_residual_pixels": 0.05809204957948812,
+          "p95_residual_pixels": 0.2052404671718613,
+          "max_residual_pixels": 0.9675025861569946
+        },
+        {
+          "iteration": 2,
+          "median_residual_pixels": 0.004149749864163745,
+          "p95_residual_pixels": 0.028811096852680743,
+          "max_residual_pixels": 0.345377779750801
+        },
+        {
+          "iteration": 3,
+          "median_residual_pixels": 0.0003331372777470431,
+          "p95_residual_pixels": 0.004656999329749211,
+          "max_residual_pixels": 0.12713629724404782
+        },
+        {
+          "iteration": 4,
+          "median_residual_pixels": 2.620955713832953e-05,
+          "p95_residual_pixels": 0.0007885845291497811,
+          "max_residual_pixels": 0.047030665721459905
+        }
+      ]
+    }
+  },
+  "outputs": [
+    "full_field_point_alignment.png",
+    "full_field_point_movements.png",
+    "full_field_he_point_overlay.png"
+  ]
+}

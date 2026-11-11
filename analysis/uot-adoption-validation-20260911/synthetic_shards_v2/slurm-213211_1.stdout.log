@@ -1,0 +1,50 @@
+seed=1102 case=1/10 method=Affine only applied=True EPE=1.4617 TRE=1.5164
+seed=1102 case=1/10 method=Density Flow baseline applied=True EPE=1.2559 TRE=1.2590
+seed=1102 case=1/10 method=UOT conservative applied=True EPE=0.7734 TRE=0.8096
+seed=1102 case=1/10 method=UOT primary applied=True EPE=1.5069 TRE=1.5747
+seed=1102 case=1/10 method=Joint Flow applied=True EPE=1.6419 TRE=1.8259
+seed=1102 case=2/10 method=Affine only applied=True EPE=2.9234 TRE=3.0560
+seed=1102 case=2/10 method=Density Flow baseline applied=True EPE=2.7248 TRE=2.7851
+seed=1102 case=2/10 method=UOT conservative applied=True EPE=2.1965 TRE=2.2656
+seed=1102 case=2/10 method=UOT primary applied=True EPE=3.5483 TRE=3.1145
+seed=1102 case=2/10 method=Joint Flow applied=True EPE=2.9793 TRE=3.2123
+seed=1102 case=3/10 method=Affine only applied=True EPE=4.3850 TRE=4.5527
+seed=1102 case=3/10 method=Density Flow baseline applied=True EPE=4.2669 TRE=4.4432
+seed=1102 case=3/10 method=UOT conservative applied=True EPE=3.6932 TRE=3.9712
+seed=1102 case=3/10 method=UOT primary applied=False EPE=4.3850 TRE=4.5527
+seed=1102 case=3/10 method=Joint Flow applied=False EPE=4.3850 TRE=4.5527
+seed=1102 case=4/10 method=Affine only applied=True EPE=1.4617 TRE=1.5164
+seed=1102 case=4/10 method=Density Flow baseline applied=True EPE=1.3675 TRE=1.4810
+seed=1102 case=4/10 method=UOT conservative applied=True EPE=1.3465 TRE=1.3205
+seed=1102 case=4/10 method=UOT primary applied=True EPE=2.4186 TRE=2.2227
+seed=1102 case=4/10 method=Joint Flow applied=True EPE=1.8312 TRE=1.9772
+seed=1102 case=5/10 method=Affine only applied=True EPE=2.9234 TRE=3.0560
+seed=1102 case=5/10 method=Density Flow baseline applied=True EPE=2.4538 TRE=2.6608
+seed=1102 case=5/10 method=UOT conservative applied=True EPE=2.0691 TRE=1.9923
+seed=1102 case=5/10 method=UOT primary applied=False EPE=2.9234 TRE=3.0560
+seed=1102 case=5/10 method=Joint Flow applied=True EPE=2.7576 TRE=2.9184
+seed=1102 case=6/10 method=Affine only applied=True EPE=2.9234 TRE=3.0560
+seed=1102 case=6/10 method=Density Flow baseline applied=True EPE=2.6586 TRE=2.6959
+seed=1102 case=6/10 method=UOT conservative applied=True EPE=2.1374 TRE=1.9852
+seed=1102 case=6/10 method=UOT primary applied=True EPE=3.1523 TRE=2.9297
+seed=1102 case=6/10 method=Joint Flow applied=True EPE=2.8727 TRE=2.9612
+seed=1102 case=7/10 method=Affine only applied=True EPE=2.9234 TRE=3.0560
+seed=1102 case=7/10 method=Density Flow baseline applied=True EPE=2.7369 TRE=2.7706
+seed=1102 case=7/10 method=UOT conservative applied=True EPE=2.5095 TRE=2.4999
+seed=1102 case=7/10 method=UOT primary applied=True EPE=2.7235 TRE=2.6135
+seed=1102 case=7/10 method=Joint Flow applied=True EPE=2.9094 TRE=3.0712
+seed=1102 case=8/10 method=Affine only applied=True EPE=2.9234 TRE=3.0560
+seed=1102 case=8/10 method=Density Flow baseline applied=False EPE=2.9234 TRE=3.0560
+seed=1102 case=8/10 method=UOT conservative applied=True EPE=2.5010 TRE=2.7490
+seed=1102 case=8/10 method=UOT primary applied=True EPE=2.7149 TRE=2.8145
+seed=1102 case=8/10 method=Joint Flow applied=True EPE=3.0242 TRE=3.2211
+seed=1102 case=9/10 method=Affine only applied=True EPE=2.9234 TRE=3.0560
+seed=1102 case=9/10 method=Density Flow baseline applied=True EPE=2.7230 TRE=3.0378
+seed=1102 case=9/10 method=UOT conservative applied=True EPE=2.7548 TRE=2.8536
+seed=1102 case=9/10 method=UOT primary applied=True EPE=3.6660 TRE=3.4257
+seed=1102 case=9/10 method=Joint Flow applied=True EPE=3.1788 TRE=3.3969
+seed=1102 case=10/10 method=Affine only applied=True EPE=4.3850 TRE=4.5527
+seed=1102 case=10/10 method=Density Flow baseline applied=True EPE=4.1178 TRE=4.2418
+seed=1102 case=10/10 method=UOT conservative applied=True EPE=3.4024 TRE=3.5754
+seed=1102 case=10/10 method=UOT primary applied=True EPE=4.5213 TRE=4.4714
+seed=1102 case=10/10 method=Joint Flow applied=True EPE=4.2138 TRE=4.4618

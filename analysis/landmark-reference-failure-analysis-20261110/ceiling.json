@@ -1,0 +1,36 @@
+[
+ {
+  "sample": "031-6_2",
+  "n_fixed_eval": 838,
+  "le3_at_reference": 0.7744630071599046,
+  "mirror_null": 0.05847255369928401,
+  "local_max_le3_near_reference": 0.7744630071599046,
+  "argmax(rot,scale,dx,dy)": [
+   0.0,
+   1.0,
+   0.0,
+   0.0
+  ],
+  "local_max_le3_wrong_poses_median": 0.06592159474995682,
+  "wrong_p95": 0.08980902119411789,
+  "wrong_max": 0.09556313993174062,
+  "accept_threshold": 0.25
+ },
+ {
+  "sample": "031-8_6",
+  "n_fixed_eval": 949,
+  "le3_at_reference": 0.051633298208640675,
+  "mirror_null": 0.04320337197049526,
+  "local_max_le3_near_reference": 0.07386990077177508,
+  "argmax(rot,scale,dx,dy)": [
+   2.0,
+   0.97,
+   0.0,
+   -15.0
+  ],
+  "local_max_le3_wrong_poses_median": 0.0759965412650781,
+  "wrong_p95": 0.08282433600360231,
+  "wrong_max": 0.08323831242873432,
+  "accept_threshold": 0.25
+ }
+]

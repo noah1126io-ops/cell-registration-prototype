@@ -1,0 +1,16 @@
+scenario_id,split,seed,strength,template_group,amplitude_um,fixed_missing_fraction,moving_missing_fraction,overlap_fraction,noise_um,local_missing_strength,fixed_n,moving_n,common_n,true_unmatched_n,moving_density_per_um2,moving_knn_median_um
+real_like_train_weak_2101,Train,2101,Weak,base_pattern_2101,6.0,0.25,0.28,0.95,0.6,0.45,248,215,148,67,0.001908691277255569,10.960566402005359
+real_like_train_moderate_2102,Train,2102,Moderate,base_pattern_2102,10.0,0.28,0.32,0.88,1.0,0.6,256,206,140,66,0.0019144655052959535,9.606101110597313
+real_like_train_strong_2103,Train,2103,Strong,base_pattern_2103,14.0,0.32,0.38,0.8,1.4,0.75,255,193,118,75,0.001970528187067248,11.069333587392387
+real_like_train_weak_2104,Train,2104,Weak,base_pattern_2104,6.0,0.25,0.28,0.95,0.6,0.45,236,233,153,80,0.00198828089129859,11.862798066824245
+real_like_train_moderate_2105,Train,2105,Moderate,base_pattern_2105,10.0,0.28,0.32,0.88,1.0,0.6,249,230,142,88,0.0019922162854778946,9.597237023322801
+real_like_validation_weak_3101,Validation,3101,Weak,base_pattern_3101,6.0,0.25,0.28,0.95,0.6,0.45,243,232,161,71,0.002089654932436457,11.421914473024124
+real_like_validation_moderate_3102,Validation,3102,Moderate,base_pattern_3102,10.0,0.28,0.32,0.88,1.0,0.6,260,220,139,81,0.0021746757153674203,9.245408429055137
+real_like_validation_strong_3103,Validation,3103,Strong,base_pattern_3103,14.0,0.32,0.38,0.8,1.4,0.75,248,239,129,110,0.0023455504500399754,10.104195121935705
+real_like_validation_weak_3104,Validation,3104,Weak,base_pattern_3104,6.0,0.25,0.28,0.95,0.6,0.45,236,229,151,78,0.0018764119488008106,10.488824796732496
+real_like_validation_moderate_3105,Validation,3105,Moderate,base_pattern_3105,10.0,0.28,0.32,0.88,1.0,0.6,257,210,156,54,0.0018672784983457332,11.526384696076146
+real_like_test_weak_4101,Test,4101,Weak,base_pattern_4101,6.0,0.25,0.28,0.95,0.6,0.45,239,216,145,71,0.0020254006968529682,10.871474017996093
+real_like_test_moderate_4102,Test,4102,Moderate,base_pattern_4102,10.0,0.28,0.32,0.88,1.0,0.6,263,209,145,64,0.0018903294740213867,9.775063887650445
+real_like_test_strong_4103,Test,4103,Strong,base_pattern_4103,14.0,0.32,0.38,0.8,1.4,0.75,263,208,127,81,0.0020020295279955507,8.74215167504711
+real_like_test_weak_4104,Test,4104,Weak,base_pattern_4104,6.0,0.25,0.28,0.95,0.6,0.45,250,229,158,71,0.0019906181532216858,10.680246334724327
+real_like_test_moderate_4105,Test,4105,Moderate,base_pattern_4105,10.0,0.28,0.32,0.88,1.0,0.6,269,211,143,68,0.001963618800059658,10.739488824805777

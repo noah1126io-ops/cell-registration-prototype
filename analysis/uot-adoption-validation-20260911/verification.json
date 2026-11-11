@@ -1,0 +1,71 @@
+{
+  "state": "PASS",
+  "required_files": {
+    "REPORT.md": {
+      "exists": true
+    },
+    "real_dataset_metrics.csv": {
+      "exists": true
+    },
+    "real_dataset_pairwise_deltas.csv": {
+      "exists": true
+    },
+    "synthetic_metrics.csv": {
+      "exists": true
+    },
+    "synthetic_summary.csv": {
+      "exists": true
+    },
+    "uot_adoption_decision.md": {
+      "exists": true
+    },
+    "real_dataset_comparison.png": {
+      "exists": true
+    },
+    "pass_rate_comparison.png": {
+      "exists": true
+    },
+    "synthetic_ground_truth_error.png": {
+      "exists": true
+    },
+    "missingness_sensitivity.png": {
+      "exists": true
+    },
+    "accuracy_deformation_pareto.png": {
+      "exists": true
+    }
+  },
+  "real_rows": 5,
+  "real_dataset_count": 1,
+  "real_method_count": 5,
+  "synthetic_rows": 250,
+  "synthetic_scenario_count": 50,
+  "synthetic_seed_count": 5,
+  "synthetic_method_count": 5,
+  "synthetic_duplicate_keys": 0,
+  "synthetic_exception_count": 0,
+  "known_affine_reconstruction_error_max_um": 6.355287432313019e-14,
+  "real_uot_reproduction_exact_within_1e_10": {
+    "UOT primary": true,
+    "UOT conservative": true
+  },
+  "uot_source_configuration_checks": {
+    "primary_cost_scale": true,
+    "primary_entropy": true,
+    "primary_relaxation": true,
+    "conservative_cost_scale": true,
+    "conservative_entropy": true,
+    "conservative_relaxation": true
+  },
+  "tracked_modified_files": [],
+  "staged_files": [],
+  "workflow_c_ui_d_tracked_changes": [],
+  "source_hashes": {
+    "prior_report": "c8d25b9f548776403d0c1663a1d9a35976db53f11bafc814c30e3405caf08560",
+    "prior_uot_trials_csv": "8c3a98afcd6bf4b5b090476ee3f066c6811bf74ac3e4d77f635bad6ef7149e28",
+    "primary_result_json": "f220dac4b16cb9f9cf83db6686a038a8e8ee2ec57382af94e327fabe7d862d61",
+    "conservative_result_json": "b5c9c426e19de447d659a7765c789425567fe5006649345daf0f3d27cc2c50f4",
+    "joint_exact_config_json": "9376ad34528462c4a607ff35bb9b78b72c05df2319f5b1467ee9624f8940df33",
+    "density_exact_config_json": "a72e0640b94b35ec20a896757b2a77d23f2f7e96fbb3dc5bedd60278d1958110"
+  }
+}

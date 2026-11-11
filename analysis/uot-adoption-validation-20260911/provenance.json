@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-11",
+  "branch": "feature/gpu-slurm",
+  "git_head": "f66ecbe5bfb691dd18695d34702a3fd13c3dcf7a",
+  "python": "3.11.16",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "pot": "0.9.7.post1",
+  "synthetic_slurm_jobs": {
+    "canonical_tissue_domain_evaluation": 213211,
+    "superseded_global_grid_pilot": 213206
+  },
+  "runtime_is_formal_benchmark": false,
+  "source_hashes": {
+    "prior_report": "c8d25b9f548776403d0c1663a1d9a35976db53f11bafc814c30e3405caf08560",
+    "prior_uot_trials_csv": "8c3a98afcd6bf4b5b090476ee3f066c6811bf74ac3e4d77f635bad6ef7149e28",
+    "primary_result_json": "f220dac4b16cb9f9cf83db6686a038a8e8ee2ec57382af94e327fabe7d862d61",
+    "conservative_result_json": "b5c9c426e19de447d659a7765c789425567fe5006649345daf0f3d27cc2c50f4",
+    "joint_exact_config_json": "9376ad34528462c4a607ff35bb9b78b72c05df2319f5b1467ee9624f8940df33",
+    "density_exact_config_json": "a72e0640b94b35ec20a896757b2a77d23f2f7e96fbb3dc5bedd60278d1958110"
+  },
+  "notes": [
+    "The v2 shards are canonical because they retain attempted-field safety and evaluate field error within known tissue support.",
+    "The earlier pilot shards are retained only as execution provenance and are not used in synthetic_metrics.csv.",
+    "No parameter sweep or per-scenario tuning was performed."
+  ]
+}

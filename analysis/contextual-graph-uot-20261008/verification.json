@@ -1,0 +1,26 @@
+{
+  "state": "PASS",
+  "checks": {
+    "required_files_exist": true,
+    "method_count_is_6": true,
+    "scenario_count_is_45": true,
+    "primary_case_count_is_15": true,
+    "per_case_rows_are_270": true,
+    "per_case_keys_unique": true,
+    "all_algorithm_outputs_finite": true,
+    "all_uot_runs_converged": true,
+    "candidate_k_complete": true,
+    "calibration_methods_complete": true,
+    "real_rows_match_saved_moving_points": true,
+    "production_tracked_changes_absent": true
+  },
+  "counts": {
+    "methods": 6,
+    "scenarios": 45,
+    "per_case_rows": 270,
+    "candidate_rows": 540,
+    "calibration_rows": 49,
+    "real_rows": 1754
+  },
+  "tracked_production_changes": []
+}

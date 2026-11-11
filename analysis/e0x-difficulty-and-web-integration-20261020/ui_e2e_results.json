@@ -1,0 +1,344 @@
+[
+ {
+  "test": "G",
+  "check": "A2 job not resubmitted (cached or already queued)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "G",
+  "check": "second job submitted (X0, IF fixed)",
+  "pass": true,
+  "detail": "rで新しいRegistrationを1件だけSlurmに投入します（CPU 4コア、6 GB、最長45分）。Production処理とは別です。\n\n方式\n\nFixed\n\n同じ設定のジョブが実行待ち・実行中です（run 20261020-162243-d30d96, job 721136）。重複投入はできません。\n\n投入しました: job 721136, run 20261020-162243-d30d96\n\nSlurm（partition mib-dbia）にジョブを1件投入することを確認しました\n\nSlurmに投入\n\nログを見るrun\n\n(stderr empty)\n\nこのジョブをキャンセル"
+ },
+ {
+  "test": "G",
+  "check": "cancel own job 721136 (owner/name verified)",
+  "pass": true,
+  "detail": "Slurmに投入します（CPU 4コア、6 GB、最長45分）。Production処理とは別です。\n\n方式\n\nFixed\n\n同じ設定のジョブが実行待ち・実行中です（run 20261020-162243-d30d96, job 721136）。重複投入はできません。\n\n投入しました: job 721136, run 20261020-162243-d30d96\n\nSlurm（partition mib-dbia）にジョブを1件投入することを確認しました\n\nSlurmに投入\n\nログを見るrun\n\n(stderr empty)\n\nこのジョブをキャンセル\n\ncancelled job 721136"
+ },
+ {
+  "test": "G",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "H",
+  "check": "completed explorer run listed with A2 detector verdict",
+  "pass": true,
+  "detail": "PREVIEW ONLY — FAIL。Workflow Dへ渡しません\nAfter: A2_HEfix@20261020-161149-dc935f. 表示座標 = H&E (Fixed) のframe-local world。原点はUNKNOWN（推測で補完しない）。\n表示モード\n重ね合わせ\nFixed画像のみ\nMoving画像のみ\nチェッカーボード\nMoving画像の透明度\nチェッカー幅 (µm)\n画像\nH&E (fixed, level 3, 1.51 µm/px)\n蛍光 (seqIF) (moving, level 3, 0.80 µm/px)\n核点群\nH&E 核 (fixed) ("
+ },
+ {
+  "test": "H",
+  "check": "IF-frame ≤3 µm of the new A2 run equals the saved Legacy A2 value (0.0532)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "H",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "A",
+  "check": "UNIQUE / Accepted shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "A",
+  "check": "H&E and fluorescence images available",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "A",
+  "check": "saved NN median 1.91 µm displayed",
+  "pass": true,
+  "detail": "metrics table"
+ },
+ {
+  "test": "A",
+  "check": "viewer banner accepted",
+  "pass": true,
+  "detail": "UNIQUE / Accepted（研究artifactで採択）"
+ },
+ {
+  "test": "A",
+  "check": "image + point layers present",
+  "pass": true,
+  "detail": "H&E (fixed, level 3, 1.51 µm/px) 蛍光 (seqIF) (moving, level 3, 0.80 µm/px) H&E 核 (fixed) (1242) 蛍光 (seqIF) 核 (moving, mapped) (1091) 残留変位ベクトル (mutual NN ≤10) Image FOV: H&E (fixed) Image FOV: 蛍光 (seqIF"
+ },
+ {
+  "test": "A",
+  "check": "zoom/pan updates the viewer (HUD coordinates)",
+  "pass": true,
+  "detail": "031-6_2:HE (fixed frame)  x=1115.8  y=1483.2 µm"
+ },
+ {
+  "test": "A",
+  "check": "Before view labelled, same fixed frame",
+  "pass": true,
+  "detail": "BEFORE — 変換なし。座標系はAfterと同じFixed frame"
+ },
+ {
+  "test": "A",
+  "check": "warp preview accepted label + inverse mapping record",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "A",
+  "check": "warp uses the stored moving->fixed transform (not inverted)",
+  "pass": true,
+  "detail": "forward_used_moving_to_target\":{\n\"M\":[\n0:[\n0:0.984698\n1:-0.004492\n]\n1:[\n0:0.003788\n1:0.979863\n]\n]\n\"t\":[\n0:541.871\n1:493.781\n]\n}\n}"
+ },
+ {
+  "test": "A",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "B",
+  "check": "AMBIGUOUS shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "PREVIEW ONLY + not passed to Workflow D",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "no Workflow D hand-off control",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "FOV of both sides + candidate regions drawn",
+  "pass": true,
+  "detail": "H&E (fixed, level 3, 1.51 µm/px) 蛍光 (seqIF) (moving, level 3, 0.80 µm/px) H&E 核 (fixed) (4800) 蛍光 (seqIF) 核 (moving, mapped) (1552) 残留変位ベクトル (mutual NN ≤10) Image FOV: H&E (fixed) Image FOV: 蛍光 (seqIF) (moving, mapped) 核検出範囲: H&E 核検出範囲: 蛍光 (seqIF) (mapped) 組織領域: H&E 組織領域: 蛍光 (seqIF) 候補 #0 の領域 候補 #1 "
+ },
+ {
+  "test": "B",
+  "check": "candidate switch -> preview-only banner",
+  "pass": true,
+  "detail": "候補プレビュー — 候補の選択は採択ではありません PREVIEW ONLY — AMBIGUOUS。Workflow Dへ渡しません"
+ },
+ {
+  "test": "B",
+  "check": "candidate table with IDs and PREVIEW ONLY",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "ablation X3 candidates with ICP metrics listed",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "ablation candidate preview banner",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "B",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "C",
+  "check": "point-only sample: images absent, nuclei present",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "C",
+  "check": "image methods disabled with reason",
+  "pass": true,
+  "detail": "Legacy A2 E0x Point-only（利用不可: 保存済み結果なし） E1 Single-image（利用不可: 画像が1枚必要（利用可能 0）） E2 Dual-image（利用不可: 画像が2枚必要（利用可能 0）） E3 Joint（利用不可: 画像が2枚必要（利用可能 0）） E0x ablation (X0-X3)（利用不可: 保存済み結果なし） Explorer run（利用不可: 保存済み結果なし） Negative control（利用不可: 保存済み結果なし） Manual adjustment（利用不可: 保存済み結果なし）"
+ },
+ {
+  "test": "C",
+  "check": "points shown without images",
+  "pass": true,
+  "detail": "PREVIEW ONLY — UNVERIFIED。Workflow Dへ渡しません\nこの結果は HE→IF で計算。表示方向に合わせ逆変換を使用\nAfter: Legacy A2 R2 (analysis real-registration-incremental-value-20261015). 表示座標 = H&E (Fixed) のframe-local world。原点はUNKNOWN（"
+ },
+ {
+  "test": "C",
+  "check": "H&E frame shown in px (spacing UNKNOWN), unit mismatch noted",
+  "pass": true,
+  "detail": "ボード\nMoving画像の透明度\nチェッカー幅 (px)\n核点群\nH&E 核 (fixed) (1842)\n蛍光 核 (moving, mapped) (1979)\nマーカーサイズ\n推定対応・残留変位\n残留変位ベクトル (mutual NN ≤10)\n色: ≤3 ≤5 >5 px\n推定対応は同一細胞の証明ではありません\n領域\nImage FOV: H&E (fixed)\n核検出範囲: H&E\n核検出範囲: 蛍光 (mapped)\n表示をリセット\nホイール: ズーム / ドラッグ: パン\n座標: serial_section_pair_20260904:HE (fixed frame) (px)"
+ },
+ {
+  "test": "C",
+  "check": "transform shown",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "C",
+  "check": "031-6_2 point-only view: E0x still available",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "C",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "D",
+  "check": "IMAGE_UNUSABLE + point-only result kept",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "D",
+  "check": "E2 saved POINT_ONLY_FALLBACK with reason",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "D",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "E",
+  "check": "IF-fixed result selected by default",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "viewer frame is IF",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "swap consistency table (E0x 0.23 µm)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "inverse warp HE->IF recorded",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "E",
+  "check": "IF-fixed warp uses stored HE->IF map of E0x_IFfix (not inverted)",
+  "pass": true,
+  "detail": "transform_direction_used\":\"HE->IF\"\n\"accepted\":true\n\"source_level\":2\n\"valid_fraction\":1\n\"forward_used_moving_to_target\":{\n\"M\":[\n0:[\n0:1.015144\n1:0.004973\n]\n1:[\n0"
+ },
+ {
+  "test": "E",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow A page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow B page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow C page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "Workflow D page renders without exception",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "F",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "I",
+  "check": "manual mode shows MANUAL / unverified / not passed to Workflow D",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "I",
+  "check": "viewer banner MANUAL",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "I",
+  "check": "identity adjustment keeps base transform",
+  "pass": true,
+  "detail": "\n\t\n\n20.4\n\n\n\n\ntranslation_he_to_if_um\n\n\t\n\n(2909.7, 1592.8)\n\nUI再計算の診断（表示中の変換、参考値・採択には使わない）\n\nfixed nuclei inside the mapped moving footprint (fixed frame), UI-recomputed\n\n指標\n\n\t\n\n値\n\n\n\n\nn_eval\n\n\t\n\n698\n\n\n\n\nnn_median\n\n\t\n\n11.7\n\n\n\n\nnn_p95\n\n\t\n\n26.9\n\n\n\n\nle_1\n\n\t\n\n0.00143\n\n\n\n\nle_3\n\n\t\n\n0.0444\n\n\n\n\nle_5\n\n\t\n\n0.123\n\n\n\n\nnull_le_3\n\n\t\n\n0.0387\n\n表示中の変換 (IF→HE): scale 1.0500, 回転 -144.00°, reflect False, t=(421.4, 2788.1)"
+ },
+ {
+  "test": "I",
+  "check": "rotation +2° and scale x1.02 applied to the displayed transform",
+  "pass": true,
+  "detail": "(('1.0500', '-144.00'), ('1.0710', '-142.00'))"
+ },
+ {
+  "test": "I",
+  "check": "zoom kept across reruns while adjusting",
+  "pass": true,
+  "detail": "(0.1952717016553139, 0.4802908849123218, 0.4802908849123218)"
+ },
+ {
+  "test": "I",
+  "check": "safety metric MANUAL (UNVERIFIED)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "I",
+  "check": "warp preview offers and labels the manual transform",
+  "pass": true,
+  "detail": "PREVIEW ONLY — この変換は正式に採択されていません。Workflow Dへは渡しません。 | Viewerで手動調整中の変換（未検証）を使う | 手動調整（基準: After: 候補 #1 (探索pose)） | PREVIEW ONLY（MANUAL (UNVERIFIED)）— 不確かな変換による画像です。正式出力として扱いません。 | \"transform\":\"MANUAL\" | \"transform_direction_used\":\"IF->HE\""
+ },
+ {
+  "test": "I",
+  "check": "saved to JSON",
+  "pass": true,
+  "detail": "d nuclei inside the mapped moving footprint (fixed frame), UI-recomputed\n\n指標\n\n\t\n\n値\n\n\n\n\nn_eval\n\n\t\n\n727\n\n\n\n\nnn_median\n\n\t\n\n12.6\n\n\n\n\nnn_p95\n\n\t\n\n26.3\n\n\n\n\nle_1\n\n\t\n\n0\n\n\n\n\nle_3\n\n\t\n\n0.033\n\n\n\n\nle_5\n\n\t\n\n0.0922\n\n\n\n\nnull_le_3\n\n\t\n\n0.0316\n\n表示中の変換 (IF→HE): scale 1.0710, 回転 -142.00°, reflect False, t=(411.9, 2807.0)"
+ },
+ {
+  "test": "I",
+  "check": "saved transform listed as Manual adjustment, MANUAL (UNVERIFIED), PREVIEW ONLY",
+  "pass": true,
+  "detail": "e2e-manual-test（IF→HE） — MANUAL (UNVERIFIED)"
+ },
+ {
+  "test": "I",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ }
+]

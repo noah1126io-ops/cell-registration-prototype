@@ -1,0 +1,219 @@
+{
+ "schema": "cellreg-research-store-export/1",
+ "store_schema_version": 1,
+ "exported_at": "2026-10-27T07:53:57+00:00",
+ "sample_id": "031-8_6",
+ "session": null,
+ "runs": [],
+ "transforms": [
+  {
+   "id": "tf-20261027074953-2afcb54c",
+   "session_id": "ses-20261027074953-3de6f9cd",
+   "sample_id": "031-8_6",
+   "run_id": "oir:031-8_6:E0x_HEfix",
+   "candidate_id": "E0x_HEfix#c1",
+   "kind": "manual",
+   "parent_id": null,
+   "fixed": "HE",
+   "moving": "IF",
+   "status": "MANUAL_UNVERIFIED",
+   "label": "e2e-manual-test",
+   "note": "",
+   "supersedes": null,
+   "created_at": "2026-10-27T07:49:53+00:00",
+   "created_by": "noa.ganeko",
+   "M": [
+    [
+     -0.832323324720416,
+     0.6740021388143759
+    ],
+    [
+     -0.6740021388143759,
+     -0.832323324720416
+    ]
+   ],
+   "t": [
+    393.47499146367693,
+    2808.4902208544727
+   ],
+   "detail": {
+    "base": {
+     "label": "After: 候補 #1 (探索pose)",
+     "result_id": "oir:031-8_6:E0x_HEfix",
+     "config": "E0x_HEfix",
+     "candidate": "E0x_HEfix#c1",
+     "stage": "final",
+     "safety": "AMBIGUOUS",
+     "M": [
+      [
+       -0.849467844093695,
+       0.6171745149070967
+      ],
+      [
+       -0.6171745149070967,
+       -0.849467844093695
+      ]
+     ],
+     "t": [
+      421.424476298042,
+      2788.1318358340222
+     ]
+    },
+    "adjustment": {
+     "rotation_deg": 3.0,
+     "scale": 1.02,
+     "dx": 10.0,
+     "dy": 0.0,
+     "pivot": [
+      302.25242338541665,
+      2035.70910625
+     ],
+     "formula": "p_fixed = s*R(rotation) @ (M_base p + t_base - pivot) + pivot + (dx, dy)"
+    },
+    "ui_diagnostics": {
+     "population": "fixed nuclei inside the mapped moving footprint (fixed frame), UI-recomputed",
+     "n_eval": 724,
+     "nn_median": 12.493970622385408,
+     "nn_p95": 27.103119678737436,
+     "le_1": 0.004143646408839779,
+     "le_3": 0.034530386740331494,
+     "le_5": 0.11187845303867404,
+     "null_le_3": 0.03591160220994475
+    }
+   }
+  }
+ ],
+ "reviews": [
+  {
+   "id": "rev-20261027075305-6339edb3",
+   "session_id": "ses-20261027074953-3de6f9cd",
+   "sample_id": "031-8_6",
+   "run_id": "20261022-155543-dfafb7",
+   "candidate_id": null,
+   "transform_id": null,
+   "judgement": "incorrect",
+   "comment": "e2e: 腺管の配置が合わない",
+   "supersedes": null,
+   "created_at": "2026-10-27T07:53:05+00:00",
+   "created_by": "noa.ganeko",
+   "problems": [
+    "region",
+    "rotation"
+   ],
+   "view": {
+    "sample": "031-8_6",
+    "result_id": "wf:20261022-155543-dfafb7",
+    "run_id": "20261022-155543-dfafb7",
+    "candidate": null,
+    "stage": null,
+    "fixed": "HE",
+    "moving": "IF",
+    "manual": false,
+    "M": [
+     [
+      -0.9928198147448125,
+      0.21103036618002588
+     ],
+     [
+      -0.21103036618002588,
+      -0.9928198147448125
+     ]
+    ],
+    "t": [
+     467.32917344591783,
+     1237.3131414687844
+    ],
+    "label": "After: auto_HEfix@20261022-155543-dfafb7"
+   }
+  }
+ ],
+ "annotations": [
+  {
+   "id": "ann-20261027075236-76d73982",
+   "session_id": "ses-20261027074953-3de6f9cd",
+   "sample_id": "031-8_6",
+   "kind": "search_roi",
+   "frame": "031-8_6:HE",
+   "label": "e2e roi",
+   "run_id": null,
+   "candidate_id": null,
+   "transform_id": null,
+   "supersedes": null,
+   "created_at": "2026-10-27T07:52:36+00:00",
+   "created_by": "noa.ganeko",
+   "geometry": [
+    [
+     300.00013207459233,
+     400.00010099940437
+    ],
+    [
+     1300.0000153480082,
+     400.00010099940437
+    ],
+    [
+     1300.0000153480082,
+     1499.9999324994494
+    ],
+    [
+     300.00013207459233,
+     1499.9999324994494
+    ]
+   ],
+   "payload": {
+    "frame_key": "HE"
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": 6,
+   "ts": "2026-10-27T07:53:05+00:00",
+   "session_id": "ses-20261027074953-3de6f9cd",
+   "sample_id": "031-8_6",
+   "actor": "noa.ganeko",
+   "action": "review.add",
+   "payload": {
+    "id": "rev-20261027075305-6339edb3",
+    "candidate": null,
+    "judgement": "incorrect"
+   }
+  },
+  {
+   "id": 5,
+   "ts": "2026-10-27T07:52:36+00:00",
+   "session_id": "ses-20261027074953-3de6f9cd",
+   "sample_id": "031-8_6",
+   "actor": "noa.ganeko",
+   "action": "annotation.add",
+   "payload": {
+    "id": "ann-20261027075236-76d73982",
+    "kind": "search_roi",
+    "label": "e2e roi"
+   }
+  },
+  {
+   "id": 2,
+   "ts": "2026-10-27T07:49:53+00:00",
+   "session_id": "ses-20261027074953-3de6f9cd",
+   "sample_id": "031-8_6",
+   "actor": "noa.ganeko",
+   "action": "transform.add",
+   "payload": {
+    "id": "tf-20261027074953-2afcb54c",
+    "kind": "manual",
+    "label": "e2e-manual-test"
+   }
+  },
+  {
+   "id": 1,
+   "ts": "2026-10-27T07:49:53+00:00",
+   "session_id": "ses-20261027074953-3de6f9cd",
+   "sample_id": "031-8_6",
+   "actor": "noa.ganeko",
+   "action": "session.create",
+   "payload": {
+    "name": "自動作成 2026-10-27 16:49"
+   }
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+scenario_id,split,strength,candidate_source,candidate_recall_30,position_graph_raw_top1_accuracy,graph_candidate_auc,duplicate_destination_count
+real_like_test_weak_4101,Test,Weak,Full contextual candidate-30,1.0,0.9724137931034482,0.9951000190512479,50
+real_like_test_weak_4101,Test,Weak,Spatial candidate-30,1.0,0.9793103448275862,0.9934169773834471,48
+real_like_test_moderate_4102,Test,Moderate,Full contextual candidate-30,1.0,0.9448275862068966,0.9787980295566503,50
+real_like_test_moderate_4102,Test,Moderate,Spatial candidate-30,1.0,0.9241379310344827,0.9760450387051373,52
+real_like_test_strong_4103,Test,Strong,Full contextual candidate-30,1.0,0.8740157480314961,0.9766407204988465,75
+real_like_test_strong_4103,Test,Strong,Spatial candidate-30,1.0,0.8740157480314961,0.9694236241081675,73
+real_like_test_weak_4104,Test,Weak,Full contextual candidate-30,1.0,0.9936708860759493,0.9945091730661879,48
+real_like_test_weak_4104,Test,Weak,Spatial candidate-30,1.0,0.9936708860759493,0.9925016218825908,51
+real_like_test_moderate_4105,Test,Moderate,Full contextual candidate-30,1.0,0.9300699300699301,0.9816703419418791,58
+real_like_test_moderate_4105,Test,Moderate,Spatial candidate-30,1.0,0.9230769230769231,0.977396774875359,58

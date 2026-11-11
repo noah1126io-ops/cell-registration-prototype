@@ -1,0 +1,3 @@
+dataset,fixed_n_original,moving_n_original,fixed_n_evaluation,moving_n_evaluation,usable,reason,unique_fixed_sha256,unique_moving_sha256
+serial_section_pair_20260904,1979,1842,1830,1754,True,"HE nuclei, fluorescence/GeoJSON nuclei, recoverable coordinates, saved affine, common Workflow C inputs",eea2e8fe7247c81b5d114d03294008bc678a1461b239ebda476d1428ea046273,1f6a355023731e7cdaafdf94ed24ce70f2c92681da590f99a73a2e16debbff95
+synthetic_smoke_20260904,80,80,65,66,False,"synthetic engineering smoke test, not an independent serial-section dataset",f7bb63cb44892a341071d49939a920c66793ac74f8b9e231cfe514376992d5b6,2585b1f0a003069566b484acf11b73a822ab352aff1a78703f7a8020dfc39528

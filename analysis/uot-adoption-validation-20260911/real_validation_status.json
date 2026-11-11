@@ -1,0 +1,7 @@
+{
+  "state": "completed",
+  "dataset": "serial_section_pair_20260904",
+  "usable_real_dataset_count": 1,
+  "input_hash_equivalence": "all saved real Workflow C runs/sweeps found on server share the same fixed/moving hashes",
+  "workflow_integration_performed": false
+}

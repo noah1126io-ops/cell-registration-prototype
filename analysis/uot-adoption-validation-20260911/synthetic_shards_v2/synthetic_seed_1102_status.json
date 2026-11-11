@@ -1,0 +1,17 @@
+{
+  "state": "completed",
+  "seed": 1102,
+  "rows": 50,
+  "scenarios": 10,
+  "methods": [
+    "Affine only",
+    "Density Flow baseline",
+    "Joint Flow",
+    "UOT conservative",
+    "UOT primary"
+  ],
+  "device": "cuda",
+  "errors": [],
+  "runtime_seconds": 27.04999427124858,
+  "parameter_tuning_performed": false
+}

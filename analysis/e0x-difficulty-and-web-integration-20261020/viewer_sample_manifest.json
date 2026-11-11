@@ -1,0 +1,228 @@
+{
+  "schema": "registration-explorer-manifest/0.1",
+  "generated": "2026-10-20",
+  "samples": [
+    {
+      "sample_id": "031-6_2",
+      "label": "031-6_2",
+      "coordinate_system": "frame-local world um per modality; x right, y down; world = level-0 pixel index x pixel_um; stage/crop origin UNKNOWN",
+      "provenance": {
+        "summary": "031-6_2: H&E 031-6 XY02 and seqIF 031-6_2 background.",
+        "user_correction_2026-10-20": "Treated as DIFFERENT sections (user correction; overrides the provider note and the 2026-10-19 REPORT wording 'same section').",
+        "provider_note": "HE shown in the 031-6_2 view: 031-6 XY02, level 0, whole HE set (registered to this field: scale 0.985, NCC 0.706).",
+        "same_section": false,
+        "reference_transform": "provider image-NCC placement (not ground truth, not independent)"
+      },
+      "modalities": {
+        "HE": {
+          "label": "H&E",
+          "kind": "brightfield_rgb",
+          "pixel_um": 0.18872089583333335,
+          "shape_px": [
+            11411,
+            11243
+          ],
+          "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_HE_031-6_XY02.ome.tif",
+          "channels": "RGB brightfield H&E (uint8)",
+          "origin": "UNKNOWN (no stage origin in OME; frame-local (0,0) used)",
+          "nuclei": {
+            "format": "csv_px",
+            "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/he-stardist-seqif-registration-20261019/out/031-6_2/he_nuclei.csv",
+            "x": "centroid_x_px",
+            "y": "centroid_y_px",
+            "units": "px",
+            "source": "StarDist 2D_versatile_he (analysis he-stardist-seqif-registration-20261019)"
+          },
+          "tissue_npz": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/cache/feats_031-6_2_HE_2um.npz"
+        },
+        "IF": {
+          "label": "蛍光 (seqIF)",
+          "kind": "fluorescence_display_rgb",
+          "pixel_um": 0.1002,
+          "shape_px": [
+            10240,
+            10240
+          ],
+          "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seqif.ome.tif",
+          "channels": "uint8 RGB display rendering: R=Desmoplakin, G=Dystrophin1, B=Hoechst+Desmoplakin (no pure nuclear channel)",
+          "origin": "UNKNOWN (no stage origin in OME; frame-local (0,0) used)",
+          "nuclei": {
+            "format": "geojson_px_props",
+            "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seg_seqif_level0.geojson",
+            "x": "centroid_x",
+            "y": "centroid_y",
+            "units": "px",
+            "source": "provider GeoJSON *_seg_seqif_level0.geojson"
+          },
+          "tissue_npz": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/cache/feats_031-6_2_IF_2um.npz"
+        }
+      },
+      "result_sources": [
+        {
+          "type": "oir-20261019",
+          "artifacts_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/artifacts",
+          "cache_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/cache",
+          "metrics_csv": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/mode_comparison.csv",
+          "previews_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/previews"
+        },
+        {
+          "type": "e0x-ablation-20261020",
+          "cache_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/e0x-difficulty-and-web-integration-20261020/cache"
+        },
+        {
+          "type": "explorer-runs",
+          "runs_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/runs/registration-explorer"
+        }
+      ]
+    },
+    {
+      "sample_id": "031-8_6",
+      "label": "031-8_6",
+      "coordinate_system": "frame-local world um per modality; x right, y down; world = level-0 pixel index x pixel_um; stage/crop origin UNKNOWN",
+      "provenance": {
+        "summary": "031-8_6: H&E from 031-7 XY06 (031-8 has no H&E) and seqIF 031-8_6 background.",
+        "provider_note": "REFERENCE ONLY - 031-8 has no HE; not registered to this field.",
+        "same_section": false,
+        "section_spacing": "UNKNOWN",
+        "reference_transform": "none (correspondence region not annotated)"
+      },
+      "modalities": {
+        "HE": {
+          "label": "H&E",
+          "kind": "brightfield_rgb",
+          "pixel_um": 0.18872089583333335,
+          "shape_px": [
+            11400,
+            11215
+          ],
+          "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_HE_reference_031-7_XY06.ome.tif",
+          "channels": "RGB brightfield H&E (uint8)",
+          "origin": "UNKNOWN (no stage origin in OME; frame-local (0,0) used)",
+          "nuclei": {
+            "format": "csv_px",
+            "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/he-stardist-seqif-registration-20261019/out/031-8_6/he_nuclei.csv",
+            "x": "centroid_x_px",
+            "y": "centroid_y_px",
+            "units": "px",
+            "source": "StarDist 2D_versatile_he (analysis he-stardist-seqif-registration-20261019)"
+          },
+          "tissue_npz": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/cache/feats_031-8_6_HE_2um.npz"
+        },
+        "IF": {
+          "label": "蛍光 (seqIF)",
+          "kind": "fluorescence_display_rgb",
+          "pixel_um": 0.1002,
+          "shape_px": [
+            10240,
+            10240
+          ],
+          "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_seqif.ome.tif",
+          "channels": "uint8 RGB display rendering: R=Desmoplakin, G=Dystrophin1, B=Hoechst+Desmoplakin (no pure nuclear channel)",
+          "origin": "UNKNOWN (no stage origin in OME; frame-local (0,0) used)",
+          "nuclei": {
+            "format": "geojson_px_props",
+            "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-8_6/031-8_6_seg_seqif_level0.geojson",
+            "x": "centroid_x",
+            "y": "centroid_y",
+            "units": "px",
+            "source": "provider GeoJSON *_seg_seqif_level0.geojson"
+          },
+          "tissue_npz": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/cache/feats_031-8_6_IF_2um.npz"
+        }
+      },
+      "result_sources": [
+        {
+          "type": "oir-20261019",
+          "artifacts_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/artifacts",
+          "cache_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/cache",
+          "metrics_csv": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/mode_comparison.csv",
+          "previews_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/optional-image-assisted-registration-20261019/previews"
+        },
+        {
+          "type": "e0x-ablation-20261020",
+          "cache_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/e0x-difficulty-and-web-integration-20261020/cache"
+        },
+        {
+          "type": "explorer-runs",
+          "runs_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/runs/registration-explorer"
+        }
+      ]
+    },
+    {
+      "sample_id": "serial_section_pair_20260904",
+      "label": "serial_section_pair_20260904 (point-only)",
+      "coordinate_system": "HE: production crop pixels (spacing UNKNOWN in this record); fluorescence: world um. The transform maps HE px -> fluorescence um.",
+      "provenance": {
+        "summary": "Earlier Point-only real pair (Workflow C run 20260904-161247-698fe6c9). Both nuclear point sets; no images registered for this viewer.",
+        "he": "original_moving_points.npy (HE nuclei, px)",
+        "fluorescence": "original_fixed_points.npy (fluorescence nuclei, um)",
+        "same_section": null
+      },
+      "modalities": {
+        "HE": {
+          "label": "H&E",
+          "kind": "points_only",
+          "pixel_um": null,
+          "shape_px": null,
+          "image_path": null,
+          "extent_override": [
+            901.0,
+            901.0
+          ],
+          "nuclei": {
+            "format": "npy",
+            "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/runs/20260904-161247-698fe6c9/input/original_moving_points.npy",
+            "units": "native",
+            "world_units": "px",
+            "source": "Workflow C input (HE crop px)"
+          }
+        },
+        "IF": {
+          "label": "蛍光",
+          "kind": "points_only",
+          "pixel_um": null,
+          "shape_px": null,
+          "image_path": null,
+          "nuclei": {
+            "format": "npy",
+            "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/runs/20260904-161247-698fe6c9/input/original_fixed_points.npy",
+            "units": "native",
+            "world_units": "um",
+            "source": "Workflow C input (um)"
+          }
+        }
+      },
+      "result_sources": [
+        {
+          "type": "stored-transform",
+          "label": "Legacy A2 R2 (analysis real-registration-incremental-value-20261015)",
+          "method": "Legacy A2",
+          "fixed": "IF",
+          "moving": "HE",
+          "M": [
+            [
+              1.106295019055863,
+              0.03457947965384987
+            ],
+            [
+              0.034905812283289754,
+              -1.1069526982145839
+            ]
+          ],
+          "t": [
+            -7.248939758167864,
+            946.7447181834401
+          ],
+          "source_file": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/real-registration-incremental-value-20261015/cache/real_stages.json",
+          "verdict": "A2",
+          "accepted": null,
+          "note": "no research-artifact verdict recorded; shown as preview with UI-recomputed diagnostics"
+        },
+        {
+          "type": "explorer-runs",
+          "runs_dir": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/runs/registration-explorer"
+        }
+      ]
+    }
+  ]
+}

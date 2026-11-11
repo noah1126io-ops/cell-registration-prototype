@@ -1,0 +1,22 @@
+{
+  "state": "completed",
+  "scenario_count": 45,
+  "primary_case_count": 15,
+  "methods": [
+    "M0 Spatial-only UOT",
+    "M1 Regional NCC only",
+    "M2 Fingerprint nearest candidate",
+    "M3 Fingerprint + UOT",
+    "M4 Fingerprint + graph + UOT",
+    "M5 Full contextual graph-UOT"
+  ],
+  "graph_support_auc": 0.9472856892698421,
+  "graph_support_primary_auc": 0.9505187480382291,
+  "interpretation": {
+    "category": "A",
+    "label": "FULL TREE SUPPORTED"
+  },
+  "real_exploration_performed": true,
+  "runtime_seconds": 404.78309552557766,
+  "all_finite": true
+}

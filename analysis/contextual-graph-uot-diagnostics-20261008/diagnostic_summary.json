@@ -1,0 +1,97 @@
+{
+  "purpose": "diagnosis_only_no_parameter_or_algorithm_change",
+  "source_analysis": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/contextual-graph-uot-20261008",
+  "branch": "feature/gpu-slurm",
+  "python": "3.11.16 | packaged by conda-forge | (main, Aug 21 2026, 22:44:51) [GCC 14.4.0]",
+  "platform": "Linux-6.8.0-88-generic-x86_64-with-glibc2.35",
+  "elapsed_seconds": 181.25113224983215,
+  "input_counts": {
+    "moving": 1754,
+    "fixed": 1830
+  },
+  "status_counts": {
+    "unmatched": 1295,
+    "ambiguous": 434,
+    "matched": 25
+  },
+  "maximum_confidence": 0.6983802902492913,
+  "confidence_at_least_0_75": 0,
+  "candidate_zero_count": 0,
+  "regional_candidate_audit": {
+    "search_boundary_hit_count": 1025,
+    "search_boundary_hit_fraction": 0.5843785632839225,
+    "best_offset_norm_um_p05_median_p95": [
+      4.242640687119285,
+      18.24828759089466,
+      25.45584412271571
+    ]
+  },
+  "candidate_rank_change_counts": {
+    "regional_rank1_differs_from_spatial": 1253,
+    "fingerprint_rank1_differs_from_spatial": 1726,
+    "base_rank1_differs_from_spatial": 927,
+    "graph_rank1_differs_from_base": 53,
+    "uot_rank1_differs_from_graph_min_cost": 195
+  },
+  "matched_condition_pass_counts": {
+    "row_mass_ratio_at_least_0_25": 25,
+    "normalized_top1_at_least_0_16": 1754,
+    "margin_at_least_0_01": 1747,
+    "all_three": 25
+  },
+  "comparative_thresholds_not_used_for_classification": {
+    "synthetic_hard_minimum_cost_p95": 4.018471087616401,
+    "synthetic_hard_graph_support_p05": 0.01826300438666242
+  },
+  "uot": {
+    "solver_final_error": 7.21410671082616e-08,
+    "solver_converged": true,
+    "transported_total_mass": 0.07701418925661047,
+    "settings": {
+      "cost_scale_um": 10.0,
+      "entropic_regularization": 0.1,
+      "mass_relaxation_kl": 0.5,
+      "minimum_row_mass_ratio": 0.25,
+      "solver": "sinkhorn_translation_invariant",
+      "reg_type": "kl",
+      "max_iterations": 2000,
+      "stop_threshold": 1e-07,
+      "source_trial": "coarse_09 / cost10_e0.1_m0.5"
+    }
+  },
+  "reproduction": {
+    "exact_columns": {
+      "top1_fixed_index": true,
+      "top2_fixed_index": true,
+      "reciprocal": true,
+      "status": true
+    },
+    "numeric_max_absolute_errors": {
+      "top1_transport_mass": 9.98821251402271e-17,
+      "top2_transport_mass": 6.776263578034403e-21,
+      "top1_top2_margin": 1.1102230246251565e-16,
+      "normalized_row_entropy": 9.985502008591496e-17,
+      "total_transported_mass": 9.99227827216953e-17,
+      "row_mass_ratio": 9.8879238130678e-17,
+      "regional_ncc": 9.020562075079397e-17,
+      "regional_ncc_margin": 9.80118763926896e-17,
+      "fingerprint_similarity": 1.1102230246251565e-16,
+      "graph_support_score": 9.71445146547012e-17,
+      "affine_candidate_distance_um": 7.105427357601002e-15,
+      "confidence": 5.551115123125783e-17
+    }
+  },
+  "source_sha256_after_diagnostics": {
+    "real_correspondence_candidates.csv": "b565e48bdb895fbd41280fb2418c099dfdf31a69a862c5b63a738d717c8b4078",
+    "correspondence_results.csv": "50079c51ae9d8daa00221abd103f6a143b9e9a49229e3a436cfab3cf19fe28f7",
+    "method_metrics.csv": "16adc06760029a79cd4683e708ca1256f36cf71149197598aa82e758ed25a3ce"
+  },
+  "deterministic_trace_sha256": "cad71cae0977060aa023cd2df07cb7d96bef96ad4b7f7feedfc0bdc22c33cc08",
+  "no_nan_or_inf_in_required_trace_columns": true,
+  "conclusion": {
+    "candidate_discovery_working": "PARTIALLY",
+    "uot_discarding_plausible_matches": "UNKNOWN scientifically; direct mass gate YES",
+    "confidence_overly_conservative": "NO as explanation of matched count",
+    "dominant_category": "C. UOT MASS / COST PROBLEM, with B. DESCRIPTOR DOMAIN GAP upstream"
+  }
+}

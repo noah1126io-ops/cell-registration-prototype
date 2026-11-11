@@ -1,0 +1,38 @@
+{
+  "UOT primary": {
+    "symmetric_median_nn_um": {
+      "current": 8.336520645818148,
+      "source": 8.33652064581816,
+      "delta": -1.2434497875801753e-14
+    },
+    "displacement_p95_um": {
+      "current": 4.87046098529398,
+      "source": 4.870460985293997,
+      "delta": -1.687538997430238e-14
+    },
+    "jacobian_p05": {
+      "current": 0.8296256621892723,
+      "source": 0.8296256621892767,
+      "delta": -4.440892098500626e-15
+    },
+    "exact_within_1e-10": true
+  },
+  "UOT conservative": {
+    "symmetric_median_nn_um": {
+      "current": 8.640460045026416,
+      "source": 8.640460045026416,
+      "delta": 0.0
+    },
+    "displacement_p95_um": {
+      "current": 2.392920398160162,
+      "source": 2.3929203981601788,
+      "delta": -1.687538997430238e-14
+    },
+    "jacobian_p05": {
+      "current": 0.9172878744831747,
+      "source": 0.9172878744831745,
+      "delta": 2.220446049250313e-16
+    },
+    "exact_within_1e-10": true
+  }
+}

@@ -1,0 +1,16 @@
+scope,cause,nuclei,fraction_of_unmatched,definition_or_note
+exclusive_actual_unmatched_rule,Candidateなし,0,0.0,The implementation always supplies 30 candidates.
+exclusive_actual_unmatched_rule,Cost不適合,0,0.0,There is no explicit final cost rejection rule.
+exclusive_actual_unmatched_rule,UOT mass不足,1295,1.0,Actual unmatched rule: row mass ratio < 0.12.
+exclusive_actual_unmatched_rule,候補が曖昧,0,0.0,Concentration and margin do not assign the unmatched label.
+exclusive_actual_unmatched_rule,Graph support不足,0,0.0,Graph support changes cost but is not a direct final rule.
+exclusive_actual_unmatched_rule,Reciprocal条件不成立,0,0.0,Reciprocity is recorded only.
+exclusive_actual_unmatched_rule,Confidence threshold不達,0,0.0,Final confidence is not used by the classifier.
+exclusive_actual_unmatched_rule,その他,0,0.0,No other unmatched path was observed.
+overlapping_unmatched_diagnostic_flag,Candidateなし,0,0.0,candidate_count == 0
+overlapping_unmatched_diagnostic_flag,CostがSynthetic Hard p95超,194,0.1498069498069498,Comparative diagnostic only: minimum cost > 4.018471
+overlapping_unmatched_diagnostic_flag,UOT mass不足,1295,1.0,row_mass_ratio < 0.12
+overlapping_unmatched_diagnostic_flag,行内候補が曖昧,5,0.003861003861003861,normalized top1 < 0.16 or top1-top2 margin < 0.01
+overlapping_unmatched_diagnostic_flag,Graph supportがSynthetic Hard p05未満,60,0.04633204633204633,Comparative diagnostic only: graph support < 0.018263
+overlapping_unmatched_diagnostic_flag,Reciprocalでない,586,0.4525096525096525,Recorded diagnostic; not a classifier condition
+overlapping_unmatched_diagnostic_flag,Confidence < 0.75,1295,1.0,Diagnostic reference only; 0.75 is not a final classifier threshold

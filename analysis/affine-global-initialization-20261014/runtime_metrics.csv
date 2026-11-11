@@ -1,0 +1,213 @@
+case,method_key,runtime_s,peak_mem_mb,n_hypotheses_scored,n_refined,dataset,method
+asym_crop_offset50_11,A0,4.156903270632029,0.2329273223876953,48,48,synthetic,Existing Centroid + ICP
+asym_crop_offset50_11,A1,129.5381335876882,40.55314254760742,528,6,synthetic,Correlogram + ICP
+asym_crop_offset50_11,A2,53.534845151007175,66.61039924621582,507,6,synthetic,Density correlation + ICP
+asym_crop_offset50_11,A3,123.54587437771261,17.962109565734863,27744,12,synthetic,Multi-start + ICP
+asym_crop_offset50_12,A0,3.272444847971201,0.1976022720336914,48,48,synthetic,Existing Centroid + ICP
+asym_crop_offset50_12,A1,99.97432607971132,30.445651054382324,528,6,synthetic,Correlogram + ICP
+asym_crop_offset50_12,A2,55.91240398213267,66.58577919006348,507,6,synthetic,Density correlation + ICP
+asym_crop_offset50_12,A3,154.50128591619432,17.980212211608887,27744,12,synthetic,Multi-start + ICP
+asym_crop_offset50_13,A0,3.276835897937417,0.21046924591064453,48,48,synthetic,Existing Centroid + ICP
+asym_crop_offset50_13,A1,99.2330131419003,30.23473834991455,528,6,synthetic,Correlogram + ICP
+asym_crop_offset50_13,A2,53.2732371930033,66.5750789642334,486,6,synthetic,Density correlation + ICP
+asym_crop_offset50_13,A3,151.9290995784104,17.97216033935547,27744,12,synthetic,Multi-start + ICP
+low_shared_offset50_11,A0,4.857429655268788,0.3219900131225586,48,48,synthetic,Existing Centroid + ICP
+low_shared_offset50_11,A1,153.30089732073247,47.11380672454834,528,6,synthetic,Correlogram + ICP
+low_shared_offset50_11,A2,51.46173085644841,66.4006404876709,528,6,synthetic,Density correlation + ICP
+low_shared_offset50_11,A3,140.65097700804472,17.97580623626709,27744,12,synthetic,Multi-start + ICP
+low_shared_offset50_12,A0,5.185509275645018,0.25284481048583984,48,48,synthetic,Existing Centroid + ICP
+low_shared_offset50_12,A1,76.23884045705199,34.483757972717285,348,6,synthetic,Correlogram + ICP
+low_shared_offset50_12,A2,36.250048564746976,66.44824123382568,348,6,synthetic,Density correlation + ICP
+low_shared_offset50_12,A3,66.98308294080198,9.026615142822266,13872,12,synthetic,Multi-start + ICP
+low_shared_offset50_13,A0,4.6218197494745255,0.2884063720703125,48,48,synthetic,Existing Centroid + ICP
+low_shared_offset50_13,A1,137.24680772796273,39.56331729888916,528,6,synthetic,Correlogram + ICP
+low_shared_offset50_13,A2,54.01154026761651,66.63780689239502,528,6,synthetic,Density correlation + ICP
+low_shared_offset50_13,A3,140.04156533256173,17.971328735351562,27744,12,synthetic,Multi-start + ICP
+missing40_offset50_11,A0,3.957481600344181,0.24579334259033203,48,48,synthetic,Existing Centroid + ICP
+missing40_offset50_11,A1,155.79458229988813,49.17140579223633,528,6,synthetic,Correlogram + ICP
+missing40_offset50_11,A2,53.15650521218777,66.62886333465576,528,6,synthetic,Density correlation + ICP
+missing40_offset50_11,A3,125.63294884935021,17.964780807495117,27744,12,synthetic,Multi-start + ICP
+missing40_offset50_12,A0,3.5480915009975433,0.2225332260131836,48,48,synthetic,Existing Centroid + ICP
+missing40_offset50_12,A1,122.16930765658617,37.967162132263184,528,6,synthetic,Correlogram + ICP
+missing40_offset50_12,A2,53.32877007126808,66.59974384307861,507,6,synthetic,Density correlation + ICP
+missing40_offset50_12,A3,159.55993083491921,17.98446559906006,27744,12,synthetic,Multi-start + ICP
+missing40_offset50_13,A0,3.514046413823962,0.22803306579589844,48,48,synthetic,Existing Centroid + ICP
+missing40_offset50_13,A1,133.22173987701535,41.39590072631836,528,6,synthetic,Correlogram + ICP
+missing40_offset50_13,A2,53.91554494574666,66.3604679107666,507,6,synthetic,Density correlation + ICP
+missing40_offset50_13,A3,118.74257193692029,17.967928886413574,27744,12,synthetic,Multi-start + ICP
+offset000_11,A0,4.621159218251705,0.3093290328979492,48,48,synthetic,Existing Centroid + ICP
+offset000_11,A1,165.12236830219626,50.64824867248535,528,6,synthetic,Correlogram + ICP
+offset000_11,A2,51.214548107236624,66.5957260131836,486,6,synthetic,Density correlation + ICP
+offset000_11,A3,122.4993967525661,17.96724510192871,27744,12,synthetic,Multi-start + ICP
+offset000_12,A0,4.143516596406698,0.2552366256713867,48,48,synthetic,Existing Centroid + ICP
+offset000_12,A1,131.46439671516418,38.82264518737793,528,6,synthetic,Correlogram + ICP
+offset000_12,A2,53.84576254710555,66.61196613311768,507,6,synthetic,Density correlation + ICP
+offset000_12,A3,132.1748052686453,17.969463348388672,27744,12,synthetic,Multi-start + ICP
+offset000_13,A0,4.407958030700684,0.2632102966308594,48,48,synthetic,Existing Centroid + ICP
+offset000_13,A1,85.96055498346686,38.78950214385986,348,6,synthetic,Correlogram + ICP
+offset000_13,A2,35.50725992396474,66.4231424331665,327,6,synthetic,Density correlation + ICP
+offset000_13,A3,68.74530700221658,9.029706954956055,13872,12,synthetic,Multi-start + ICP
+offset025_11,A0,5.759918089956045,0.2997465133666992,48,48,synthetic,Existing Centroid + ICP
+offset025_11,A1,167.57152757421136,50.70786762237549,528,6,synthetic,Correlogram + ICP
+offset025_11,A2,50.74540853500366,66.59603214263916,486,6,synthetic,Density correlation + ICP
+offset025_11,A3,121.8592128045857,17.967086791992188,27744,12,synthetic,Multi-start + ICP
+offset025_12,A0,3.6947331689298153,0.2574739456176758,48,48,synthetic,Existing Centroid + ICP
+offset025_12,A1,126.33567877486348,39.00744438171387,528,6,synthetic,Correlogram + ICP
+offset025_12,A2,55.568346440792084,66.63417530059814,528,6,synthetic,Density correlation + ICP
+offset025_12,A3,132.03253434598446,17.969539642333984,27744,12,synthetic,Multi-start + ICP
+offset025_13,A0,4.151033136993647,0.2641630172729492,48,48,synthetic,Existing Centroid + ICP
+offset025_13,A1,82.62537620589137,38.44362258911133,348,6,synthetic,Correlogram + ICP
+offset025_13,A2,34.11841884255409,66.42500495910645,327,6,synthetic,Density correlation + ICP
+offset025_13,A3,65.48334380052984,9.023752212524414,13872,12,synthetic,Multi-start + ICP
+offset050_11,A0,4.9555545803159475,0.33532047271728516,48,48,synthetic,Existing Centroid + ICP
+offset050_11,A1,167.94838781282306,50.5231351852417,528,6,synthetic,Correlogram + ICP
+offset050_11,A2,51.01909917220473,66.59465026855469,486,6,synthetic,Density correlation + ICP
+offset050_11,A3,118.21825771406293,17.96651268005371,27744,12,synthetic,Multi-start + ICP
+offset050_12,A0,4.435455413535237,0.2870359420776367,48,48,synthetic,Existing Centroid + ICP
+offset050_12,A1,131.40134285576642,38.91069316864014,528,6,synthetic,Correlogram + ICP
+offset050_12,A2,56.89864908531308,66.63789176940918,528,6,synthetic,Density correlation + ICP
+offset050_12,A3,130.26757218129933,17.969322204589844,27744,12,synthetic,Multi-start + ICP
+offset050_13,A0,4.021063027903438,0.2917633056640625,48,48,synthetic,Existing Centroid + ICP
+offset050_13,A1,85.4231372307986,38.42890167236328,348,6,synthetic,Correlogram + ICP
+offset050_13,A2,33.281617974862456,66.39562034606934,306,6,synthetic,Density correlation + ICP
+offset050_13,A3,66.88198385946453,9.007532119750977,13872,12,synthetic,Multi-start + ICP
+offset075_11,A0,4.862494992092252,0.3352804183959961,48,48,synthetic,Existing Centroid + ICP
+offset075_11,A1,161.56533124670386,50.403188705444336,528,6,synthetic,Correlogram + ICP
+offset075_11,A2,50.51150924526155,66.59907054901123,486,6,synthetic,Density correlation + ICP
+offset075_11,A3,119.68878582306206,17.96685218811035,27744,12,synthetic,Multi-start + ICP
+offset075_12,A0,3.9225347619503736,0.25650501251220703,48,48,synthetic,Existing Centroid + ICP
+offset075_12,A1,128.64791096746922,38.857558250427246,528,6,synthetic,Correlogram + ICP
+offset075_12,A2,56.095369707793,66.63283157348633,528,6,synthetic,Density correlation + ICP
+offset075_12,A3,129.0217814706266,17.96951198577881,27744,12,synthetic,Multi-start + ICP
+offset075_13,A0,4.088106287643313,0.29786205291748047,48,48,synthetic,Existing Centroid + ICP
+offset075_13,A1,78.0987389087677,38.085997581481934,327,6,synthetic,Correlogram + ICP
+offset075_13,A2,31.185420896857977,66.37137031555176,285,6,synthetic,Density correlation + ICP
+offset075_13,A3,65.8521974068135,9.03364372253418,13872,12,synthetic,Multi-start + ICP
+offset100_11,A0,5.043358260765672,0.30521678924560547,48,48,synthetic,Existing Centroid + ICP
+offset100_11,A1,158.63890628889203,50.53697490692139,507,6,synthetic,Correlogram + ICP
+offset100_11,A2,54.46389113739133,66.61202049255371,507,6,synthetic,Density correlation + ICP
+offset100_11,A3,120.23571281321347,17.9670352935791,27744,12,synthetic,Multi-start + ICP
+offset100_12,A0,3.9922458045184612,0.2570209503173828,48,48,synthetic,Existing Centroid + ICP
+offset100_12,A1,126.50514303520322,39.516385078430176,507,6,synthetic,Correlogram + ICP
+offset100_12,A2,56.4615193400532,66.63955783843994,528,6,synthetic,Density correlation + ICP
+offset100_12,A3,129.6181163880974,17.969045639038086,27744,12,synthetic,Multi-start + ICP
+offset100_13,A0,4.406253458932042,0.2840700149536133,48,48,synthetic,Existing Centroid + ICP
+offset100_13,A1,79.91260878369212,37.8161735534668,348,6,synthetic,Correlogram + ICP
+offset100_13,A2,29.55375680886209,66.37285137176514,285,6,synthetic,Density correlation + ICP
+offset100_13,A3,66.9442206081003,9.030571937561035,13872,12,synthetic,Multi-start + ICP
+offset150_large_11,A0,5.252916207537055,0.33032989501953125,48,48,synthetic,Existing Centroid + ICP
+offset150_large_11,A1,165.46672395057976,50.03022575378418,528,6,synthetic,Correlogram + ICP
+offset150_large_11,A2,49.76695610024035,66.61944484710693,507,6,synthetic,Density correlation + ICP
+offset150_large_11,A3,124.55382751487195,17.96780300140381,27744,12,synthetic,Multi-start + ICP
+offset150_large_12,A0,4.757176969200373,0.2625093460083008,48,48,synthetic,Existing Centroid + ICP
+offset150_large_12,A1,126.72088264301419,39.43801021575928,528,6,synthetic,Correlogram + ICP
+offset150_large_12,A2,57.124702263623476,66.63770008087158,528,6,synthetic,Density correlation + ICP
+offset150_large_12,A3,135.36678591743112,17.970227241516113,27744,12,synthetic,Multi-start + ICP
+offset150_large_13,A0,4.4977085161954165,0.28928661346435547,48,48,synthetic,Existing Centroid + ICP
+offset150_large_13,A1,79.90881570242345,37.95629024505615,348,6,synthetic,Correlogram + ICP
+offset150_large_13,A2,28.484517250210047,66.37943363189697,285,6,synthetic,Density correlation + ICP
+offset150_large_13,A3,66.02397974953055,9.028223991394043,13872,12,synthetic,Multi-start + ICP
+partial_overlap_350_11,A0,4.449088899418712,0.30722808837890625,48,48,synthetic,Existing Centroid + ICP
+partial_overlap_350_11,A1,153.07097092829645,47.445420265197754,528,6,synthetic,Correlogram + ICP
+partial_overlap_350_11,A2,55.214018223807216,66.64364242553711,528,6,synthetic,Density correlation + ICP
+partial_overlap_350_11,A3,136.1316075734794,17.97590160369873,27744,12,synthetic,Multi-start + ICP
+partial_overlap_350_12,A0,5.392833737656474,0.2626619338989258,48,48,synthetic,Existing Centroid + ICP
+partial_overlap_350_12,A1,129.3615568075329,39.205787658691406,528,6,synthetic,Correlogram + ICP
+partial_overlap_350_12,A2,55.27058209106326,66.62388896942139,528,6,synthetic,Density correlation + ICP
+partial_overlap_350_12,A3,131.84030621871352,17.969508171081543,27744,12,synthetic,Multi-start + ICP
+partial_overlap_350_13,A0,4.0978441294282675,0.2872762680053711,48,48,synthetic,Existing Centroid + ICP
+partial_overlap_350_13,A1,81.41281983628869,37.366623878479004,348,6,synthetic,Correlogram + ICP
+partial_overlap_350_13,A2,36.77753665484488,66.44052600860596,348,6,synthetic,Density correlation + ICP
+partial_overlap_350_13,A3,65.73958341218531,9.027811050415039,13872,12,synthetic,Multi-start + ICP
+rot3_offset50_11,A0,5.450905326753855,0.33343505859375,48,48,synthetic,Existing Centroid + ICP
+rot3_offset50_11,A1,161.21026915498078,50.541579246520996,528,6,synthetic,Correlogram + ICP
+rot3_offset50_11,A2,56.68256142362952,66.6433801651001,528,6,synthetic,Density correlation + ICP
+rot3_offset50_11,A3,119.7638751808554,17.965603828430176,27744,12,synthetic,Multi-start + ICP
+rot3_offset50_12,A0,3.4870573058724403,0.2848968505859375,48,48,synthetic,Existing Centroid + ICP
+rot3_offset50_12,A1,125.35400619357824,38.92812252044678,528,6,synthetic,Correlogram + ICP
+rot3_offset50_12,A2,56.28932115249336,66.6362075805664,528,6,synthetic,Density correlation + ICP
+rot3_offset50_12,A3,131.7692263238132,17.96949005126953,27744,12,synthetic,Multi-start + ICP
+rot3_offset50_13,A0,4.65828819014132,0.2589712142944336,48,48,synthetic,Existing Centroid + ICP
+rot3_offset50_13,A1,79.93771547824144,38.32712364196777,348,6,synthetic,Correlogram + ICP
+rot3_offset50_13,A2,34.14667627774179,66.41753959655762,327,6,synthetic,Density correlation + ICP
+rot3_offset50_13,A3,66.15883572399616,9.033974647521973,13872,12,synthetic,Multi-start + ICP
+rot6_offset50_11,A0,5.102466434240341,0.2967376708984375,48,48,synthetic,Existing Centroid + ICP
+rot6_offset50_11,A1,162.18374179676175,50.309160232543945,528,6,synthetic,Correlogram + ICP
+rot6_offset50_11,A2,54.10706356167793,66.645583152771,528,6,synthetic,Density correlation + ICP
+rot6_offset50_11,A3,124.0829515941441,17.96682071685791,27744,12,synthetic,Multi-start + ICP
+rot6_offset50_12,A0,4.896463703364134,0.27831554412841797,48,48,synthetic,Existing Centroid + ICP
+rot6_offset50_12,A1,126.95889128372073,38.66388511657715,528,6,synthetic,Correlogram + ICP
+rot6_offset50_12,A2,54.09861299023032,66.63404846191406,528,6,synthetic,Density correlation + ICP
+rot6_offset50_12,A3,130.492607165128,17.964186668395996,27744,12,synthetic,Multi-start + ICP
+rot6_offset50_13,A0,4.588009797036648,0.26396942138671875,48,48,synthetic,Existing Centroid + ICP
+rot6_offset50_13,A1,79.66108566150069,38.3602991104126,327,6,synthetic,Correlogram + ICP
+rot6_offset50_13,A2,35.98862883448601,66.42948627471924,348,6,synthetic,Density correlation + ICP
+rot6_offset50_13,A3,69.1762706078589,9.035091400146484,13872,12,synthetic,Multi-start + ICP
+rot90_proper_offset50_11,A0,4.996841015294194,0.3277568817138672,48,48,synthetic,Existing Centroid + ICP
+rot90_proper_offset50_11,A1,159.25553751550615,50.43358039855957,507,6,synthetic,Correlogram + ICP
+rot90_proper_offset50_11,A2,54.840913750231266,66.64402103424072,528,6,synthetic,Density correlation + ICP
+rot90_proper_offset50_11,A3,118.09726739302278,17.968290328979492,27744,12,synthetic,Multi-start + ICP
+rot90_proper_offset50_12,A0,4.541476476937532,0.25618648529052734,48,48,synthetic,Existing Centroid + ICP
+rot90_proper_offset50_12,A1,129.34333717264235,39.04601573944092,528,6,synthetic,Correlogram + ICP
+rot90_proper_offset50_12,A2,56.38535175845027,66.6384334564209,528,6,synthetic,Density correlation + ICP
+rot90_proper_offset50_12,A3,130.06497483700514,17.96906566619873,27744,12,synthetic,Multi-start + ICP
+rot90_proper_offset50_13,A0,4.323665792122483,0.2660665512084961,48,48,synthetic,Existing Centroid + ICP
+rot90_proper_offset50_13,A1,85.9125608112663,38.18323230743408,348,6,synthetic,Correlogram + ICP
+rot90_proper_offset50_13,A2,34.93554878048599,66.42625141143799,327,6,synthetic,Density correlation + ICP
+rot90_proper_offset50_13,A3,66.00060256011784,9.028404235839844,13872,12,synthetic,Multi-start + ICP
+small_fov_offset80_11,A0,2.6788116060197353,0.18548965454101562,48,48,synthetic,Existing Centroid + ICP
+small_fov_offset80_11,A1,101.02742319181561,30.54475498199463,528,6,synthetic,Correlogram + ICP
+small_fov_offset80_11,A2,53.90420652553439,66.59127521514893,507,6,synthetic,Density correlation + ICP
+small_fov_offset80_11,A3,144.16699329391122,17.97023296356201,27744,12,synthetic,Multi-start + ICP
+small_fov_offset80_12,A0,2.504676701501012,0.1668987274169922,48,48,synthetic,Existing Centroid + ICP
+small_fov_offset80_12,A1,76.26097927056253,24.831778526306152,507,6,synthetic,Correlogram + ICP
+small_fov_offset80_12,A2,52.78128142096102,66.61329460144043,528,6,synthetic,Density correlation + ICP
+small_fov_offset80_12,A3,141.13576164841652,17.964717864990234,27744,12,synthetic,Multi-start + ICP
+small_fov_offset80_13,A0,2.366085907444358,0.142822265625,48,48,synthetic,Existing Centroid + ICP
+small_fov_offset80_13,A1,78.42254417575896,23.683024406433105,528,6,synthetic,Correlogram + ICP
+small_fov_offset80_13,A2,57.905001148581505,66.59776878356934,528,6,synthetic,Density correlation + ICP
+small_fov_offset80_13,A3,129.87904174812138,17.968664169311523,27744,12,synthetic,Multi-start + ICP
+strong_nonuniform_offset50_11,A0,5.273917496204376,0.3243265151977539,48,48,synthetic,Existing Centroid + ICP
+strong_nonuniform_offset50_11,A1,124.450842410326,58.59745216369629,348,6,synthetic,Correlogram + ICP
+strong_nonuniform_offset50_11,A2,35.369428001344204,66.43187141418457,327,6,synthetic,Density correlation + ICP
+strong_nonuniform_offset50_11,A3,62.66447852179408,9.032966613769531,13872,12,synthetic,Multi-start + ICP
+strong_nonuniform_offset50_12,A0,4.463951855897903,0.2682533264160156,48,48,synthetic,Existing Centroid + ICP
+strong_nonuniform_offset50_12,A1,103.85468710586429,31.469101905822754,507,6,synthetic,Correlogram + ICP
+strong_nonuniform_offset50_12,A2,52.76630496047437,66.60795211791992,507,6,synthetic,Density correlation + ICP
+strong_nonuniform_offset50_12,A3,124.74256698414683,17.966971397399902,27744,12,synthetic,Multi-start + ICP
+strong_nonuniform_offset50_13,A0,3.9966900628060102,0.25797271728515625,48,48,synthetic,Existing Centroid + ICP
+strong_nonuniform_offset50_13,A1,106.77434626221657,33.7865047454834,528,6,synthetic,Correlogram + ICP
+strong_nonuniform_offset50_13,A2,49.109912822023034,66.58272171020508,486,6,synthetic,Density correlation + ICP
+strong_nonuniform_offset50_13,A3,126.8269046805799,17.96828269958496,27744,12,synthetic,Multi-start + ICP
+NC1a unrelated: Real fixed vs synthetic moving,A0,5.579851094633341,0.3317737579345703,48,48,control,Existing Centroid + ICP
+NC1a unrelated: Real fixed vs synthetic moving,A1,163.48813630081713,51.82883262634277,528,6,control,Correlogram + ICP
+NC1a unrelated: Real fixed vs synthetic moving,A2,98.00585605576634,66.85531711578369,507,6,control,Density correlation + ICP
+NC1a unrelated: Real fixed vs synthetic moving,A3,127.99150566384196,17.99632167816162,27744,12,control,Multi-start + ICP
+NC1b unrelated: synthetic independent sections,A0,4.84786799736321,0.2693357467651367,48,48,control,Existing Centroid + ICP
+NC1b unrelated: synthetic independent sections,A1,143.9361265320331,42.03921890258789,528,6,control,Correlogram + ICP
+NC1b unrelated: synthetic independent sections,A2,56.83028642833233,66.6363468170166,528,6,control,Density correlation + ICP
+NC1b unrelated: synthetic independent sections,A3,140.85367936454713,17.965164184570312,27744,12,control,Multi-start + ICP
+"NC2a orientation mismatch: Real, wrong chirality only",A0,2.4428166784346104,0.30455780029296875,24,24,control,Existing Centroid + ICP
+"NC2a orientation mismatch: Real, wrong chirality only",A1,99.78322188556194,50.8665132522583,348,6,control,Correlogram + ICP
+"NC2a orientation mismatch: Real, wrong chirality only",A2,62.83640065789223,66.68665409088135,348,6,control,Density correlation + ICP
+"NC2a orientation mismatch: Real, wrong chirality only",A3,57.83784040808678,9.053641319274902,13872,12,control,Multi-start + ICP
+"NC2b orientation mismatch: synthetic, wrong chirality only",A0,2.3797908015549183,0.27298831939697266,24,24,control,Existing Centroid + ICP
+"NC2b orientation mismatch: synthetic, wrong chirality only",A1,58.361375980079174,37.451528549194336,258,6,control,Correlogram + ICP
+"NC2b orientation mismatch: synthetic, wrong chirality only",A2,25.559810377657413,66.10344314575195,258,6,control,Density correlation + ICP
+"NC2b orientation mismatch: synthetic, wrong chirality only",A3,33.438479881733656,4.56639289855957,6936,12,control,Multi-start + ICP
+NC3 tiny overlap: synthetic offset 900 um,A0,5.132572740316391,0.2783641815185547,48,48,control,Existing Centroid + ICP
+NC3 tiny overlap: synthetic offset 900 um,A1,162.97969619184732,53.49193000793457,528,6,control,Correlogram + ICP
+NC3 tiny overlap: synthetic offset 900 um,A2,48.19253512844443,66.63631439208984,528,6,control,Density correlation + ICP
+NC3 tiny overlap: synthetic offset 900 um,A3,125.6530775539577,17.96708869934082,27744,12,control,Multi-start + ICP
+"NC4 density-only: resampled Real fixed density, no shared nuclei",A0,4.330734375864267,0.2628364562988281,48,48,control,Existing Centroid + ICP
+"NC4 density-only: resampled Real fixed density, no shared nuclei",A1,133.82537045702338,45.42313289642334,528,6,control,Correlogram + ICP
+"NC4 density-only: resampled Real fixed density, no shared nuclei",A2,88.899064745754,66.86005210876465,507,6,control,Density correlation + ICP
+"NC4 density-only: resampled Real fixed density, no shared nuclei",A3,125.11416781693697,17.996822357177734,27744,12,control,Multi-start + ICP
+NC5 no correspondence: uniform random moving,A0,4.404480341821909,0.32954978942871094,48,48,control,Existing Centroid + ICP
+NC5 no correspondence: uniform random moving,A1,144.68942488357425,48.26570415496826,528,6,control,Correlogram + ICP
+NC5 no correspondence: uniform random moving,A2,93.92601875215769,66.88359546661377,528,6,control,Density correlation + ICP
+NC5 no correspondence: uniform random moving,A3,113.60470680519938,17.991222381591797,27744,12,control,Multi-start + ICP
+real,A0,4.247735869139433,0.3055438995361328,48,48,real,Existing Centroid + ICP
+real,A1,141.95970952883363,51.12692165374756,528,6,real,Correlogram + ICP
+real,A2,91.12216790392995,66.88686752319336,528,6,real,Density correlation + ICP
+real,A3,114.27819293364882,17.997447967529297,27744,12,real,Multi-start + ICP

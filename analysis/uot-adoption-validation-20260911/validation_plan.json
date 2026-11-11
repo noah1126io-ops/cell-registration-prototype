@@ -1,0 +1,46 @@
+{
+  "frozen_before_execution": "2026-09-11",
+  "question": "Can either fixed UOT configuration replace Joint Flow as the next point-only Workflow C registration direction?",
+  "real_dataset_policy": {
+    "minimum_desired": 3,
+    "available_unique_usable": 1,
+    "consequence": "A decision is unavailable regardless of favorable results; no real-data generalization claim is allowed."
+  },
+  "methods": [
+    "Affine only",
+    "Density Flow baseline",
+    "UOT conservative",
+    "UOT primary",
+    "Joint Flow"
+  ],
+  "fixed_configuration_policy": "No sweep, no per-dataset or per-scenario tuning, and no safety-threshold changes.",
+  "synthetic_design": {
+    "seeds": [1101, 1102, 1103, 1104, 1105],
+    "difficulty_cases": {
+      "Easy": {"amplitude_um": 4.0, "missing_fraction": 0.1, "unmatched_fraction": 0.05, "overlap_fraction": 1.0, "noise_um": 0.25},
+      "Medium": {"amplitude_um": 8.0, "missing_fraction": 0.3, "unmatched_fraction": 0.15, "overlap_fraction": 0.85, "noise_um": 0.75},
+      "Hard": {"amplitude_um": 12.0, "missing_fraction": 0.5, "unmatched_fraction": 0.3, "overlap_fraction": 0.7, "noise_um": 1.25}
+    },
+    "missingness_sensitivity": {
+      "missing_fractions": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
+      "fixed_amplitude_um": 8.0,
+      "fixed_unmatched_fraction": 0.15,
+      "fixed_overlap_fraction": 0.85,
+      "fixed_noise_um": 0.75
+    },
+    "deformation_sensitivity": {
+      "amplitudes_um": [4.0, 8.0, 12.0],
+      "fixed_missing_fraction": 0.3,
+      "fixed_unmatched_fraction": 0.15,
+      "fixed_overlap_fraction": 0.85,
+      "fixed_noise_um": 0.75
+    }
+  },
+  "comparison_rules": {
+    "real_nn_tie_um": 0.25,
+    "large_within_degradation_percentage_points": 2.0,
+    "large_mutual_nn_degradation_percentage_points": 2.0,
+    "synthetic_noninferiority": "UOT overall median EPE and median TRE must each be no greater than Joint; missingness-stratified failure rate may not exceed Joint; no foldover is allowed.",
+    "strong_adoption": "Requires all nine user-specified criteria and at least three usable real datasets."
+  }
+}

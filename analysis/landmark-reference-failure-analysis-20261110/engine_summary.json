@@ -1,0 +1,139 @@
+{
+ "031-6_2": {
+  "status": "ACCEPTED",
+  "accepted": true,
+  "failure_stage": null,
+  "selected": "image#0",
+  "flags": [],
+  "params": {
+   "scale": 0.9822862229404288,
+   "reflect": false,
+   "rotation_deg": 0.2204308506530445,
+   "anisotropy": 1.0049870861502117,
+   "det": 0.9648862237785737
+  },
+  "reason": "image と points が同じ領域で採択基準を満たした（差 0.0 µm）",
+  "core": "registration_core 1.2 (2026-11-10)",
+  "max_abs_diff_vs_1022_accepted": 0.0
+ },
+ "031-8_6": {
+  "status": "TISSUE_LEVEL",
+  "accepted": false,
+  "failure_stage": null,
+  "selected": "image#0",
+  "flags": [
+   "ICP_DIAGNOSTIC_ONLY"
+  ],
+  "params": {
+   "scale": 1.0,
+   "reflect": false,
+   "rotation_deg": 13.0,
+   "anisotropy": 1.0,
+   "det": 1.0
+  },
+  "reason": "隣接切片：画像探索が一意で、IF視野の4象限中4象限が同じ位置を独立に再現した（組織レベルで位置決定。核は別の細胞なので細胞レベルの採択はしない）",
+  "core": "registration_core 1.2 (2026-11-10)",
+  "vs_landmarks": {
+   "probe_median_um": 22.568648788326268,
+   "centre_um": 16.312928926246848,
+   "probe_max_um": 37.36019810633065,
+   "d_rotation_deg": -0.32899797997842484,
+   "scale_ratio": 1.0565241443853077,
+   "same_chirality": true,
+   "landmark_error_median_um": 20.97995699288429,
+   "landmark_error_max_um": 46.70857866769284
+  },
+  "vs_1027_auto_icp": {
+   "probe_median_um": 7.852784065864008,
+   "centre_um": 7.852784065864008,
+   "probe_max_um": 13.380041339856326,
+   "d_rotation_deg": 0.5890809060500146,
+   "scale_ratio": 1.0127619996784167,
+   "same_chirality": true
+  },
+  "manual_vs_landmarks": {
+   "probe_median_um": 57.50856631162288,
+   "centre_um": 54.82987435765116,
+   "probe_max_um": 113.64919656277151,
+   "d_rotation_deg": 2.228718700684965,
+   "scale_ratio": 1.1646636190484327,
+   "same_chirality": true,
+   "landmark_error_median_um": 80.18188813510417,
+   "landmark_error_max_um": 135.50280347559496
+  },
+  "quadrants": {
+   "quadrants": [
+    {
+     "quadrant": 0,
+     "origin_moving": [
+      0.0,
+      0.0
+     ],
+     "ok": true,
+     "shift_um": 8.665630545020647,
+     "d_theta_deg": 1.0,
+     "scale_ratio": 1.03,
+     "z": 16.819856643676758
+    },
+    {
+     "quadrant": 1,
+     "origin_moving": [
+      513.024,
+      0.0
+     ],
+     "ok": true,
+     "shift_um": 2.694029760505123,
+     "d_theta_deg": 1.0,
+     "scale_ratio": 0.97,
+     "z": 12.192638397216797
+    },
+    {
+     "quadrant": 2,
+     "origin_moving": [
+      0.0,
+      513.024
+     ],
+     "ok": true,
+     "shift_um": 9.947283572818193,
+     "d_theta_deg": 0.0,
+     "scale_ratio": 1.03,
+     "z": 12.70497989654541
+    },
+    {
+     "quadrant": 3,
+     "origin_moving": [
+      513.024,
+      513.024
+     ],
+     "ok": true,
+     "shift_um": 3.6405034147267528,
+     "d_theta_deg": -1.0,
+     "scale_ratio": 1.0,
+     "z": 11.576614379882812
+    }
+   ],
+   "n_agree": 4,
+   "pass": true,
+   "rule": {
+    "min_agree": 3,
+    "max_shift_um": 30.0,
+    "max_dtheta_deg": 2.0,
+    "half_deg": 4.0,
+    "step_deg": 1.0,
+    "scales": [
+     0.97,
+     1.0,
+     1.03
+    ],
+    "window_um": 100.0
+   },
+   "runtime_s": 93.28284925501794
+  },
+  "icp_diag": {
+   "scale_change": -0.012601183380171355,
+   "rot_change_deg": -0.5890809060500146,
+   "median_shift_um": 12.664474048361708,
+   "max_shift_um": 20.52444739633642
+  }
+ }
+}

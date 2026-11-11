@@ -1,0 +1,110 @@
+[
+ {
+  "test": "FM",
+  "check": "8 feature images shown (tissue / nuclear / occ / cleft x HE / IF)",
+  "pass": true,
+  "detail": "8"
+ },
+ {
+  "test": "FM",
+  "check": "explains old IF tissue is nuclei-dominated and the new occ / cleft maps",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "FM",
+  "check": "quality table distinguishes readable / usable",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "FM",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "RF",
+  "check": "reference panel states it is not ground truth",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "RF",
+  "check": "reference designated and described",
+  "pass": true,
+  "detail": "\t\n\npoints\n\n\t\n\n540 pose / 437 s\n\n最初に止まった段階: C1 対応領域の探索 — 対応領域の探索（候補が一意に決まらない / ピークが弱い / 候補なし）\n\n画像の利用: IMAGE_AVAILABLE, IMAGE_USABLE\n\n画像探索の1位と核探索の1位の差：位置 1201 µm（視野の四隅と中心の中央値）、回転 177.0°、倍率比 0.952。別の領域を指しています。\n\nkeyboard_arrow_right\n\n画像探索が実際に比較している画像（特徴マップ）\n\n参照変換（研究者が指定した暫定の変換。Ground Truthではありません）\n\n参照に使う変換\n\n参照変換に指定\n\n現在の参照：e2e-manual-test（tf-20261027074953-2afcb54c）— scale 1.0710, 回転 -141.00°, IF→HE。地図とViewerに黄緑の破線で表示します。\n\n自動推定の候補と参照変換の比較（Localization指標。核の近接率に依存しない）\n\n参照領域に一致する候補：points#1\n\n候補一覧（行を選ぶと『Viewer』でその候補を表示します。どの候補もPREVIEW ONLYで、選んでも採択にはなりません）\n\n左の『クリック操作』で『候補をクリックで選択』にすると、地図上の候補をクリックして選べます。"
+ },
+ {
+  "test": "RF",
+  "check": "candidate vs reference table and verdict caption",
+  "pass": true,
+  "detail": "しています。\n\nkeyboard_arrow_right\n\n画像探索が実際に比較している画像（特徴マップ）\n\n参照変換（研究者が指定した暫定の変換。Ground Truthではありません）\n\n参照に使う変換\n\n参照変換に指定\n\n現在の参照：e2e-manual-test（tf-20261027074953-2afcb54c）— scale 1.0710, 回転 -141.00°, IF→HE。地図とViewerに黄緑の破線で表示します。\n\n自動推定の候補と参照変換の比較（Localization指標。核の近接率に依存しない）\n\n参照領域に一致する候補：points#1\n\n候補一覧（行を選ぶと『Viewer』でその候補を表示します。どの候補もPREVIEW ONLYで、選んでも採択にはなりません）\n\n左の『クリック操作』で『候補をクリックで選択』にすると、地図上の候補をクリックして選べます。"
+ },
+ {
+  "test": "RF",
+  "check": "comparison grids present (candidate list + reference table)",
+  "pass": true,
+  "detail": "2"
+ },
+ {
+  "test": "RF",
+  "check": "reference footprint drawn on the candidate map",
+  "pass": true,
+  "detail": "['points#3（視野サイズの違いに対応した核探索）', 'points#4（視野サイズの違いに対応した核探索）', 'points#5（視野サイズの違いに対応した核探索）', '参照変換（研究者指定・暫定）の領域']"
+ },
+ {
+  "test": "RF",
+  "check": "reference designation persists after reload",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "RF",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "LR",
+  "check": "3 pairs listed with a type / confidence editor",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "LR",
+  "check": "robust fit with leave-one-out error shown",
+  "pass": true,
+  "detail": "\n\n\n\nruntime_s\n\n\t\n\n1.72e+03\n\n\n\n\npeak_mem_mb\n\n\t\n\n673\n\n\n\n\nscale_he_to_if\n\n\t\n\n1.02\n\n\n\n\nrotation_he_to_if_deg\n\n\t\n\n-0.222\n\n\n\n\ntranslation_he_to_if_um\n\n\t\n\n(-552.6, -501.8)\n\nUI再計算の診断（表示中の変換、参考値・採択には使わない）\n\nfixed nuclei inside the mapped moving footprint (fixed frame), UI-recomputed\n\n指標\n\n\t\n\n値\n\n\n\n\nn_eval\n\n\t\n\n840\n\n\n\n\nnn_median\n\n\t\n\n1.36\n\n\n\n\nnn_p95\n\n\t\n\n14.6\n\n\n\n\nle_1\n\n\t\n\n0.344\n\n\n\n\nle_3\n\n\t\n\n0.773\n\n\n\n\nle_5\n\n\t\n\n0.824\n\n\n\n\nnull_le_3\n\n\t\n\n0.0726\n\n表示中の変換 (IF→HE): scale 0.9823, 回転 0.22°, reflect False, t=(541.9, 493.8)"
+ },
+ {
+  "test": "LR",
+  "check": "saved as landmark transform and designated as reference",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "LR",
+  "check": "reference footprint drawn in the viewer",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "test": "LR",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ },
+ {
+  "test": "NR",
+  "check": "image feature selector present, default occ+cleft",
+  "pass": true,
+  "detail": "組織の占有率と間隙の網目（核を除く、2026-10-27〜）"
+ },
+ {
+  "test": "NR",
+  "check": "no Streamlit exception on page",
+  "pass": true,
+  "detail": "[]"
+ }
+]

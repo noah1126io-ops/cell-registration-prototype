@@ -1,0 +1,2176 @@
+{
+ "schema": "cellreg-registration-artifact/1",
+ "run_id": "20261022-155543-fd1a6e",
+ "created_at": "2026-10-22T07:24:30.558314+00:00",
+ "software": {
+  "core": "registration_core 1.0 (2026-10-22)",
+  "git_head": "f66ecbe5bfb691dd18695d34702a3fd13c3dcf7a",
+  "git_dirty": true,
+  "python": "3.11.16",
+  "numpy": "2.4.6"
+ },
+ "sample": "031-6_2",
+ "mode": "automatic",
+ "input": {
+  "fixed": {
+   "key": "HE",
+   "frame": "031-6_2:HE",
+   "points_sha256": "ce32472974fae250f61f5e451a052d4d1e636f388cc300c08c0f2da19023e530",
+   "n_points": 1242,
+   "extent": [
+    2121.7890318541668,
+    2153.494142354167
+   ],
+   "pixel_um": 0.18872089583333335,
+   "image": {
+    "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_HE_031-6_XY02.ome.tif",
+    "size": 272033742,
+    "mtime": 1792391093.882567
+   },
+   "nuclei_source": "StarDist 2D_versatile_he (analysis he-stardist-seqif-registration-20261019)"
+  },
+  "moving": {
+   "key": "IF",
+   "frame": "031-6_2:IF",
+   "points_sha256": "6ba3e25afb0163bfb5a6d6e69b6686484f008fef89c69396ca6e3c947cb7d9c8",
+   "n_points": 1091,
+   "extent": [
+    1026.048,
+    1026.048
+   ],
+   "pixel_um": 0.1002,
+   "image": {
+    "path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seqif.ome.tif",
+    "size": 218248191,
+    "mtime": 1792391090.4945672
+   },
+   "nuclei_source": "provider GeoJSON *_seg_seqif_level0.geojson"
+  }
+ },
+ "frames": {
+  "fixed": {
+   "name": "031-6_2:HE",
+   "modality": "HE",
+   "pixel_um": 0.18872089583333335,
+   "shape_px": [
+    11411,
+    11243
+   ],
+   "origin_um": "UNKNOWN (frame-local (0,0) used)",
+   "origin_known": false,
+   "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_HE_031-6_XY02.ome.tif",
+   "pyramid_downsamples": [
+    1,
+    2,
+    4,
+    8,
+    16
+   ],
+   "axis": "x right, y down (image)"
+  },
+  "moving": {
+   "name": "031-6_2:IF",
+   "modality": "IF",
+   "pixel_um": 0.1002,
+   "shape_px": [
+    10240,
+    10240
+   ],
+   "origin_um": "UNKNOWN (frame-local (0,0) used)",
+   "origin_known": false,
+   "image_path": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/031-6_2/031-6_2_seqif.ome.tif",
+   "pyramid_downsamples": [
+    1,
+    2,
+    4,
+    8,
+    16
+   ],
+   "axis": "x right, y down (image)"
+  },
+  "convention": "fixed_world = M @ moving_world + t; frame-local world (um when pixel spacing is known); image resampling uses the inverse"
+ },
+ "config": {
+  "localization": "auto",
+  "image_feature": "tissue+nuclear",
+  "image_combine": "zsum",
+  "feature_res_um": 2.0,
+  "n_candidates": 6,
+  "search": {},
+  "run_points_with_images": true,
+  "local_half_deg": 10.0,
+  "local_step_deg": 1.0,
+  "local_scales": [
+   0.95,
+   0.975,
+   1.0,
+   1.025,
+   1.05
+  ],
+  "local_window_um": 150.0
+ },
+ "constraints": {
+  "exclude_poses": [],
+  "search_roi": null,
+  "init": null,
+  "landmarks": [],
+  "annotation_ids": []
+ },
+ "image_status": {
+  "flags": [
+   "IMAGE_AVAILABLE",
+   "IMAGE_USABLE"
+  ],
+  "reasons": [],
+  "quality": {
+   "HE": {
+    "tissue_fraction_fov": 0.18179262041491334,
+    "envelope_fraction_fov": 0.17618400260678535,
+    "otsu_threshold": 1.3002259731292725,
+    "nuclei_in_tissue_fraction": 0.9629032258064516,
+    "nuclear_map_auc_own_nuclei_vs_tissue": 0.9334720564516129,
+    "source_level": 2,
+    "source_um_per_px": 0.7548835833333334,
+    "usable": true,
+    "reasons": []
+   },
+   "IF": {
+    "tissue_fraction_fov": 0.3576143086761739,
+    "envelope_fraction_fov": 0.41110085154406484,
+    "otsu_threshold": 35.69927978515625,
+    "nuclei_in_tissue_fraction": 0.9376718606782768,
+    "nuclear_map_auc_own_nuclei_vs_tissue": 0.9062661778185152,
+    "source_level": 3,
+    "source_um_per_px": 0.8016,
+    "usable": true,
+    "reasons": []
+   }
+  },
+  "usable_for_image_search": true
+ },
+ "notes": [],
+ "localization": {
+  "image": {
+   "source": "image",
+   "label": "両画像からの対応領域探索（組織・核の構造map）",
+   "verdict": "UNIQUE",
+   "verdict_text": "一意：最上位の候補が2位より十分に高い（margin ≥ 0.10）",
+   "margin": 0.5044926812767059,
+   "n_poses": 540,
+   "runtime_s": 1121.4362432439812,
+   "layers": [
+    "HE:tissue",
+    "HE:nuclear",
+    "IF:tissue",
+    "IF:nuclear"
+   ],
+   "config": {
+    "res_coarse": 8.0,
+    "res_fine": 4.0,
+    "rot_step": 4.0,
+    "rot_range": [
+     0.0,
+     360.0
+    ],
+    "scales": [
+     0.95,
+     1.0,
+     1.05
+    ],
+    "fine_rot_half": 4.0,
+    "fine_rot_step": 1.0,
+    "fine_scales": [
+     0.97,
+     0.985,
+     1.0,
+     1.015,
+     1.03
+    ],
+    "fine_window_um": 40.0,
+    "chiralities": [
+     "proper"
+    ],
+    "min_overlap_frac": 0.5,
+    "peaks_per_pose": 3,
+    "n_fine": 6,
+    "combine": "zsum",
+    "distinct_um": 40.0,
+    "distinct_deg": 8.0,
+    "ambiguous_margin": 0.1,
+    "min_peak_z": 6.0
+   },
+   "coarse_top": [
+    {
+     "chirality": "proper",
+     "theta": 0.0,
+     "scale": 1.0,
+     "t": [
+      531.8705159270834,
+      483.7230711770834
+     ],
+     "score": 20.75525665283203,
+     "layer_ncc": {
+      "img_tissue": 0.8601458668708801,
+      "img_nuclear": 0.6832452416419983
+     },
+     "layer_z": {
+      "img_tissue": 6.009321212768555,
+      "img_nuclear": 14.74593448638916
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 356.0,
+     "scale": 0.95,
+     "t": [
+      476.7115236458111,
+      528.5588947494132
+     ],
+     "score": 12.727123260498047,
+     "layer_ncc": {
+      "img_tissue": 0.7505298256874084,
+      "img_nuclear": 0.31078988313674927
+     },
+     "layer_z": {
+      "img_tissue": 5.519801616668701,
+      "img_nuclear": 7.2073211669921875
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 352.0,
+     "scale": 0.95,
+     "t": [
+      478.43561061432183,
+      541.9465336635019
+     ],
+     "score": 12.61140251159668,
+     "layer_ncc": {
+      "img_tissue": 0.7074735760688782,
+      "img_nuclear": 0.3069233298301697
+     },
+     "layer_z": {
+      "img_tissue": 5.32094669342041,
+      "img_nuclear": 7.2904558181762695
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 356.0,
+     "scale": 1.05,
+     "t": [
+      509.95541919515085,
+      464.96013933597396
+     ],
+     "score": 12.008843421936035,
+     "layer_ncc": {
+      "img_tissue": 0.7500202655792236,
+      "img_nuclear": 0.31903278827667236
+     },
+     "layer_z": {
+      "img_tissue": 5.041220188140869,
+      "img_nuclear": 6.967623233795166
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 344.0,
+     "scale": 0.95,
+     "t": [
+      354.0635617557492,
+      646.5924167840034
+     ],
+     "score": 11.804372787475586,
+     "layer_ncc": {
+      "img_tissue": 0.6804467439651489,
+      "img_nuclear": 0.27509739995002747
+     },
+     "layer_z": {
+      "img_tissue": 5.277322769165039,
+      "img_nuclear": 6.527050018310547
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 0.0,
+     "scale": 0.95,
+     "t": [
+      597.5217159270834,
+      517.3742711770834
+     ],
+     "score": 11.600008010864258,
+     "layer_ncc": {
+      "img_tissue": 0.7288944125175476,
+      "img_nuclear": 0.27636241912841797
+     },
+     "layer_z": {
+      "img_tissue": 5.310683727264404,
+      "img_nuclear": 6.289324760437012
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 344.0,
+     "scale": 1.0,
+     "t": [
+      402.33561679936315,
+      565.0053297106833
+     ],
+     "score": 11.451883316040039,
+     "layer_ncc": {
+      "img_tissue": 0.6331431269645691,
+      "img_nuclear": 0.2933119535446167
+     },
+     "layer_z": {
+      "img_tissue": 4.719465255737305,
+      "img_nuclear": 6.732417583465576
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 336.0,
+     "scale": 0.95,
+     "t": [
+      281.42493171007425,
+      693.7422401569809
+     ],
+     "score": 11.333616256713867,
+     "layer_ncc": {
+      "img_tissue": 0.6257612109184265,
+      "img_nuclear": 0.2671365439891815
+     },
+     "layer_z": {
+      "img_tissue": 5.080397129058838,
+      "img_nuclear": 6.253218650817871
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 340.0,
+     "scale": 0.95,
+     "t": [
+      348.2225772862846,
+      601.4577623543495
+     ],
+     "score": 11.250434875488281,
+     "layer_ncc": {
+      "img_tissue": 0.5829914212226868,
+      "img_nuclear": 0.28402337431907654
+     },
+     "layer_z": {
+      "img_tissue": 4.667957305908203,
+      "img_nuclear": 6.582477569580078
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 340.0,
+     "scale": 1.0,
+     "t": [
+      315.34510683150575,
+      634.1267461005214
+     ],
+     "score": 11.12251091003418,
+     "layer_ncc": {
+      "img_tissue": 0.6568261384963989,
+      "img_nuclear": 0.2699272930622101
+     },
+     "layer_z": {
+      "img_tissue": 4.950135707855225,
+      "img_nuclear": 6.172375202178955
+     },
+     "stage": "coarse"
+    }
+   ],
+   "excluded": [],
+   "n_candidates": 2
+  },
+  "points": {
+   "source": "points",
+   "label": "視野サイズの違いに対応した核探索",
+   "verdict": "UNIQUE",
+   "verdict_text": "一意：最上位の候補が2位より十分に高い（margin ≥ 0.10）",
+   "margin": 0.47746881900362376,
+   "n_poses": 540,
+   "runtime_s": 594.54545903299,
+   "layers": [
+    "points"
+   ],
+   "config": {
+    "res_coarse": 8.0,
+    "res_fine": 4.0,
+    "rot_step": 4.0,
+    "rot_range": [
+     0.0,
+     360.0
+    ],
+    "scales": [
+     0.95,
+     1.0,
+     1.05
+    ],
+    "fine_rot_half": 4.0,
+    "fine_rot_step": 1.0,
+    "fine_scales": [
+     0.97,
+     0.985,
+     1.0,
+     1.015,
+     1.03
+    ],
+    "fine_window_um": 40.0,
+    "chiralities": [
+     "proper"
+    ],
+    "min_overlap_frac": 0.5,
+    "peaks_per_pose": 3,
+    "n_fine": 6,
+    "combine": "zsum",
+    "distinct_um": 40.0,
+    "distinct_deg": 8.0,
+    "ambiguous_margin": 0.1,
+    "min_peak_z": 6.0
+   },
+   "coarse_top": [
+    {
+     "chirality": "proper",
+     "theta": 0.0,
+     "scale": 1.0,
+     "t": [
+      531.8705159270834,
+      483.7230711770834
+     ],
+     "score": 10.14726734161377,
+     "layer_ncc": {
+      "points": 0.6144127249717712
+     },
+     "layer_z": {
+      "points": 10.14726734161377
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 160.0,
+     "scale": 0.95,
+     "t": [
+      1245.5664545678824,
+      2544.036379999817
+     ],
+     "score": 5.813261985778809,
+     "layer_ncc": {
+      "points": 0.3394259810447693
+     },
+     "layer_z": {
+      "points": 5.813261985778809
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 152.0,
+     "scale": 1.0,
+     "t": [
+      1378.7180008326104,
+      2472.8701980292726
+     ],
+     "score": 5.673823356628418,
+     "layer_ncc": {
+      "points": 0.33740177750587463
+     },
+     "layer_z": {
+      "points": 5.673823356628418
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 172.0,
+     "scale": 1.0,
+     "t": [
+      864.3249425720953,
+      1513.3792159282223
+     ],
+     "score": 5.117092132568359,
+     "layer_ncc": {
+      "points": 0.2909015119075775
+     },
+     "layer_z": {
+      "points": 5.117092132568359
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 164.0,
+     "scale": 0.95,
+     "t": [
+      1279.7254700984176,
+      2546.9017255701633
+     ],
+     "score": 5.044981002807617,
+     "layer_ncc": {
+      "points": 0.29673850536346436
+     },
+     "layer_z": {
+      "points": 5.044981002807617
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 164.0,
+     "scale": 0.95,
+     "t": [
+      903.7254700984176,
+      1474.9017255701633
+     ],
+     "score": 5.037662029266357,
+     "layer_ncc": {
+      "points": 0.29630252718925476
+     },
+     "layer_z": {
+      "points": 5.037662029266357
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 176.0,
+     "scale": 1.05,
+     "t": [
+      891.8336126590159,
+      1496.5340030181928
+     ],
+     "score": 4.971160888671875,
+     "layer_ncc": {
+      "points": 0.2755235433578491
+     },
+     "layer_z": {
+      "points": 4.971160888671875
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 168.0,
+     "scale": 1.05,
+     "t": [
+      907.7952420154811,
+      1531.6540539982916
+     ],
+     "score": 4.914480686187744,
+     "layer_ncc": {
+      "points": 0.27609017491340637
+     },
+     "layer_z": {
+      "points": 4.914480686187744
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 180.0,
+     "scale": 0.95,
+     "t": [
+      852.2673159270835,
+      1436.1198711770833
+     ],
+     "score": 4.9115800857543945,
+     "layer_ncc": {
+      "points": 0.27684158086776733
+     },
+     "layer_z": {
+      "points": 4.9115800857543945
+     },
+     "stage": "coarse"
+    },
+    {
+     "chirality": "proper",
+     "theta": 180.0,
+     "scale": 0.95,
+     "t": [
+      780.2673159270835,
+      1524.1198711770833
+     ],
+     "score": 4.89202880859375,
+     "layer_ncc": {
+      "points": 0.2757340669631958
+     },
+     "layer_z": {
+      "points": 4.89202880859375
+     },
+     "stage": "coarse"
+    }
+   ],
+   "excluded": [],
+   "n_candidates": 5
+  }
+ },
+ "candidates": [
+  {
+   "id": "image#0",
+   "source": "image",
+   "source_label": "両画像からの対応領域探索（組織・核の構造map）",
+   "rank": 0,
+   "search": {
+    "source": "image",
+    "rank": 0,
+    "chirality": "proper",
+    "theta_deg": 0.0,
+    "scale": 0.985,
+    "t": [
+     539.5658759270834,
+     495.41843117708345
+    ],
+    "score": 27.025094985961914,
+    "layer_ncc": {
+     "img_tissue": 0.8555149435997009,
+     "img_nuclear": 0.7778052091598511
+    },
+    "layer_z": {
+     "img_tissue": 5.967607021331787,
+     "img_nuclear": 21.05748748779297
+    },
+    "relative_gap_to_top": 0.0,
+    "M_search": [
+     [
+      0.985,
+      0.0
+     ],
+     [
+      0.0,
+      0.985
+     ]
+    ]
+   },
+   "T_search": {
+    "M": [
+     [
+      0.985,
+      0.0
+     ],
+     [
+      0.0,
+      0.985
+     ]
+    ],
+    "t": [
+     539.5658759270834,
+     495.41843117708345
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.985,
+     "reflect": false,
+     "rotation_deg": 0.0,
+     "anisotropy": 1.0,
+     "det": 0.970225
+    }
+   },
+   "flags": [],
+   "refine": {
+    "method": "overlap-restricted ICP (similarity -> affine)",
+    "ran": true,
+    "pose_change": {
+     "scale_change": -0.002755103613777843,
+     "rot_change_deg": 0.22043085065303103,
+     "median_shift_um": 3.501113092509431,
+     "max_shift_um": 7.2823025060781745
+    },
+    "n_moving_used": 1091,
+    "n_fixed_used": 842,
+    "objective": 1.6073582909263378
+   },
+   "T_final": {
+    "M": [
+     [
+      0.9846983486114077,
+      -0.004492208834814493
+     ],
+     [
+      0.00378839361963696,
+      0.9798627233242705
+     ]
+    ],
+    "t": [
+     541.8709742279991,
+     493.7813441161543
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.9822862229404288,
+     "reflect": false,
+     "rotation_deg": 0.2204308506530445,
+     "anisotropy": 1.0049870861502117,
+     "det": 0.9648862237785737
+    }
+   },
+   "validation": {
+    "search_pose_fixed_frame": {
+     "n_eval": 839,
+     "le_1um": 0.04290822407628129,
+     "le_2um": 0.17759237187127533,
+     "le_3um": 0.38855780691299163,
+     "le_5um": 0.734207389749702,
+     "nn_median_um": 3.6091644035525476,
+     "nn_p95_um": 15.331199594063447,
+     "null_le_3um": 0.06555423122765197,
+     "inlier_over_null": 5.927272727272727,
+     "geometric_pass": true
+    },
+    "fixed_frame": {
+     "n_eval": 838,
+     "le_1um": 0.3448687350835322,
+     "le_2um": 0.6742243436754176,
+     "le_3um": 0.7744630071599046,
+     "le_5um": 0.8257756563245824,
+     "nn_median_um": 1.3576670144215965,
+     "nn_p95_um": 14.489190152918392,
+     "null_le_3um": 0.05847255369928401,
+     "inlier_over_null": 13.244897959183675,
+     "geometric_pass": true
+    },
+    "overlap": {
+     "overlap_area_mm2": 1.015952,
+     "overlap_frac_of_moving": 0.9650233755060363,
+     "n_fixed_in_overlap": 840,
+     "n_moving_in_overlap": 1091,
+     "overlap_polygon_fixed": [
+      [
+       541.8709742279991,
+       493.7813441161543
+      ],
+      [
+       1552.2187454240368,
+       497.66841781279555
+      ],
+      [
+       1547.609523533493,
+       1503.0546053542166
+      ],
+      [
+       537.2617523374554,
+       1499.1675316575754
+      ]
+     ]
+    },
+    "if_frame": {
+     "ok": true,
+     "params_he_to_if": {
+      "scale": 1.0180332133810712,
+      "reflect": false,
+      "rotation_deg": -0.22151866670538867,
+      "anisotropy": 1.0049870861502121,
+      "det": 1.0363916235469897
+     },
+     "n_if_eval": 1091,
+     "n_he_in_if_field": 841,
+     "final": {
+      "le_1um": 0.2603116406966086,
+      "le_2um": 0.5132905591200734,
+      "le_3um": 0.5994500458295142,
+      "le_5um": 0.6828597616865261,
+      "nn_median_um": 1.9078213337944137,
+      "nn_p95_um": 17.81234008784756,
+      "n_eval": 1091
+     },
+     "null": {
+      "le_1um": 0.0036663611365719525,
+      "le_2um": 0.02474793767186068,
+      "le_3um": 0.04857928505957837,
+      "le_5um": 0.13290559120073328,
+      "nn_median_um": 12.062928384989975,
+      "nn_p95_um": 47.09910378512407,
+      "n_eval": 1091
+     },
+     "inlier_over_null": 12.339622641509434,
+     "search_pose": {
+      "le_1um": 0.03024747937671861,
+      "le_2um": 0.1301558203483043,
+      "le_3um": 0.29605866177818513,
+      "le_5um": 0.5921173235563703,
+      "nn_median_um": 4.310029401139572,
+      "nn_p95_um": 18.67209282465431,
+      "n_eval": 1091
+     },
+     "geometric_pass": true,
+     "image": {
+      "nuclear_corr": 0.7972562909126282,
+      "nuclear_block_corr_median": 0.7329326868057251,
+      "nuclear_block_corr_frac_pos": 0.66,
+      "tissue_corr": 0.8525015711784363,
+      "tissue_block_corr_median": 0.2991788536310196,
+      "tissue_block_corr_frac_pos": 0.73,
+      "tissue_dice": 0.9013619440019753,
+      "boundary_chamfer_um": 6.324555320336759,
+      "n_boundary_px": 1249,
+      "valid_fraction_of_if": 1.0,
+      "independent_of_search": {
+       "nuclear_corr": false,
+       "tissue_corr": false
+      }
+     }
+    }
+   },
+   "geometric_pass": true
+  },
+  {
+   "id": "image#1",
+   "source": "image",
+   "source_label": "両画像からの対応領域探索（組織・核の構造map）",
+   "rank": 1,
+   "search": {
+    "source": "image",
+    "rank": 1,
+    "chirality": "proper",
+    "theta_deg": 347.0,
+    "scale": 0.9784999999999999,
+    "t": [
+     354.84252924012765,
+     608.5432364402826
+    ],
+    "score": 13.391132354736328,
+    "layer_ncc": {
+     "img_tissue": 0.6997081637382507,
+     "img_nuclear": 0.2869792878627777
+    },
+    "layer_z": {
+     "img_tissue": 5.176766872406006,
+     "img_nuclear": 8.21436595916748
+    },
+    "relative_gap_to_top": 0.5044926812767059,
+    "M_search": [
+     [
+      0.9534211083923525,
+      0.22011460667547222
+     ],
+     [
+      -0.22011460667547222,
+      0.9534211083923525
+     ]
+    ]
+   },
+   "T_search": {
+    "M": [
+     [
+      0.9534211083923525,
+      0.22011460667547222
+     ],
+     [
+      -0.22011460667547222,
+      0.9534211083923525
+     ]
+    ],
+    "t": [
+     354.84252924012765,
+     608.5432364402826
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.9784999999999998,
+     "reflect": false,
+     "rotation_deg": -13.00000000000002,
+     "anisotropy": 1.0,
+     "det": 0.9574622499999997
+    }
+   },
+   "flags": [
+    "ICP_LEFT_TRUST_REGION"
+   ],
+   "refine": {
+    "method": "overlap-restricted ICP (similarity -> affine)",
+    "ran": true,
+    "pose_change": {
+     "scale_change": -0.007376693576800264,
+     "rot_change_deg": 0.815211833037722,
+     "median_shift_um": 15.90713859863012,
+     "max_shift_um": 18.37514536325225
+    },
+    "n_moving_used": 1091,
+    "n_fixed_used": 820,
+    "objective": 8.606070167880247,
+    "icp_rejected": "ICP left the image-search trust region; the search pose is kept (2026-10-19 rule)"
+   },
+   "T_final": {
+    "M": [
+     [
+      0.9534211083923525,
+      0.22011460667547222
+     ],
+     [
+      -0.22011460667547222,
+      0.9534211083923525
+     ]
+    ],
+    "t": [
+     354.84252924012765,
+     608.5432364402826
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.9784999999999998,
+     "reflect": false,
+     "rotation_deg": -13.00000000000002,
+     "anisotropy": 1.0,
+     "det": 0.9574622499999997
+    }
+   },
+   "validation": {
+    "search_pose_fixed_frame": {
+     "n_eval": 799,
+     "le_1um": 0.0037546933667083854,
+     "le_2um": 0.023779724655819776,
+     "le_3um": 0.07008760951188986,
+     "le_5um": 0.17271589486858574,
+     "nn_median_um": 9.717711252410068,
+     "nn_p95_um": 38.14648962870649,
+     "null_le_3um": 0.06382978723404255,
+     "inlier_over_null": 1.0980392156862746,
+     "geometric_pass": false
+    },
+    "fixed_frame": {
+     "n_eval": 799,
+     "le_1um": 0.0037546933667083854,
+     "le_2um": 0.023779724655819776,
+     "le_3um": 0.07008760951188986,
+     "le_5um": 0.17271589486858574,
+     "nn_median_um": 9.717711252410068,
+     "nn_p95_um": 38.14648962870649,
+     "null_le_3um": 0.06382978723404255,
+     "inlier_over_null": 1.0980392156862746,
+     "geometric_pass": false
+    },
+    "overlap": {
+     "overlap_area_mm2": 1.008016,
+     "overlap_frac_of_moving": 0.9574851989898074,
+     "n_fixed_in_overlap": 805,
+     "n_moving_in_overlap": 1091,
+     "overlap_polygon_fixed": [
+      [
+       354.84252924012765,
+       608.5432364402826
+      ],
+      [
+       1333.098350663884,
+       382.69508449012767
+      ],
+      [
+       1558.9465026140392,
+       1360.950905913884
+      ],
+      [
+       580.6906811902826,
+       1586.7990578640392
+      ]
+     ]
+    },
+    "if_frame": {
+     "ok": true,
+     "params_he_to_if": {
+      "scale": 1.021972406745018,
+      "reflect": false,
+      "rotation_deg": 13.00000000000002,
+      "anisotropy": 1.0,
+      "det": 1.0444276001482047
+     },
+     "n_if_eval": 1091,
+     "n_he_in_if_field": 813,
+     "final": {
+      "le_1um": 0.002749770852428964,
+      "le_2um": 0.016498625114573784,
+      "le_3um": 0.04949587534372136,
+      "le_5um": 0.13473877176901924,
+      "nn_median_um": 11.755057138928459,
+      "nn_p95_um": 42.00049669047698,
+      "n_eval": 1091
+     },
+     "null": {
+      "le_1um": 0.006416131989000917,
+      "le_2um": 0.013748854262144821,
+      "le_3um": 0.0384967919340055,
+      "le_5um": 0.10540788267644363,
+      "nn_median_um": 12.503238747689368,
+      "nn_p95_um": 78.67011481731086,
+      "n_eval": 1091
+     },
+     "inlier_over_null": 1.2857142857142858,
+     "search_pose": {
+      "le_1um": 0.002749770852428964,
+      "le_2um": 0.016498625114573784,
+      "le_3um": 0.04949587534372136,
+      "le_5um": 0.13473877176901924,
+      "nn_median_um": 11.755057138928459,
+      "nn_p95_um": 42.00049669047698,
+      "n_eval": 1091
+     },
+     "geometric_pass": false,
+     "image": {
+      "nuclear_corr": 0.24226969480514526,
+      "nuclear_block_corr_median": 0.0,
+      "nuclear_block_corr_frac_pos": 0.16,
+      "tissue_corr": 0.6953549981117249,
+      "tissue_block_corr_median": 0.07601622864603996,
+      "tissue_block_corr_frac_pos": 0.47,
+      "tissue_dice": 0.8024069162000197,
+      "boundary_chamfer_um": 30.0,
+      "n_boundary_px": 1249,
+      "valid_fraction_of_if": 1.0,
+      "independent_of_search": {
+       "nuclear_corr": false,
+       "tissue_corr": false
+      }
+     }
+    }
+   },
+   "geometric_pass": false
+  },
+  {
+   "id": "points#0",
+   "source": "points",
+   "source_label": "視野サイズの違いに対応した核探索",
+   "rank": 0,
+   "search": {
+    "source": "points",
+    "rank": 0,
+    "chirality": "proper",
+    "theta_deg": 0.0,
+    "scale": 0.985,
+    "t": [
+     539.5658759270834,
+     491.41843117708345
+    ],
+    "score": 11.560102462768555,
+    "layer_ncc": {
+     "points": 0.6938756108283997
+    },
+    "layer_z": {
+     "points": 11.560102462768555
+    },
+    "relative_gap_to_top": 0.0,
+    "M_search": [
+     [
+      0.985,
+      0.0
+     ],
+     [
+      0.0,
+      0.985
+     ]
+    ]
+   },
+   "T_search": {
+    "M": [
+     [
+      0.985,
+      0.0
+     ],
+     [
+      0.0,
+      0.985
+     ]
+    ],
+    "t": [
+     539.5658759270834,
+     491.41843117708345
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.985,
+     "reflect": false,
+     "rotation_deg": 0.0,
+     "anisotropy": 1.0,
+     "det": 0.970225
+    }
+   },
+   "flags": [],
+   "refine": {
+    "method": "overlap-restricted ICP (similarity -> affine)",
+    "ran": true,
+    "pose_change": {
+     "scale_change": -0.002755103613777843,
+     "rot_change_deg": 0.22043085065303103,
+     "median_shift_um": 3.5056790665122888,
+     "max_shift_um": 6.560846773620766
+    },
+    "n_moving_used": 1091,
+    "n_fixed_used": 842,
+    "objective": 1.6073582909263378
+   },
+   "T_final": {
+    "M": [
+     [
+      0.9846983486114077,
+      -0.004492208834814493
+     ],
+     [
+      0.00378839361963696,
+      0.9798627233242705
+     ]
+    ],
+    "t": [
+     541.8709742279991,
+     493.7813441161543
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.9822862229404288,
+     "reflect": false,
+     "rotation_deg": 0.2204308506530445,
+     "anisotropy": 1.0049870861502117,
+     "det": 0.9648862237785737
+    }
+   },
+   "validation": {
+    "search_pose_fixed_frame": {
+     "n_eval": 838,
+     "le_1um": 0.12410501193317422,
+     "le_2um": 0.418854415274463,
+     "le_3um": 0.6670644391408115,
+     "le_5um": 0.8126491646778043,
+     "nn_median_um": 2.291931207517341,
+     "nn_p95_um": 14.980544263826053,
+     "null_le_3um": 0.057279236276849645,
+     "inlier_over_null": 11.645833333333334,
+     "geometric_pass": true
+    },
+    "fixed_frame": {
+     "n_eval": 838,
+     "le_1um": 0.3448687350835322,
+     "le_2um": 0.6742243436754176,
+     "le_3um": 0.7744630071599046,
+     "le_5um": 0.8257756563245824,
+     "nn_median_um": 1.3576670144215965,
+     "nn_p95_um": 14.489190152918392,
+     "null_le_3um": 0.05847255369928401,
+     "inlier_over_null": 13.244897959183675,
+     "geometric_pass": true
+    },
+    "overlap": {
+     "overlap_area_mm2": 1.015952,
+     "overlap_frac_of_moving": 0.9650233755060363,
+     "n_fixed_in_overlap": 840,
+     "n_moving_in_overlap": 1091,
+     "overlap_polygon_fixed": [
+      [
+       541.8709742279991,
+       493.7813441161543
+      ],
+      [
+       1552.2187454240368,
+       497.66841781279555
+      ],
+      [
+       1547.609523533493,
+       1503.0546053542166
+      ],
+      [
+       537.2617523374554,
+       1499.1675316575754
+      ]
+     ]
+    },
+    "if_frame": {
+     "ok": true,
+     "params_he_to_if": {
+      "scale": 1.0180332133810712,
+      "reflect": false,
+      "rotation_deg": -0.22151866670538867,
+      "anisotropy": 1.0049870861502121,
+      "det": 1.0363916235469897
+     },
+     "n_if_eval": 1091,
+     "n_he_in_if_field": 841,
+     "final": {
+      "le_1um": 0.2603116406966086,
+      "le_2um": 0.5132905591200734,
+      "le_3um": 0.5994500458295142,
+      "le_5um": 0.6828597616865261,
+      "nn_median_um": 1.9078213337944137,
+      "nn_p95_um": 17.81234008784756,
+      "n_eval": 1091
+     },
+     "null": {
+      "le_1um": 0.0036663611365719525,
+      "le_2um": 0.02474793767186068,
+      "le_3um": 0.04857928505957837,
+      "le_5um": 0.13290559120073328,
+      "nn_median_um": 12.062928384989975,
+      "nn_p95_um": 47.09910378512407,
+      "n_eval": 1091
+     },
+     "inlier_over_null": 12.339622641509434,
+     "search_pose": {
+      "le_1um": 0.09532538955087076,
+      "le_2um": 0.31347387717690195,
+      "le_3um": 0.5105407882676444,
+      "le_5um": 0.6718606782768103,
+      "nn_median_um": 2.9275735475992555,
+      "nn_p95_um": 18.562693788946987,
+      "n_eval": 1091
+     },
+     "geometric_pass": true,
+     "image": {
+      "nuclear_corr": 0.7972562909126282,
+      "nuclear_block_corr_median": 0.7329326868057251,
+      "nuclear_block_corr_frac_pos": 0.66,
+      "tissue_corr": 0.8525015711784363,
+      "tissue_block_corr_median": 0.2991788536310196,
+      "tissue_block_corr_frac_pos": 0.73,
+      "tissue_dice": 0.9013619440019753,
+      "boundary_chamfer_um": 6.324555320336759,
+      "n_boundary_px": 1249,
+      "valid_fraction_of_if": 1.0,
+      "independent_of_search": {
+       "nuclear_corr": true,
+       "tissue_corr": true
+      }
+     }
+    }
+   },
+   "geometric_pass": true
+  },
+  {
+   "id": "points#1",
+   "source": "points",
+   "source_label": "視野サイズの違いに対応した核探索",
+   "rank": 1,
+   "search": {
+    "source": "points",
+    "rank": 1,
+    "chirality": "proper",
+    "theta_deg": 153.0,
+    "scale": 1.015,
+    "t": [
+     1377.2605054287317,
+     2496.3097757378177
+    ],
+    "score": 6.04051399230957,
+    "layer_ncc": {
+     "points": 0.3572002351284027
+    },
+    "layer_z": {
+     "points": 6.04051399230957
+    },
+    "relative_gap_to_top": 0.47746881900362376,
+    "M_search": [
+     [
+      -0.9043716220511933,
+      -0.46080035723564
+     ],
+     [
+      0.46080035723564,
+      -0.9043716220511933
+     ]
+    ]
+   },
+   "T_search": {
+    "M": [
+     [
+      -0.9043716220511933,
+      -0.46080035723564
+     ],
+     [
+      0.46080035723564,
+      -0.9043716220511933
+     ]
+    ],
+    "t": [
+     1377.2605054287317,
+     2496.3097757378177
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 1.015,
+     "reflect": false,
+     "rotation_deg": 153.0,
+     "anisotropy": 1.0,
+     "det": 1.0302249999999997
+    }
+   },
+   "flags": [
+    "RELOCATED_BY_ICP"
+   ],
+   "refine": {
+    "method": "overlap-restricted ICP (similarity -> affine)",
+    "ran": true,
+    "pose_change": {
+     "scale_change": -0.8416929258517751,
+     "rot_change_deg": 5.138440052331077,
+     "median_shift_um": 667.024759132474,
+     "max_shift_um": 1004.7735263953361
+    },
+    "n_moving_used": 1091,
+    "n_fixed_used": 38,
+    "objective": 7.290783587002869
+   },
+   "T_final": {
+    "M": [
+     [
+      -0.12094709793118276,
+      0.01996811536791543
+     ],
+     [
+      0.04852618991964383,
+      -0.22148178326067391
+     ]
+    ],
+    "t": [
+     1084.059748655275,
+     2177.285954929927
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.16068168026044818,
+     "reflect": false,
+     "rotation_deg": 158.13844005233108,
+     "anisotropy": 2.096103876455324,
+     "det": 0.025818602371320908
+    }
+   },
+   "validation": {
+    "search_pose_fixed_frame": {
+     "n_eval": 73,
+     "le_1um": 0.0,
+     "le_2um": 0.0684931506849315,
+     "le_3um": 0.0821917808219178,
+     "le_5um": 0.2191780821917808,
+     "nn_median_um": 11.38808635625755,
+     "nn_p95_um": 83.1934297094195,
+     "null_le_3um": 0.0547945205479452,
+     "inlier_over_null": 1.5,
+     "geometric_pass": false
+    },
+    "fixed_frame": {
+     "n_eval": 33,
+     "le_1um": 0.24242424242424243,
+     "le_2um": 0.6363636363636364,
+     "le_3um": 0.696969696969697,
+     "le_5um": 0.8181818181818182,
+     "nn_median_um": 1.6301898183048809,
+     "nn_p95_um": 17.18633630621778,
+     "null_le_3um": 0.6060606060606061,
+     "inlier_over_null": 1.1500000000000001,
+     "geometric_pass": false
+    },
+    "overlap": {
+     "overlap_area_mm2": 0.021184,
+     "overlap_frac_of_moving": 0.020122067958643592,
+     "n_fixed_in_overlap": 38,
+     "n_moving_in_overlap": 1091,
+     "overlap_polygon_fixed": [
+      [
+       1084.059748655275,
+       2177.285954929927
+      ],
+      [
+       959.9622207171807,
+       2227.0761550445977
+      ],
+      [
+       980.4504655541996,
+       1999.8252142935496
+      ],
+      [
+       1104.5479934922937,
+       1950.035014178879
+      ]
+     ]
+    },
+    "if_frame": {
+     "ok": true,
+     "params_he_to_if": {
+      "scale": 6.223484832739518,
+      "reflect": false,
+      "rotation_deg": -167.64189208749448,
+      "anisotropy": 2.0961038764553233,
+      "det": 38.73176346333883
+     },
+     "n_if_eval": 1091,
+     "n_he_in_if_field": 38,
+     "final": {
+      "le_1um": 0.0,
+      "le_2um": 0.0,
+      "le_3um": 0.0,
+      "le_5um": 0.005499541704857928,
+      "nn_median_um": 60.63913904623231,
+      "nn_p95_um": 119.66352123083291,
+      "n_eval": 1091
+     },
+     "null": {
+      "le_1um": 0.0,
+      "le_2um": 0.0,
+      "le_3um": 0.0,
+      "le_5um": 0.0018331805682859762,
+      "nn_median_um": 66.96998378291707,
+      "nn_p95_um": 123.79957746711099,
+      "n_eval": 1091
+     },
+     "inlier_over_null": 0.0,
+     "search_pose": {
+      "le_1um": 0.0,
+      "le_2um": 0.00458295142071494,
+      "le_3um": 0.005499541704857928,
+      "le_5um": 0.01466544454628781,
+      "nn_median_um": 154.26326817120653,
+      "nn_p95_um": 397.6719708816932,
+      "n_eval": 1091
+     },
+     "geometric_pass": false,
+     "image": {
+      "nuclear_corr": 0.055584874004125595,
+      "nuclear_block_corr_median": 0.0002409659355180338,
+      "nuclear_block_corr_frac_pos": 0.20253164556962025,
+      "tissue_corr": 0.08439570665359497,
+      "tissue_block_corr_median": -0.0037076128646731377,
+      "tissue_block_corr_frac_pos": 0.3670886075949367,
+      "tissue_dice": 0.6373133633456176,
+      "boundary_chamfer_um": 54.91812087098393,
+      "n_boundary_px": 1249,
+      "valid_fraction_of_if": 0.7696119223768757,
+      "independent_of_search": {
+       "nuclear_corr": true,
+       "tissue_corr": true
+      }
+     }
+    }
+   },
+   "geometric_pass": false
+  },
+  {
+   "id": "points#2",
+   "source": "points",
+   "source_label": "視野サイズの違いに対応した核探索",
+   "rank": 2,
+   "search": {
+    "source": "points",
+    "rank": 2,
+    "chirality": "proper",
+    "theta_deg": 160.0,
+    "scale": 0.95,
+    "t": [
+     1297.5664545678824,
+     2520.036379999817
+    ],
+    "score": 5.404078483581543,
+    "layer_ncc": {
+     "points": 0.31471729278564453
+    },
+    "layer_z": {
+     "points": 5.404078483581543
+    },
+    "relative_gap_to_top": 0.5325233058282679,
+    "M_search": [
+     [
+      -0.8927079897466128,
+      -0.32491913615938545
+     ],
+     [
+      0.32491913615938545,
+      -0.8927079897466128
+     ]
+    ]
+   },
+   "T_search": {
+    "M": [
+     [
+      -0.8927079897466128,
+      -0.32491913615938545
+     ],
+     [
+      0.32491913615938545,
+      -0.8927079897466128
+     ]
+    ],
+    "t": [
+     1297.5664545678824,
+     2520.036379999817
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.9499999999999998,
+     "reflect": false,
+     "rotation_deg": 160.0,
+     "anisotropy": 1.0,
+     "det": 0.9024999999999997
+    }
+   },
+   "flags": [
+    "RELOCATED_BY_ICP"
+   ],
+   "refine": {
+    "method": "overlap-restricted ICP (similarity -> affine)",
+    "ran": true,
+    "pose_change": {
+     "scale_change": -0.8411224813694392,
+     "rot_change_deg": 101.63850422535046,
+     "median_shift_um": 695.954186973853,
+     "max_shift_um": 1004.1222035602316
+    },
+    "n_moving_used": 1091,
+    "n_fixed_used": 38,
+    "objective": 7.095163617181992
+   },
+   "T_final": {
+    "M": [
+     [
+      -0.03143185277195055,
+      0.06533104185636907
+     ],
+     [
+      -0.21385043564763653,
+      -0.28028550528089236
+     ]
+    ],
+    "t": [
+     1004.4193434948884,
+     2282.5325697520384
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.15093364269903273,
+     "reflect": false,
+     "rotation_deg": -98.36149577464954,
+     "anisotropy": 5.505028989451658,
+     "det": 0.022780964498399277
+    }
+   },
+   "validation": {
+    "search_pose_fixed_frame": {
+     "n_eval": 73,
+     "le_1um": 0.0410958904109589,
+     "le_2um": 0.0684931506849315,
+     "le_3um": 0.1095890410958904,
+     "le_5um": 0.1780821917808219,
+     "nn_median_um": 12.140140219099875,
+     "nn_p95_um": 208.10190129841763,
+     "null_le_3um": 0.0273972602739726,
+     "inlier_over_null": 4.0,
+     "geometric_pass": false
+    },
+    "fixed_frame": {
+     "n_eval": 27,
+     "le_1um": 0.18518518518518517,
+     "le_2um": 0.4444444444444444,
+     "le_3um": 0.6666666666666666,
+     "le_5um": 0.7407407407407407,
+     "nn_median_um": 2.021127838888606,
+     "nn_p95_um": 15.980807295641782,
+     "null_le_3um": 0.6666666666666666,
+     "inlier_over_null": 1.0,
+     "geometric_pass": false
+    },
+    "overlap": {
+     "overlap_area_mm2": 0.020768,
+     "overlap_frac_of_moving": 0.019726921609002555,
+     "n_fixed_in_overlap": 38,
+     "n_moving_in_overlap": 1091,
+     "overlap_polygon_fixed": [
+      [
+       1004.4193434948884,
+       2282.5325697520384
+      ],
+      [
+       972.168753821934,
+       2063.111757956652
+      ],
+      [
+       1039.201538656578,
+       1775.5253758342033
+      ],
+      [
+       1071.4521283295321,
+       1994.9461876295893
+      ]
+     ]
+    },
+    "if_frame": {
+     "ok": true,
+     "params_he_to_if": {
+      "scale": 6.625428116076393,
+      "reflect": false,
+      "rotation_deg": 142.6573251687621,
+      "anisotropy": 5.505028989451655,
+      "det": 43.89629772129559
+     },
+     "n_if_eval": 1091,
+     "n_he_in_if_field": 38,
+     "final": {
+      "le_1um": 0.0,
+      "le_2um": 0.0,
+      "le_3um": 0.0009165902841429881,
+      "le_5um": 0.0018331805682859762,
+      "nn_median_um": 64.12144343311631,
+      "nn_p95_um": 152.85481930459258,
+      "n_eval": 1091
+     },
+     "null": {
+      "le_1um": 0.0,
+      "le_2um": 0.0,
+      "le_3um": 0.0009165902841429881,
+      "le_5um": 0.002749770852428964,
+      "nn_median_um": 73.51413833759493,
+      "nn_p95_um": 146.36903918941653,
+      "n_eval": 1091
+     },
+     "inlier_over_null": 1.0,
+     "search_pose": {
+      "le_1um": 0.002749770852428964,
+      "le_2um": 0.00458295142071494,
+      "le_3um": 0.007332722273143905,
+      "le_5um": 0.012832263978001834,
+      "nn_median_um": 141.3931790617361,
+      "nn_p95_um": 395.42692773979064,
+      "n_eval": 1091
+     },
+     "geometric_pass": false,
+     "image": {
+      "nuclear_corr": 0.05733763054013252,
+      "nuclear_block_corr_median": 0.0,
+      "nuclear_block_corr_frac_pos": 0.16091954022988506,
+      "tissue_corr": 0.05476005747914314,
+      "tissue_block_corr_median": -0.0761699452996254,
+      "tissue_block_corr_frac_pos": 0.3563218390804598,
+      "tissue_dice": 0.6045837600487293,
+      "boundary_chamfer_um": 70.9365914038728,
+      "n_boundary_px": 1249,
+      "valid_fraction_of_if": 0.8597707176757141,
+      "independent_of_search": {
+       "nuclear_corr": true,
+       "tissue_corr": true
+      }
+     }
+    }
+   },
+   "geometric_pass": false
+  },
+  {
+   "id": "points#3",
+   "source": "points",
+   "source_label": "視野サイズの違いに対応した核探索",
+   "rank": 3,
+   "search": {
+    "source": "points",
+    "rank": 3,
+    "chirality": "proper",
+    "theta_deg": 165.0,
+    "scale": 0.9215,
+    "t": [
+     907.8946330651693,
+     1447.032944667582
+    ],
+    "score": 5.2615532875061035,
+    "layer_ncc": {
+     "points": 0.30636122822761536
+    },
+    "layer_z": {
+     "points": 5.2615532875061035
+    },
+    "relative_gap_to_top": 0.5448523657595676,
+    "M_search": [
+     [
+      -0.8901006489253763,
+      -0.2385017500619731
+     ],
+     [
+      0.2385017500619731,
+      -0.8901006489253763
+     ]
+    ]
+   },
+   "T_search": {
+    "M": [
+     [
+      -0.8901006489253763,
+      -0.2385017500619731
+     ],
+     [
+      0.2385017500619731,
+      -0.8901006489253763
+     ]
+    ],
+    "t": [
+     907.8946330651693,
+     1447.032944667582
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.9215,
+     "reflect": false,
+     "rotation_deg": 165.0,
+     "anisotropy": 1.0,
+     "det": 0.8491622499999999
+    }
+   },
+   "flags": [
+    "RELOCATED_BY_ICP"
+   ],
+   "refine": {
+    "method": "overlap-restricted ICP (similarity -> affine)",
+    "ran": true,
+    "pose_change": {
+     "scale_change": -0.7003933017811204,
+     "rot_change_deg": 22.49290809268956,
+     "median_shift_um": 573.2566422297497,
+     "max_shift_um": 832.8283569537509
+    },
+    "n_moving_used": 1091,
+    "n_fixed_used": 131,
+    "objective": 6.775301014582305
+   },
+   "T_final": {
+    "M": [
+     [
+      -0.2594926873202336,
+      0.08007556817764483
+     ],
+     [
+      -0.034130184959611544,
+      -0.2832116559615607
+     ]
+    ],
+    "t": [
+     746.4028024599463,
+     1287.3185677588785
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.27608757240869763,
+     "reflect": false,
+     "rotation_deg": -172.50709190731044,
+     "anisotropy": 1.2056399817627246,
+     "det": 0.07622434763852787
+    }
+   },
+   "validation": {
+    "search_pose_fixed_frame": {
+     "n_eval": 192,
+     "le_1um": 0.010416666666666666,
+     "le_2um": 0.026041666666666668,
+     "le_3um": 0.0625,
+     "le_5um": 0.14583333333333334,
+     "nn_median_um": 20.20424236407077,
+     "nn_p95_um": 246.66550136222259,
+     "null_le_3um": 0.026041666666666668,
+     "inlier_over_null": 2.4,
+     "geometric_pass": false
+    },
+    "fixed_frame": {
+     "n_eval": 117,
+     "le_1um": 0.07692307692307693,
+     "le_2um": 0.23931623931623933,
+     "le_3um": 0.4358974358974359,
+     "le_5um": 0.717948717948718,
+     "nn_median_um": 3.198189946157759,
+     "nn_p95_um": 50.297575352801026,
+     "null_le_3um": 0.3504273504273504,
+     "inlier_over_null": 1.2439024390243902,
+     "geometric_pass": false
+    },
+    "overlap": {
+     "overlap_area_mm2": 0.080288,
+     "overlap_frac_of_moving": 0.0762632454807202,
+     "n_fixed_in_overlap": 127,
+     "n_moving_in_overlap": 1091,
+     "overlap_polygon_fixed": [
+      [
+       746.4028024599463,
+       1287.3185677588785
+      ],
+      [
+       480.15084962039526,
+       1252.299359741439
+      ],
+      [
+       562.3122261979314,
+       961.7106065653916
+      ],
+      [
+       828.5641790374824,
+       996.7298145828311
+      ]
+     ]
+    },
+    "if_frame": {
+     "ok": true,
+     "params_he_to_if": {
+      "scale": 3.6220391641521665,
+      "reflect": false,
+      "rotation_deg": 173.12835283214582,
+      "anisotropy": 1.205639981762724,
+      "det": 13.119167706652126
+     },
+     "n_if_eval": 1091,
+     "n_he_in_if_field": 128,
+     "final": {
+      "le_1um": 0.0,
+      "le_2um": 0.0036663611365719525,
+      "le_3um": 0.006416131989000917,
+      "le_5um": 0.013748854262144821,
+      "nn_median_um": 31.35424584855004,
+      "nn_p95_um": 117.91428414234335,
+      "n_eval": 1091
+     },
+     "null": {
+      "le_1um": 0.0009165902841429881,
+      "le_2um": 0.002749770852428964,
+      "le_3um": 0.0036663611365719525,
+      "le_5um": 0.01466544454628781,
+      "nn_median_um": 34.2659330710502,
+      "nn_p95_um": 80.0288336454247,
+      "n_eval": 1091
+     },
+     "inlier_over_null": 1.75,
+     "search_pose": {
+      "le_1um": 0.0018331805682859762,
+      "le_2um": 0.00458295142071494,
+      "le_3um": 0.007332722273143905,
+      "le_5um": 0.025664527956003668,
+      "nn_median_um": 175.07945769610836,
+      "nn_p95_um": 375.38825276375513,
+      "n_eval": 1091
+     },
+     "geometric_pass": false,
+     "image": {
+      "nuclear_corr": 0.13641595840454102,
+      "nuclear_block_corr_median": 0.003212064504623413,
+      "nuclear_block_corr_frac_pos": 0.16,
+      "tissue_corr": 0.4826464056968689,
+      "tissue_block_corr_median": 0.06670740991830826,
+      "tissue_block_corr_frac_pos": 0.47,
+      "tissue_dice": 0.6723000441809265,
+      "boundary_chamfer_um": 64.03124237432849,
+      "n_boundary_px": 1249,
+      "valid_fraction_of_if": 1.0,
+      "independent_of_search": {
+       "nuclear_corr": true,
+       "tissue_corr": true
+      }
+     }
+    }
+   },
+   "geometric_pass": false
+  },
+  {
+   "id": "points#4",
+   "source": "points",
+   "source_label": "視野サイズの違いに対応した核探索",
+   "rank": 4,
+   "search": {
+    "source": "points",
+    "rank": 4,
+    "chirality": "proper",
+    "theta_deg": 170.0,
+    "scale": 0.97,
+    "t": [
+     873.3807404463955,
+     1492.407071259561
+    ],
+    "score": 5.189775466918945,
+    "layer_ncc": {
+     "points": 0.2977744936943054
+    },
+    "layer_z": {
+     "points": 5.189775466918945
+    },
+    "relative_gap_to_top": 0.5510614647548691,
+    "M_search": [
+     [
+      -0.9552635204218417,
+      -0.16843873233692236
+     ],
+     [
+      0.16843873233692236,
+      -0.9552635204218417
+     ]
+    ]
+   },
+   "T_search": {
+    "M": [
+     [
+      -0.9552635204218417,
+      -0.16843873233692236
+     ],
+     [
+      0.16843873233692236,
+      -0.9552635204218417
+     ]
+    ],
+    "t": [
+     873.3807404463955,
+     1492.407071259561
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.9699999999999999,
+     "reflect": false,
+     "rotation_deg": 170.0,
+     "anisotropy": 1.0000000000000002,
+     "det": 0.9408999999999997
+    }
+   },
+   "flags": [
+    "RELOCATED_BY_ICP"
+   ],
+   "refine": {
+    "method": "overlap-restricted ICP (similarity -> affine)",
+    "ran": true,
+    "pose_change": {
+     "scale_change": -0.6856597257663994,
+     "rot_change_deg": 28.331380828214492,
+     "median_shift_um": 609.9105502547056,
+     "max_shift_um": 868.9203810994113
+    },
+    "n_moving_used": 1091,
+    "n_fixed_used": 141,
+    "objective": 7.354922550594363
+   },
+   "T_final": {
+    "M": [
+     [
+      -0.2834100689710938,
+      0.13449742259541897
+     ],
+     [
+      -0.09390115096752932,
+      -0.28347858585244134
+     ]
+    ],
+    "t": [
+     712.9952525420262,
+     1295.380301546302
+    ],
+    "source_frame": "031-6_2:IF",
+    "target_frame": "031-6_2:HE",
+    "params": {
+     "scale": 0.30491006600659243,
+     "reflect": false,
+     "rotation_deg": -161.66861917178548,
+     "anisotropy": 1.1423000679890132,
+     "det": 0.09297014835214454
+    }
+   },
+   "validation": {
+    "search_pose_fixed_frame": {
+     "n_eval": 181,
+     "le_1um": 0.0,
+     "le_2um": 0.027624309392265192,
+     "le_3um": 0.0718232044198895,
+     "le_5um": 0.1878453038674033,
+     "nn_median_um": 19.31025789951145,
+     "nn_p95_um": 230.6432999934754,
+     "null_le_3um": 0.055248618784530384,
+     "inlier_over_null": 1.3,
+     "geometric_pass": false
+    },
+    "fixed_frame": {
+     "n_eval": 127,
+     "le_1um": 0.07874015748031496,
+     "le_2um": 0.2204724409448819,
+     "le_3um": 0.4015748031496063,
+     "le_5um": 0.6535433070866141,
+     "nn_median_um": 3.542454946114154,
+     "nn_p95_um": 41.301410919094764,
+     "null_le_3um": 0.3779527559055118,
+     "inlier_over_null": 1.0625,
+     "geometric_pass": false
+    },
+    "overlap": {
+     "overlap_area_mm2": 0.097952,
+     "overlap_frac_of_moving": 0.09304176740393963,
+     "n_fixed_in_overlap": 136,
+     "n_moving_in_overlap": 1091,
+     "overlap_polygon_fixed": [
+      [
+       712.9952525420262,
+       1295.380301546302
+      ],
+      [
+       422.20291809437333,
+       1199.0332133983704
+      ],
+      [
+       560.2037295535578,
+       908.1705773416447
+      ],
+      [
+       850.9960640012106,
+       1004.5176654895763
+      ]
+     ]
+    },
+    "if_frame": {
+     "ok": true,
+     "params_he_to_if": {
+      "scale": 3.2796555820442443,
+      "reflect": false,
+      "rotation_deg": 161.6727537410548,
+      "anisotropy": 1.1423000679890132,
+      "det": 10.756140736833972
+     },
+     "n_if_eval": 1091,
+     "n_he_in_if_field": 139,
+     "final": {
+      "le_1um": 0.0018331805682859762,
+      "le_2um": 0.006416131989000917,
+      "le_3um": 0.007332722273143905,
+      "le_5um": 0.01833180568285976,
+      "nn_median_um": 31.297526924671903,
+      "nn_p95_um": 227.0589157681901,
+      "n_eval": 1091
+     },
+     "null": {
+      "le_1um": 0.0,
+      "le_2um": 0.0,
+      "le_3um": 0.0018331805682859762,
+      "le_5um": 0.00916590284142988,
+      "nn_median_um": 34.46104032367548,
+      "nn_p95_um": 189.49880225625435,
+      "n_eval": 1091
+     },
+     "inlier_over_null": 4.0,
+     "search_pose": {
+      "le_1um": 0.0,
+      "le_2um": 0.00458295142071494,
+      "le_3um": 0.011915673693858845,
+      "le_5um": 0.031164069660861594,
+      "nn_median_um": 175.70686552206254,
+      "nn_p95_um": 382.91975493462,
+      "n_eval": 1091
+     },
+     "geometric_pass": false,
+     "image": {
+      "nuclear_corr": 0.15303254127502441,
+      "nuclear_block_corr_median": 0.024318212643265724,
+      "nuclear_block_corr_frac_pos": 0.2,
+      "tissue_corr": 0.4655649662017822,
+      "tissue_block_corr_median": 0.10640949010848999,
+      "tissue_block_corr_frac_pos": 0.51,
+      "tissue_dice": 0.6574857415409241,
+      "boundary_chamfer_um": 92.34717104492157,
+      "n_boundary_px": 1249,
+      "valid_fraction_of_if": 1.0,
+      "independent_of_search": {
+       "nuclear_corr": true,
+       "tissue_corr": true
+      }
+     }
+    }
+   },
+   "geometric_pass": false
+  }
+ ],
+ "decision": {
+  "status": "ACCEPTED",
+  "accepted": true,
+  "selected_candidate": "image#0",
+  "reason": "image と points が同じ領域で採択基準を満たした（差 0.0 µm）",
+  "mode": "automatic",
+  "per_source": {
+   "image": {
+    "verdict": "UNIQUE",
+    "verdict_text": "一意：最上位の候補が2位より十分に高い（margin ≥ 0.10）",
+    "margin": 0.5044926812767059,
+    "top": "image#0",
+    "search_ok": true,
+    "geometry_ok": true,
+    "accepted_by_rule": true,
+    "failure_stage": null,
+    "search_pose_geometry_ok": true
+   },
+   "points": {
+    "verdict": "UNIQUE",
+    "verdict_text": "一意：最上位の候補が2位より十分に高い（margin ≥ 0.10）",
+    "margin": 0.47746881900362376,
+    "top": "points#0",
+    "search_ok": true,
+    "geometry_ok": true,
+    "accepted_by_rule": true,
+    "failure_stage": null,
+    "search_pose_geometry_ok": true
+   }
+  },
+  "failure_stage": null,
+  "failure_stage_text": null,
+  "rule": "prespecified 2026-10-19: search verdict UNIQUE AND <=3 um proximity >= 0.25 AND >= 3x mirror null (fixed frame, and IF frame when HE/IF); unchanged"
+ },
+ "transform": {
+  "forward": {
+   "M": [
+    [
+     0.9846983486114077,
+     -0.004492208834814493
+    ],
+    [
+     0.00378839361963696,
+     0.9798627233242705
+    ]
+   ],
+   "t": [
+    541.8709742279991,
+    493.7813441161543
+   ],
+   "source_frame": "031-6_2:IF",
+   "target_frame": "031-6_2:HE",
+   "params": {
+    "scale": 0.9822862229404288,
+    "reflect": false,
+    "rotation_deg": 0.2204308506530445,
+    "anisotropy": 1.0049870861502117,
+    "det": 0.9648862237785737
+   }
+  },
+  "inverse": {
+   "M": [
+    [
+     1.0155215186792153,
+     0.004655687607625523
+    ],
+    [
+     -0.003926259414090606,
+     1.0205331202214165
+    ]
+   ],
+   "t": [
+    -552.5805263608818,
+    -501.7926898041988
+   ],
+   "source_frame": "031-6_2:HE",
+   "target_frame": "031-6_2:IF",
+   "params": {
+    "scale": 1.0180332133810712,
+    "reflect": false,
+    "rotation_deg": -0.22151866670538867,
+    "anisotropy": 1.0049870861502121,
+    "det": 1.0363916235469897
+   }
+  },
+  "candidate": "image#0",
+  "accepted": true,
+  "direction": "IF world -> HE world"
+ },
+ "runtime_s": 1721.684103987005,
+ "peak_mem_mb": 672.6588373184204
+}

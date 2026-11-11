@@ -1,0 +1,80 @@
+{
+  "purpose": "candidate_fixed_cost_ablation_no_algorithm_change",
+  "branch": "feature/gpu-slurm",
+  "python": "3.11.16 | packaged by conda-forge | (main, Aug 21 2026, 22:44:51) [GCC 14.4.0]",
+  "platform": "Linux-6.8.0-88-generic-x86_64-with-glibc2.35",
+  "elapsed_seconds": 130.0011351108551,
+  "candidate_fixed": true,
+  "real_candidate_hash": "778f89d8bd48f8573ab8c2aecf565e7f7761d2c830bc19f156e98bdea1f8f8df",
+  "synthetic_candidate_hash_by_case": {
+    "primary_easy_1101": "e8bd7d8e12ccf771937eff697de01d9598ce06b3e3d8999788724851c5210d8b",
+    "primary_easy_1102": "737844e0661c4bfe00beb97b0add025265229404852b717713ca38f474c9e616",
+    "primary_easy_1103": "aa03f422b8763557d5f7bdcdb816a2b1babb4cabe0a70e4efe2fcbe05ba0b641",
+    "primary_easy_1104": "7c775fada2a856365368d404d5f867b259c83358131c7b9fb94a7c125dac0a52",
+    "primary_easy_1105": "ca494c04570cc4e171272f31f346bd7cb415f692f9b3852dc50028999c6dee9b",
+    "primary_medium_1101": "69800eab8923d75132445befb2dbf9065d910e9c30bea16369621504fbb30716",
+    "primary_medium_1102": "27c3e252c084150e3e0914ace28f20b91b7224b0cbe2819038c1037d5a3fe425",
+    "primary_medium_1103": "88c4c8cf79c36a219fb8c9871f01b9e3f3d5582f8c2f329f370fe59603f5509a",
+    "primary_medium_1104": "36fa790f46444a4ffd80e28537f717ee1078cb7186301283ccb6aa39e8aa9276",
+    "primary_medium_1105": "69b246ab526da509f9de97da598c4b5da961da9b422a9adad502c33ad20c87f3",
+    "primary_hard_1101": "18c543c8bacf80719421837ca85f494a00730e9f09a3ff7f47c8444680e50fc1",
+    "primary_hard_1102": "cdeb7d8734ff00cb7d570fb8b0b71ae7f32f8570de965b1b62f55aac3f2b1d6f",
+    "primary_hard_1103": "a06d65283fdc38c0fca9d071d9f250afedfa0bddc548c4e9a5e6d5bea1d24a9a",
+    "primary_hard_1104": "b4f73441259044e4b987086eba19764bb32e536d227e01c1ca15c4f6fb79cb3a",
+    "primary_hard_1105": "b78cd8cb958034dd51286aa56face541122a98e4c22a7479771fba827d79b856"
+  },
+  "frozen_uot": {
+    "cost_scale_um": 10.0,
+    "entropic_regularization": 0.1,
+    "mass_relaxation_kl": 0.5,
+    "minimum_row_mass_ratio": 0.25,
+    "solver": "sinkhorn_translation_invariant",
+    "reg_type": "kl",
+    "max_iterations": 2000,
+    "stop_threshold": 1e-07,
+    "source_trial": "coarse_09 / cost10_e0.1_m0.5"
+  },
+  "cost_weights": {
+    "position": 0.45,
+    "fingerprint": 0.85,
+    "region": 0.7,
+    "graph": 0.75,
+    "outside": 25.0
+  },
+  "known_result_verification": {
+    "exact": {
+      "top1_fixed_index": true,
+      "status": true
+    },
+    "maximum_absolute_errors": {
+      "row_mass_ratio": 9.8879238130678e-17,
+      "top1_mass": 9.98821251402271e-17,
+      "confidence": 5.551115123125783e-17
+    },
+    "status_counts": {
+      "unmatched": 1295,
+      "ambiguous": 434,
+      "matched": 25
+    }
+  },
+  "graph_hypothesis": {
+    "synthetic_uot_top1_a1": 0.7391124014931564,
+    "synthetic_uot_top1_a4": 0.8245541269182912,
+    "synthetic_matched_recall_a1": 0.7154707590211531,
+    "synthetic_matched_recall_a4": 0.8000829531314807,
+    "real_total_mass_a1": 0.23329269880367853,
+    "real_total_mass_a4": 0.14165924441009575,
+    "graph_improves_synthetic_identity": true,
+    "graph_reduces_real_mass": true,
+    "graph_reduces_synthetic_matched_recall": false
+  },
+  "interpretation": "B. USEFUL DISCRIMINATION WITH MASS PENALTY",
+  "real_has_ground_truth": false,
+  "warping_performed": false,
+  "source_sha256_after_experiment": {
+    "contextual_uot.py": "5029298da2efed6c4d9bd591b9a09a78b44dc56400ffdc677879ec466c52223c",
+    "candidate_generation.py": "38a8920098023413e9ead153899d838d90bb358cf3f90eddf28f850eb0651ed6",
+    "real_correspondence_candidates.csv": "b565e48bdb895fbd41280fb2418c099dfdf31a69a862c5b63a738d717c8b4078"
+  },
+  "deterministic_real_trace_sha256": "47aafdb0a4b0b3c0bb0bfa6193c79dc2026a203380ede1f57ec635b513438c51"
+}

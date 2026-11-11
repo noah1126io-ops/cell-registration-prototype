@@ -1,0 +1,8 @@
+stage,input_moving_nuclei,valid_moving_nuclei,candidate_count_p05,candidate_count_median,candidate_count_p95,zero_candidate_nuclei,valid_score_nuclei,score_p05,score_median,score_p95,nan_count,inf_count,operation_and_main_degradation
+Affine,1754,1754,1830.0,1830.0,1830.0,0,1754,1.0,1.0,1.0,0,0,"No filtering; 1,830 fixed nuclei form the search universe"
+Regional NCC,1754,1754,30.0,30.0,30.0,0,1754,0.12216293343111484,0.36032934707519115,0.6057041298346809,0,0,"Ranks 30 candidates; 1,025 offsets hit ±18 um boundary; no deletion"
+Fingerprint,1754,1754,30.0,30.0,30.0,0,1754,0.3986389252513771,0.7944835067353526,0.9298025276384763,0,0,Ranks candidates inside spatial top-80; no moving-nucleus rejection
+Candidate union/prune,1754,1754,30.0,30.0,30.0,0,1754,1.024035943030088,2.0441986155396448,5.500976596627474,0,0,Union of three top-20 lists is cost-ranked and pruned to 30
+Graph,1754,1754,30.0,30.0,30.0,0,1754,0.024277896791127792,0.2419069643276132,0.5238804982415637,0,0,No deletion; adds 0.75 × (1 - support) to candidate cost
+UOT,1754,1754,30.0,30.0,30.0,0,1754,0.0005272980141509427,0.06942774402619392,0.20653612282459055,0,0,"1,295 rows receive mass ratio <0.12"
+Confidence classification,1754,1754,30.0,30.0,30.0,0,1754,0.3692984635883356,0.54113636377725,0.6382496431333387,0,0,"25 matched; classification uses mass/concentration/margin, not final confidence"

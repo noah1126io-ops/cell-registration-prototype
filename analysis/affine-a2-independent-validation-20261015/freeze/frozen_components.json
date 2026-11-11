@@ -1,0 +1,98 @@
+{
+  "components": {
+    "A2 / A0 / A3 / detector / evaluation (init_lib)": {
+      "path": "analysis/affine-global-initialization-20261014/init_lib.py",
+      "sha256": "58b2feca7b8fdef00278f4b7c01cdf65e5d2f0736b70497a341860d21ba78537"
+    },
+    "prior runner (reference for detector usage)": {
+      "path": "analysis/affine-global-initialization-20261014/run_cases.py",
+      "sha256": "56bcd0a84d8306bdeb2c8fba9e553002105a0fa9917b31278d85908e8c3f740c"
+    },
+    "prior aggregate (Real detector with checkerboard held-out)": {
+      "path": "analysis/affine-global-initialization-20261014/aggregate.py",
+      "sha256": "4aeef50c609b8fd35184e9b988b5367b269fc1a94ee9cb861d439cadf59faeaf"
+    },
+    "production ICP / A0": {
+      "path": "src/pointset_registration.py",
+      "sha256": "8377608324e62321d260cf72bf003943567dee67de1f2e32ecec5ab74f67e25e"
+    },
+    "Graph/UOT/B2 library": {
+      "path": "analysis/graph-matching-adoption-separation-20261014/experiment_lib.py",
+      "sha256": "07cdee6d750aeaebad08e8bf8c18db232d485fa925eb73443549b779950d81e1"
+    },
+    "B2 training table": {
+      "path": "analysis/graph-matching-adoption-separation-20261014/per_nucleus_results.csv",
+      "sha256": "7dcbc1864536cd76fb8bca4611b6f3096f5582b34c6fd52a98ce22ffbf7ec84b"
+    },
+    "UOT context/cost": {
+      "path": "analysis/contextual-uot-cost-ablation-20261008/run_cost_ablation.py",
+      "sha256": "dcd9709a68a21cb269998ab6a3a3f98c5f85ab21d1eda3f1789975b3a0944da6"
+    },
+    "candidate generation": {
+      "path": "analysis/contextual-graph-uot-20261008/candidate_generation.py",
+      "sha256": "38a8920098023413e9ead153899d838d90bb358cf3f90eddf28f850eb0651ed6"
+    },
+    "graph consistency": {
+      "path": "analysis/contextual-graph-uot-20261008/graph_consistency.py",
+      "sha256": "c82785101591fec563671dbb8dae2c02cf1d43a41a2269705a61fe9635a5d643"
+    },
+    "contextual UOT": {
+      "path": "analysis/contextual-graph-uot-20261008/contextual_uot.py",
+      "sha256": "5029298da2efed6c4d9bd591b9a09a78b44dc56400ffdc677879ec466c52223c"
+    },
+    "regional pattern (NCC +-18)": {
+      "path": "analysis/contextual-graph-uot-20261008/regional_pattern.py",
+      "sha256": "9315e8d49388a9ba14dc0a2f943f3a34ef847d5eda8f26fd79e30c75aef83173"
+    },
+    "local fingerprint": {
+      "path": "analysis/contextual-graph-uot-20261008/local_fingerprint.py",
+      "sha256": "5adcf89d696e7ea1b4817d6036ddc78010104288008ea81efe46a6cd76fbf470"
+    },
+    "candidate config": {
+      "path": "analysis/contextual-graph-uot-20261008/config.py",
+      "sha256": "9a6bee0afbe32a98ceee2893663f96ae30307cc10a5a669ef78782135425ce0e"
+    },
+    "prior Real A2 result": {
+      "path": "analysis/affine-global-initialization-20261014/cache/real.json",
+      "sha256": "97ec06150dbc80323b46bd30d5121281d136577a7f81771a15768beb876c6375"
+    }
+  },
+  "a2_settings": {
+    "SEARCH_RADIUS_UM": 200.0,
+    "COARSE_ROT_STEP": 4.0,
+    "FINE_ROT_HALF": 3.0,
+    "FINE_ROT_STEP": 1.0,
+    "FINE_SCALE": [
+      0.97,
+      1.0,
+      1.03
+    ],
+    "N_REFINE": 6,
+    "raster_px_um": 4.0,
+    "raster_sigma_um": 8.0,
+    "min_overlap_fraction": 0.3,
+    "icp": "icp_similarity(trim 0.8, 80 it) -> affine_icp(trim 0.7, 80 it)"
+  },
+  "a3_settings": {
+    "A3_ROT_STEP": 15.0,
+    "A3_TRANS_STEP": 25.0,
+    "A3_SHORT_ITERS": 4,
+    "A3_TOPK": 12
+  },
+  "detector_thresholds": {
+    "inlier_radius_um": 3.0,
+    "pass_min_inlier": 0.25,
+    "pass_min_inlier_over_null": 3.0,
+    "pass_min_block_consistency": 0.6,
+    "pass_min_heldout_inlier": 0.2,
+    "ambiguous_min_inlier_over_null": 2.0,
+    "ambiguous_basin_margin": 0.1
+  },
+  "detector_usage": {
+    "synthetic": "init_lib.detector(M, t, moving_px, fixed, basin_margin=<method diagnostics>) -- no held-out (as the 2026-10-14 synthetic 180)",
+    "real": "same + heldout_inlier = mean checkerboard held-out inlier (as 2026-10-14 aggregate.py)"
+  },
+  "python": "3.11.16 | packaged by conda-forge | (main, Aug 21 2026, 22:44:51) [GCC 14.4.0]",
+  "platform": "Linux-6.8.0-88-generic-x86_64-with-glibc2.35",
+  "git_head": "f66ecbe5bfb691dd18695d34702a3fd13c3dcf7a"
+}

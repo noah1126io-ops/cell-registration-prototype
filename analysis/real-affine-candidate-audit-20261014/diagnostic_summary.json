@@ -1,0 +1,368 @@
+{
+  "purpose": "analysis_only_affine_coordinate_candidate_audit",
+  "dataset": "serial_section_pair_20260904",
+  "branch": "feature/gpu-slurm",
+  "git_head": "f66ecbe5bfb691dd18695d34702a3fd13c3dcf7a",
+  "python": "3.11.16 | packaged by conda-forge | (main, Aug 21 2026, 22:44:51) [GCC 14.4.0]",
+  "platform": "Linux-6.8.0-88-generic-x86_64-with-glibc2.35",
+  "elapsed_seconds": 778.2490128669888,
+  "ncc_elapsed_seconds": 231.94076552800834,
+  "audit_results": {
+    "coordinate_system": "UNKNOWN",
+    "affine_direction": "PASS",
+    "affine_alignment": "UNKNOWN",
+    "roi_overlap": "UNKNOWN",
+    "regional_ncc": "FAIL",
+    "candidate_generation": "UNKNOWN",
+    "candidate_pruning": "UNKNOWN"
+  },
+  "cause_classification": [
+    "D. REGIONAL NCC SEARCH LIMITATION",
+    "G. INCONCLUSIVE (missing acquisition metadata, landmarks, and real correspondence truth)"
+  ],
+  "input_counts": {
+    "fixed_original": 1979,
+    "moving_original": 1842,
+    "fixed_subset": 1830,
+    "moving_subset": 1754
+  },
+  "affine": {
+    "source_run": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/runs/20260904-161247-698fe6c9",
+    "transform_direction": "normalized HE pixel xy -> fluorescence GeoJSON world xy (um)",
+    "application_order": "optional x/y image-axis flip, then row-vector points @ affine_matrix.T + translation",
+    "estimation_inputs": {
+      "moving": "1,842 normalized HE nucleus centers in image-pixel xy",
+      "fixed": "1,979 fluorescence GeoJSON nucleus centers in application world-um xy",
+      "image_values_used_in_objective": false,
+      "image_dimensions_used_for_flip": [
+        901.0,
+        901.0
+      ]
+    },
+    "estimation_initialization": "Each of 4 x/y flip candidates; within each, rotations 0..330 degrees in 30-degree steps with centroid/RMS-radius scale initialization.",
+    "similarity_stage": {
+      "method": "nearest-neighbor trimmed similarity ICP followed by Umeyama refit",
+      "trim_quantile": 0.8,
+      "max_iterations": 80,
+      "convergence_tolerance": 0.0001
+    },
+    "affine_stage": {
+      "method": "nearest-neighbor trimmed ICP with full 2x2 affine least-squares refit",
+      "trim_quantile": 0.7,
+      "max_iterations": 80,
+      "convergence_tolerance": 0.0001,
+      "reestimated_pairs_used": 1289,
+      "reestimated_mean_trimmed_residual_um": 7.5371674474076436,
+      "reestimated_final_all_point_median_nn_residual_um": 9.838212693968341
+    },
+    "flip_candidate_selection": "Similarity-stage orientation error + target-span penalty when fitted affine determinant < 0 + 0.001 per explicit flip; final affine median residual is only a tie-breaker.",
+    "reestimation_exactly_matches_saved_matrix": true,
+    "reestimation_exactly_matches_saved_translation": true,
+    "reestimated_flip_matches_saved": true,
+    "affine_matrix_after_explicit_flip": [
+      [
+        -1.0964391959706368,
+        0.013463987495834218
+      ],
+      [
+        -0.008111597300243944,
+        -1.1003574446014204
+      ]
+    ],
+    "affine_translation_after_explicit_flip": [
+      1002.81039098349,
+      1013.4960908456746
+    ],
+    "flip_x": true,
+    "flip_y": false,
+    "image_width_px": 901.0,
+    "image_height_px": 901.0,
+    "effective_raw_pixel_to_world_matrix": [
+      [
+        1.0964391959706368,
+        0.013463987495834218
+      ],
+      [
+        0.008111597300243944,
+        -1.1003574446014204
+      ]
+    ],
+    "effective_raw_pixel_to_world_translation": [
+      14.91867541394629,
+      1006.1875416781548
+    ],
+    "determinant_after_explicit_flip": 1.2065842462837078,
+    "effective_determinant_including_flip": -1.2065842462837078,
+    "singular_scales_um_per_input_pixel": [
+      1.1017679477131104,
+      1.0951346413626932
+    ],
+    "effective_x_axis_scale_um_per_pixel": 1.0964692008768406,
+    "effective_y_axis_scale_um_per_pixel": 1.1004398142783893,
+    "polar_rotation_degrees_after_flip": -179.43729420313613,
+    "symmetric_stretch_matrix": [
+      [
+        1.0964659820299796,
+        -0.002656825649249306
+      ],
+      [
+        -0.002656825649249316,
+        1.100436607045824
+      ]
+    ],
+    "shear_indicator_off_diagonal": -0.002656825649249306,
+    "saved_affine_reconstruction_max_abs_error_um": 0.0,
+    "inverse_roundtrip_max_abs_error_px": 1.7053025658242404e-13,
+    "correct_direction_nn_median_um_proxy": 9.895033458833023,
+    "inverse_direction_nn_median_mixed_units_proxy": 11.155732098030732,
+    "independent_landmarks_available": false,
+    "tre_um": null,
+    "raw_he_pixel_spacing_metadata": "UNKNOWN",
+    "raw_he_crop_offset_metadata": "UNKNOWN",
+    "raw_he_downsampling_metadata": "UNKNOWN",
+    "geojson_crs_and_unit_metadata": "UNKNOWN (world-um is an application convention, not retained source CRS metadata)"
+  },
+  "roi": {
+    "original_counts": {
+      "fixed": 1979,
+      "moving": 1842
+    },
+    "subset_counts": {
+      "fixed": 1830,
+      "moving": 1754
+    },
+    "excluded_counts": {
+      "fixed": 149,
+      "moving": 88
+    },
+    "reconstructed_filter_assumptions": {
+      "edge_margin_px": 10.0,
+      "fixed_nearest_he_max_um": 43.0
+    },
+    "saved_fixed_subset_exactly_reproduced": true,
+    "saved_moving_subset_exactly_reproduced": true,
+    "warped_he_valid_tissue_area_um2": 977344.0,
+    "eroded_10um_tissue_area_um2": 941935.0,
+    "fixed_subset_convex_hull_area_um2": 931616.6782567091,
+    "moving_subset_convex_hull_area_um2": 933421.3027315503,
+    "convex_hull_intersection_area_um2_proxy": 929033.2438047174,
+    "convex_hull_iou_proxy": 0.9925518610089497,
+    "fixed_hull_covered_by_intersection_proxy": 0.9972269340896451,
+    "moving_hull_covered_by_intersection_proxy": 0.9952989513802699,
+    "authoritative_fluorescence_acquisition_polygon_available": false,
+    "roi_interpretation": "HE-derived tissue mask is authoritative for saved subset filtering; hull metrics are geometric proxies, not acquisition-FOV proof.",
+    "fixed_feature_counts": {
+      "outside_image": 0,
+      "outside_tissue_or_background": 77,
+      "within_10px_tissue_boundary": 72
+    },
+    "moving_feature_counts": {
+      "outside_image": 0,
+      "outside_tissue_or_background": 5,
+      "within_10px_tissue_boundary": 83
+    }
+  },
+  "regional_ncc": {
+    "18.0": {
+      "unit": "moving_nucleus",
+      "group": "all",
+      "n": 1754,
+      "independent_anchor_count": 331,
+      "boundary_hit_count": 1025,
+      "boundary_hit_fraction": 0.5843785632839225,
+      "x_positive_count": 307,
+      "x_negative_count": 310,
+      "y_positive_count": 369,
+      "y_negative_count": 306,
+      "xy_both_count": 267,
+      "offset_neighbor_inconsistency_median_um": 19.209372712298546,
+      "candidate_set_changed_fraction_vs_radius18": 0.0,
+      "candidate_set_jaccard_median_vs_radius18": 1.0,
+      "regional_top1_changed_fraction_vs_radius18": 0.0,
+      "graph_top1_changed_fraction_vs_radius18": 0.0,
+      "best_ncc_p05": 0.1221629334311148,
+      "best_ncc_median": 0.3603293470751911,
+      "best_ncc_p95": 0.605704129834681,
+      "second_ncc_p05": 0.0781952355887819,
+      "second_ncc_median": 0.330792476291054,
+      "second_ncc_p95": 0.5632996606903774,
+      "peak_margin_p05": 0.0047468563264523,
+      "peak_margin_median": 0.0356897094130514,
+      "peak_margin_p95": 0.0835109525328402,
+      "offset_norm_um_p05": 4.242640687119285,
+      "offset_norm_um_median": 18.24828759089466,
+      "offset_norm_um_p95": 25.45584412271571,
+      "local_density_per_um2_p05": 0.0011014182912933,
+      "local_density_per_um2_median": 0.0019274820097634,
+      "local_density_per_um2_p95": 0.0038549640195268,
+      "candidate_top1_distance_um_p05": 3.5449600549935405,
+      "candidate_top1_distance_um_median": 14.753252148174573,
+      "candidate_top1_distance_um_p95": 30.05494623354117,
+      "graph_top1_support_p05": 0.0242778967911277,
+      "graph_top1_support_median": 0.2438076423031537,
+      "graph_top1_support_p95": 0.5239885604571508,
+      "independent_anchor_boundary_hit_count": 193,
+      "independent_anchor_boundary_hit_fraction": 0.5830815709969789
+    },
+    "36.0": {
+      "unit": "moving_nucleus",
+      "group": "all",
+      "n": 1754,
+      "independent_anchor_count": 331,
+      "boundary_hit_count": 947,
+      "boundary_hit_fraction": 0.5399087799315849,
+      "x_positive_count": 92,
+      "x_negative_count": 133,
+      "y_positive_count": 137,
+      "y_negative_count": 637,
+      "xy_both_count": 52,
+      "offset_neighbor_inconsistency_median_um": 28.30194339616981,
+      "candidate_set_changed_fraction_vs_radius18": 0.7827822120866591,
+      "candidate_set_jaccard_median_vs_radius18": 0.7647058823529411,
+      "regional_top1_changed_fraction_vs_radius18": 0.7177879133409351,
+      "graph_top1_changed_fraction_vs_radius18": 0.6220068415051311,
+      "best_ncc_p05": 0.3263698562888208,
+      "best_ncc_median": 0.5070659588785819,
+      "best_ncc_p95": 0.7705565357799813,
+      "second_ncc_p05": 0.3029238459070073,
+      "second_ncc_median": 0.4626105820051642,
+      "second_ncc_p95": 0.6719074772170123,
+      "peak_margin_p05": 0.0055522746585709,
+      "peak_margin_median": 0.0475118174893876,
+      "peak_margin_p95": 0.126688668434076,
+      "offset_norm_um_p05": 8.48528137423857,
+      "offset_norm_um_median": 36.12478373637688,
+      "offset_norm_um_p95": 46.86149805543992,
+      "local_density_per_um2_p05": 0.0011014182912933,
+      "local_density_per_um2_median": 0.0019274820097634,
+      "local_density_per_um2_p95": 0.0038549640195268,
+      "candidate_top1_distance_um_p05": 6.8410895598295145,
+      "candidate_top1_distance_um_median": 23.1683355843874,
+      "candidate_top1_distance_um_p95": 40.59281401943964,
+      "graph_top1_support_p05": 0.0159651437929334,
+      "graph_top1_support_median": 0.1194260529475936,
+      "graph_top1_support_p95": 0.3829277126924312,
+      "independent_anchor_boundary_hit_count": 179,
+      "independent_anchor_boundary_hit_fraction": 0.540785498489426
+    },
+    "54.0": {
+      "unit": "moving_nucleus",
+      "group": "all",
+      "n": 1754,
+      "independent_anchor_count": 331,
+      "boundary_hit_count": 585,
+      "boundary_hit_fraction": 0.3335233751425313,
+      "x_positive_count": 22,
+      "x_negative_count": 21,
+      "y_positive_count": 48,
+      "y_negative_count": 494,
+      "xy_both_count": 0,
+      "offset_neighbor_inconsistency_median_um": 3.0,
+      "candidate_set_changed_fraction_vs_radius18": 0.9401368301026226,
+      "candidate_set_jaccard_median_vs_radius18": 0.6216216216216216,
+      "regional_top1_changed_fraction_vs_radius18": 0.92018244013683,
+      "graph_top1_changed_fraction_vs_radius18": 0.8757126567844926,
+      "best_ncc_p05": 0.484117006459644,
+      "best_ncc_median": 0.7343242623681044,
+      "best_ncc_p95": 0.9218320657517508,
+      "second_ncc_p05": 0.4438814365790087,
+      "second_ncc_median": 0.6516678824839346,
+      "second_ncc_p95": 0.8194625329305486,
+      "peak_margin_p05": 0.0113677800842034,
+      "peak_margin_median": 0.0796421872798962,
+      "peak_margin_p95": 0.1442858934809052,
+      "offset_norm_um_p05": 25.01166931547869,
+      "offset_norm_um_median": 49.47726750741192,
+      "offset_norm_um_p95": 61.773780845922005,
+      "local_density_per_um2_p05": 0.0011014182912933,
+      "local_density_per_um2_median": 0.0019274820097634,
+      "local_density_per_um2_p95": 0.0038549640195268,
+      "candidate_top1_distance_um_p05": 14.141402309321718,
+      "candidate_top1_distance_um_median": 31.855988123286533,
+      "candidate_top1_distance_um_p95": 49.90670973841038,
+      "graph_top1_support_p05": 0.0093594145671393,
+      "graph_top1_support_median": 0.0479490858245114,
+      "graph_top1_support_p95": 0.1948238092012506,
+      "independent_anchor_boundary_hit_count": 108,
+      "independent_anchor_boundary_hit_fraction": 0.32628398791540786
+    }
+  },
+  "candidate": {
+    "candidate_count": 30,
+    "candidate_zero_count": 0,
+    "candidate_hash": "778f89d8bd48f8573ab8c2aecf565e7f7761d2c830bc19f156e98bdea1f8f8df",
+    "spatial_top1_to_graph_top1_change_fraction": 0.5267958950969214,
+    "real_b2_graph_support_median": 0.2274341125353023,
+    "real_b2_candidate_distance_median_um": 10.623480559062276
+  },
+  "spatial_residual_proxies": {
+    "global_nearest_fixed_distance_median_um": 9.895033458833023,
+    "global_mutual_nearest_fraction": 0.5478905359179019,
+    "global_nn_vector_median_um": [
+      0.19389496586463295,
+      0.4056969044307266
+    ],
+    "global_regional_offset_median_um": [
+      0.0,
+      3.0
+    ],
+    "region_nn_ncc_direction_cosine_median": 0.4215394923951554,
+    "low_graph_support_region_count": 9,
+    "low_graph_support_region_direction_cosine_median": 0.8214730452499495,
+    "region_graph_support_vs_ncc_offset_norm_spearman": -0.24068909582569442,
+    "region_graph_support_vs_nn_distance_spearman": -0.4187902187902188
+  },
+  "baseline_reproduction": {
+    "regional_offset_x_max_abs_error_um": 0.0,
+    "regional_offset_y_max_abs_error_um": 0.0,
+    "regional_ncc_max_abs_error": 2.220446049250313e-16,
+    "regional_margin_max_abs_error": 3.122502256758253e-16,
+    "candidate_indices_match_saved_hash": true,
+    "fast_graph_support_max_abs_error": 0.0,
+    "graph_cost_top1_exact": true
+  },
+  "stable_ids": {
+    "fixed_subset_unique_original_rows": 1830,
+    "moving_subset_unique_original_rows": 1754,
+    "source_feature_ids_preserved": false
+  },
+  "finite_checks": {
+    "candidate_source_numeric": true,
+    "candidate_k_sensitivity": true,
+    "spatial_regions": true,
+    "synthetic_affine": true,
+    "ncc_per_nucleus": true
+  },
+  "determinism_hashes": {
+    "candidate_indices": "778f89d8bd48f8573ab8c2aecf565e7f7761d2c830bc19f156e98bdea1f8f8df",
+    "regional_offsets": "662b820b80373a2a3efb9bc49001681a0b6293b07093d5308ec87273c228c4ad",
+    "candidate_source_csv": "6d8042cbacd71d24ff57ae691cf243950b64c2dd23da34792a0ab2743610e0f9"
+  },
+  "source_hashes_before": {
+    "src/pointset_registration.py": "8377608324e62321d260cf72bf003943567dee67de1f2e32ecec5ab74f67e25e",
+    "src/point_io.py": "856839cb4efbf1e0f0446ec39461eb64c6f53643db0ec640e37d1df5f439ec19",
+    "src/geojson_utils.py": "66be5d7e475790e8d3b265007081b96671c2853a06ed35c000eca066941ce649",
+    "app.py": "c22efd1ad40cc55bd6730c51e53251965f90ead6e3b87b1adbd74344693dbb63",
+    "analysis/contextual-graph-uot-20261008/regional_pattern.py": "9315e8d49388a9ba14dc0a2f943f3a34ef847d5eda8f26fd79e30c75aef83173",
+    "analysis/contextual-graph-uot-20261008/candidate_generation.py": "38a8920098023413e9ead153899d838d90bb358cf3f90eddf28f850eb0651ed6",
+    "analysis/contextual-graph-uot-20261008/graph_consistency.py": "c82785101591fec563671dbb8dae2c02cf1d43a41a2269705a61fe9635a5d643"
+  },
+  "source_hashes_after": {
+    "src/pointset_registration.py": "8377608324e62321d260cf72bf003943567dee67de1f2e32ecec5ab74f67e25e",
+    "src/point_io.py": "856839cb4efbf1e0f0446ec39461eb64c6f53643db0ec640e37d1df5f439ec19",
+    "src/geojson_utils.py": "66be5d7e475790e8d3b265007081b96671c2853a06ed35c000eca066941ce649",
+    "app.py": "c22efd1ad40cc55bd6730c51e53251965f90ead6e3b87b1adbd74344693dbb63",
+    "analysis/contextual-graph-uot-20261008/regional_pattern.py": "9315e8d49388a9ba14dc0a2f943f3a34ef847d5eda8f26fd79e30c75aef83173",
+    "analysis/contextual-graph-uot-20261008/candidate_generation.py": "38a8920098023413e9ead153899d838d90bb358cf3f90eddf28f850eb0651ed6",
+    "analysis/contextual-graph-uot-20261008/graph_consistency.py": "c82785101591fec563671dbb8dae2c02cf1d43a41a2269705a61fe9635a5d643"
+  },
+  "source_files_unchanged": true,
+  "production_changes": false,
+  "workflow_integration": false,
+  "tests": {
+    "analysis_only": "11 passed",
+    "full_repository": "269 passed, 4 skipped",
+    "analysis_test_command": "conda run -n cell-rg pytest -q analysis/real-affine-candidate-audit-20261014/test_audit.py",
+    "full_repository_test_command": "conda run -n cell-rg pytest -q"
+  }
+}

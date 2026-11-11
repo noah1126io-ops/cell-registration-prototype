@@ -1,0 +1,514 @@
+{
+  "purpose": "independent Claude audit of Real affine / coordinate / candidate discovery",
+  "dataset": "serial_section_pair_20260904",
+  "date": "2026-10-14",
+  "branch": "feature/gpu-slurm",
+  "git_head": "f66ecbe5bfb691dd18695d34702a3fd13c3dcf7a",
+  "python": "3.11.16 | packaged by conda-forge | (main, Aug 21 2026, 22:44:51) [GCC 14.4.0]",
+  "platform": "Linux-6.8.0-88-generic-x86_64-with-glibc2.35",
+  "audit_status": {
+    "coordinate_system": "PASS (internal path) / provenance metadata UNKNOWN",
+    "affine_direction": "PASS",
+    "affine_alignment": "FAIL",
+    "roi_overlap": "FAIL (crop offset; mask is image footprint)",
+    "regional_ncc": "FAIL as configured (window < residual); method itself works after re-fit",
+    "candidate_discovery": "PASS at K=30 (proxy partner in final set 94.4%); FAIL at K=10",
+    "candidate_pruning_ranking": "FAIL (proxy partner top-1 0.08%)"
+  },
+  "cause_classification": [
+    "B. Affine misalignment (primary)",
+    "C. ROI/overlap (crop offset defeating centroid initialisation)",
+    "D. Regional NCC limitation (secondary consequence of B)",
+    "E. Candidate ranking (consequence of B; discovery itself largely adequate at K=30)"
+  ],
+  "not_supported": [
+    "A. coordinate convention error",
+    "F. biological/domain difference as main explanation of the Real gap"
+  ],
+  "key_numbers": {
+    "within_3um_saved_refit_null": [
+      0.07183580387685291,
+      0.7383124287343216,
+      0.05017103762827822
+    ],
+    "icp_objective_saved_refit": [
+      7.5371674474076436,
+      1.0421771025797295
+    ],
+    "correction_median_um": [
+      -7.586343283787244,
+      -49.91988871224021
+    ],
+    "correction_rotation_deg": 1.2355710975993497,
+    "fixed_in_he_white_saved_refit": [
+      0.06366851945426984,
+      0.002553626149131767,
+      0.07652986051993975
+    ],
+    "ncc_window": [
+      {
+        "condition": "saved_affine",
+        "search_radius_um": 18.0,
+        "nucleus_boundary_hit_rate": 0.5843785632839225,
+        "anchor_boundary_hit_rate": 0.5830815709969789,
+        "agree_with_correlogram_within_6um_rate": 0.0
+      },
+      {
+        "condition": "saved_affine",
+        "search_radius_um": 36.0,
+        "nucleus_boundary_hit_rate": 0.5399087799315849,
+        "anchor_boundary_hit_rate": 0.540785498489426,
+        "agree_with_correlogram_within_6um_rate": 0.1087613293051359
+      },
+      {
+        "condition": "saved_affine",
+        "search_radius_um": 54.0,
+        "nucleus_boundary_hit_rate": 0.3335233751425313,
+        "anchor_boundary_hit_rate": 0.3262839879154078,
+        "agree_with_correlogram_within_6um_rate": 0.676737160120846
+      },
+      {
+        "condition": "saved_affine",
+        "search_radius_um": 72.0,
+        "nucleus_boundary_hit_rate": 0.024515393386545,
+        "anchor_boundary_hit_rate": 0.0211480362537764,
+        "agree_with_correlogram_within_6um_rate": 0.7915407854984894
+      },
+      {
+        "condition": "corrected_affine",
+        "search_radius_um": 18.0,
+        "nucleus_boundary_hit_rate": 0.048460661345496,
+        "anchor_boundary_hit_rate": 0.048780487804878,
+        "agree_with_correlogram_within_6um_rate": null
+      },
+      {
+        "condition": "corrected_affine",
+        "search_radius_um": 54.0,
+        "nucleus_boundary_hit_rate": 0.0575826681870011,
+        "anchor_boundary_hit_rate": 0.0609756097560975,
+        "agree_with_correlogram_within_6um_rate": null
+      },
+      {
+        "condition": "null_mirror_x",
+        "search_radius_um": 18.0,
+        "nucleus_boundary_hit_rate": 0.6123147092360319,
+        "anchor_boundary_hit_rate": 0.6119402985074627,
+        "agree_with_correlogram_within_6um_rate": null
+      },
+      {
+        "condition": "null_mirror_x",
+        "search_radius_um": 54.0,
+        "nucleus_boundary_hit_rate": 0.185860889395667,
+        "anchor_boundary_hit_rate": 0.1820895522388059,
+        "agree_with_correlogram_within_6um_rate": null
+      }
+    ],
+    "domain_methods": [
+      {
+        "case": "Real saved affine (baseline)",
+        "method": "Position + Graph",
+        "matched": 716,
+        "ambiguous": 698,
+        "unmatched": 340,
+        "graph_support_median": 0.2273020740913078,
+        "candidate_distance_median_um": 10.48093446182887,
+        "minimum_contextual_cost_median": 0.8043151160172507,
+        "row_mass_ratio_median": 0.2222809685014348,
+        "confidence_median": 0.5547130396387294,
+        "reciprocal_rate": 0.7126567844925884
+      },
+      {
+        "case": "Real saved affine (baseline)",
+        "method": "Relative-cost Graph-UOT",
+        "matched": 1691,
+        "ambiguous": 63,
+        "unmatched": 0,
+        "graph_support_median": 0.2274341125353023,
+        "candidate_distance_median_um": 10.623480559062276,
+        "minimum_contextual_cost_median": 0.8043151160172507,
+        "row_mass_ratio_median": 0.4658252702015449,
+        "confidence_median": 0.6283907082454946,
+        "reciprocal_rate": 0.7411630558722919
+      },
+      {
+        "case": "Real saved affine (baseline)",
+        "method": "Full contextual UOT",
+        "matched": 25,
+        "ambiguous": 434,
+        "unmatched": 1295,
+        "graph_support_median": 0.2419069643276132,
+        "candidate_distance_median_um": 14.83061412345113,
+        "minimum_contextual_cost_median": 0.8043151160172507,
+        "row_mass_ratio_median": 0.0694277440261939,
+        "confidence_median": 0.54113636377725,
+        "reciprocal_rate": 0.6584948688711516
+      },
+      {
+        "case": "Real saved affine (baseline)",
+        "method": "Separated Matching / Adoption",
+        "matched": 26,
+        "ambiguous": 209,
+        "unmatched": 1519,
+        "graph_support_median": 0.2274341125353023,
+        "candidate_distance_median_um": 10.623480559062276,
+        "minimum_contextual_cost_median": 0.8043151160172507,
+        "row_mass_ratio_median": 0.4658252702015449,
+        "confidence_median": 0.1718139672428642,
+        "reciprocal_rate": 0.7411630558722919
+      },
+      {
+        "case": "Real corrected affine (diagnostic)",
+        "method": "Position + Graph",
+        "matched": 1419,
+        "ambiguous": 129,
+        "unmatched": 206,
+        "graph_support_median": 0.8054826873836038,
+        "candidate_distance_median_um": 1.3746289946399497,
+        "minimum_contextual_cost_median": 0.1542818656790387,
+        "row_mass_ratio_median": 0.4476444078150848,
+        "confidence_median": 0.7758467733443823,
+        "reciprocal_rate": 0.8078677309007982
+      },
+      {
+        "case": "Real corrected affine (diagnostic)",
+        "method": "Relative-cost Graph-UOT",
+        "matched": 1652,
+        "ambiguous": 102,
+        "unmatched": 0,
+        "graph_support_median": 0.8047613060149239,
+        "candidate_distance_median_um": 1.3833348633212994,
+        "minimum_contextual_cost_median": 0.1542818656790387,
+        "row_mass_ratio_median": 0.5050830028999869,
+        "confidence_median": 0.7920889355073564,
+        "reciprocal_rate": 0.8135689851767389
+      },
+      {
+        "case": "Real corrected affine (diagnostic)",
+        "method": "Full contextual UOT",
+        "matched": 1161,
+        "ambiguous": 227,
+        "unmatched": 366,
+        "graph_support_median": 0.804742504960853,
+        "candidate_distance_median_um": 1.3945815712494225,
+        "minimum_contextual_cost_median": 0.1542818656790387,
+        "row_mass_ratio_median": 0.3419286584032196,
+        "confidence_median": 0.755685714697635,
+        "reciprocal_rate": 0.80672748004561
+      },
+      {
+        "case": "Real corrected affine (diagnostic)",
+        "method": "Separated Matching / Adoption",
+        "matched": 1267,
+        "ambiguous": 135,
+        "unmatched": 352,
+        "graph_support_median": 0.8047613060149239,
+        "candidate_distance_median_um": 1.3833348633212994,
+        "minimum_contextual_cost_median": 0.1542818656790387,
+        "row_mass_ratio_median": 0.5050830028999869,
+        "confidence_median": 0.9574235551553284,
+        "reciprocal_rate": 0.8135689851767389
+      },
+      {
+        "case": "Real null: moving mirrored in x",
+        "method": "Position + Graph",
+        "matched": 607,
+        "ambiguous": 770,
+        "unmatched": 377,
+        "graph_support_median": 0.1776510014058104,
+        "candidate_distance_median_um": 11.201066544654228,
+        "minimum_contextual_cost_median": 0.8511544514904743,
+        "row_mass_ratio_median": 0.21002276646407,
+        "confidence_median": 0.5482399345805702,
+        "reciprocal_rate": 0.6921322690992018
+      },
+      {
+        "case": "Real null: moving mirrored in x",
+        "method": "Relative-cost Graph-UOT",
+        "matched": 1694,
+        "ambiguous": 60,
+        "unmatched": 0,
+        "graph_support_median": 0.1782578581943715,
+        "candidate_distance_median_um": 11.318197242318575,
+        "minimum_contextual_cost_median": 0.8511544514904743,
+        "row_mass_ratio_median": 0.4515499928371111,
+        "confidence_median": 0.6231146151670319,
+        "reciprocal_rate": 0.7206385404789054
+      },
+      {
+        "case": "Real null: moving mirrored in x",
+        "method": "Full contextual UOT",
+        "matched": 14,
+        "ambiguous": 317,
+        "unmatched": 1423,
+        "graph_support_median": 0.2048388822824902,
+        "candidate_distance_median_um": 15.085139981138957,
+        "minimum_contextual_cost_median": 0.8511544514904743,
+        "row_mass_ratio_median": 0.0543452877827198,
+        "confidence_median": 0.5379255170238917,
+        "reciprocal_rate": 0.6345496009122007
+      },
+      {
+        "case": "Real null: moving mirrored in x",
+        "method": "Separated Matching / Adoption",
+        "matched": 8,
+        "ambiguous": 155,
+        "unmatched": 1591,
+        "graph_support_median": 0.1782578581943715,
+        "candidate_distance_median_um": 11.318197242318575,
+        "minimum_contextual_cost_median": 0.8511544514904743,
+        "row_mass_ratio_median": 0.4515499928371111,
+        "confidence_median": 0.1358634048661082,
+        "reciprocal_rate": 0.7206385404789054
+      }
+    ],
+    "domain_cases": [
+      {
+        "case": "Real saved affine (baseline)",
+        "ncc18_nucleus_boundary_rate": 0.5843785632839225,
+        "ncc18_anchor_boundary_rate": 0.5830815709969789,
+        "knn_median_um": 11.952622084386553,
+        "solver_all_converged": true,
+        "finite_costs": true,
+        "candidate_recall30_true": null,
+        "top1_pg_accuracy": null,
+        "top1_pg_graph_support_median": null,
+        "top1_pg_distance_median_um": null,
+        "radial_g_0_4": null,
+        "within_3um": null
+      },
+      {
+        "case": "Real corrected affine (diagnostic)",
+        "ncc18_nucleus_boundary_rate": 0.048460661345496,
+        "ncc18_anchor_boundary_rate": 0.048780487804878,
+        "knn_median_um": 12.067355781607974,
+        "solver_all_converged": true,
+        "finite_costs": true,
+        "candidate_recall30_true": null,
+        "top1_pg_accuracy": null,
+        "top1_pg_graph_support_median": null,
+        "top1_pg_distance_median_um": null,
+        "radial_g_0_4": null,
+        "within_3um": null
+      },
+      {
+        "case": "Real null: moving mirrored in x",
+        "ncc18_nucleus_boundary_rate": 0.6123147092360319,
+        "ncc18_anchor_boundary_rate": 0.6119402985074627,
+        "knn_median_um": 11.952622084386553,
+        "solver_all_converged": true,
+        "finite_costs": true,
+        "candidate_recall30_true": null,
+        "top1_pg_accuracy": null,
+        "top1_pg_graph_support_median": null,
+        "top1_pg_distance_median_um": null,
+        "radial_g_0_4": null,
+        "within_3um": null
+      },
+      {
+        "case": "Synthetic 4101 Weak: correct affine",
+        "ncc18_nucleus_boundary_rate": 0.0,
+        "ncc18_anchor_boundary_rate": 0.0,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 1.0,
+        "top1_pg_accuracy": 0.9724137931034482,
+        "top1_pg_graph_support_median": 0.7132750993770784,
+        "top1_pg_distance_median_um": 3.21493661269683,
+        "radial_g_0_4": 9.202963917525771,
+        "within_3um": 0.4722222222222222
+      },
+      {
+        "case": "Synthetic 4101 Weak: Real-measured residual injected",
+        "ncc18_nucleus_boundary_rate": 0.4907407407407407,
+        "ncc18_anchor_boundary_rate": 0.525,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 0.9448275862068966,
+        "top1_pg_accuracy": 0.0275862068965517,
+        "top1_pg_graph_support_median": 0.1489953548562761,
+        "top1_pg_distance_median_um": 12.338274130891614,
+        "radial_g_0_4": 1.1643302180685358,
+        "within_3um": 0.0509259259259259
+      },
+      {
+        "case": "Synthetic 4102 Moderate: correct affine",
+        "ncc18_nucleus_boundary_rate": 0.0239234449760765,
+        "ncc18_anchor_boundary_rate": 0.027027027027027,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 1.0,
+        "top1_pg_accuracy": 0.9448275862068966,
+        "top1_pg_graph_support_median": 0.7182687281845839,
+        "top1_pg_distance_median_um": 4.893735451042772,
+        "radial_g_0_4": 3.4560104529616726,
+        "within_3um": 0.1913875598086124
+      },
+      {
+        "case": "Synthetic 4102 Moderate: Real-measured residual injected",
+        "ncc18_nucleus_boundary_rate": 0.6602870813397129,
+        "ncc18_anchor_boundary_rate": 0.6571428571428571,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 0.8413793103448276,
+        "top1_pg_accuracy": 0.0137931034482758,
+        "top1_pg_graph_support_median": 0.1617166207277862,
+        "top1_pg_distance_median_um": 11.833431697730488,
+        "radial_g_0_4": 0.988320846187748,
+        "within_3um": 0.0574162679425837
+      },
+      {
+        "case": "Synthetic 4103 Strong: correct affine",
+        "ncc18_nucleus_boundary_rate": 0.0,
+        "ncc18_anchor_boundary_rate": 0.0,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 1.0,
+        "top1_pg_accuracy": 0.8740157480314961,
+        "top1_pg_graph_support_median": 0.6165381112300485,
+        "top1_pg_distance_median_um": 7.431969180426885,
+        "radial_g_0_4": 1.975892381459776,
+        "within_3um": 0.0817307692307692
+      },
+      {
+        "case": "Synthetic 4103 Strong: Real-measured residual injected",
+        "ncc18_nucleus_boundary_rate": 0.7836538461538461,
+        "ncc18_anchor_boundary_rate": 0.7714285714285715,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 0.937007874015748,
+        "top1_pg_accuracy": 0.0236220472440944,
+        "top1_pg_graph_support_median": 0.133792771137941,
+        "top1_pg_distance_median_um": 12.084225948839595,
+        "radial_g_0_4": 0.6352902946273831,
+        "within_3um": 0.0384615384615384
+      },
+      {
+        "case": "Synthetic 4104 Weak: correct affine",
+        "ncc18_nucleus_boundary_rate": 0.0524017467248908,
+        "ncc18_anchor_boundary_rate": 0.0526315789473684,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 1.0,
+        "top1_pg_accuracy": 0.9936708860759492,
+        "top1_pg_graph_support_median": 0.7716091524487929,
+        "top1_pg_distance_median_um": 3.04574300660264,
+        "radial_g_0_4": 8.156290115532734,
+        "within_3um": 0.4934497816593886
+      },
+      {
+        "case": "Synthetic 4104 Weak: Real-measured residual injected",
+        "ncc18_nucleus_boundary_rate": 0.8384279475982532,
+        "ncc18_anchor_boundary_rate": 0.8205128205128205,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 0.8607594936708861,
+        "top1_pg_accuracy": 0.0126582278481012,
+        "top1_pg_graph_support_median": 0.1113338628725318,
+        "top1_pg_distance_median_um": 11.934216546623176,
+        "radial_g_0_4": 1.477747597158379,
+        "within_3um": 0.0917030567685589
+      },
+      {
+        "case": "Synthetic 4105 Moderate: correct affine",
+        "ncc18_nucleus_boundary_rate": 0.0426540284360189,
+        "ncc18_anchor_boundary_rate": 0.048780487804878,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 1.0,
+        "top1_pg_accuracy": 0.93006993006993,
+        "top1_pg_graph_support_median": 0.7257269933096692,
+        "top1_pg_distance_median_um": 5.515955895252416,
+        "radial_g_0_4": 3.641952309985097,
+        "within_3um": 0.1706161137440758
+      },
+      {
+        "case": "Synthetic 4105 Moderate: Real-measured residual injected",
+        "ncc18_nucleus_boundary_rate": 0.6398104265402843,
+        "ncc18_anchor_boundary_rate": 0.625,
+        "knn_median_um": null,
+        "solver_all_converged": null,
+        "finite_costs": null,
+        "candidate_recall30_true": 0.916083916083916,
+        "top1_pg_accuracy": 0.0209790209790209,
+        "top1_pg_graph_support_median": 0.1254306116929244,
+        "top1_pg_distance_median_um": 12.495199602967608,
+        "radial_g_0_4": 1.037593984962406,
+        "within_3um": 0.0521327014218009
+      }
+    ],
+    "candidates": {
+      "stored_candidate_hash_reproduced": true,
+      "graph_fast_vs_frozen_max_abs_diff": 5.551115123125783e-17,
+      "graph_fast_runtime_s": 166.4346432685852,
+      "union_size_median": 37.0,
+      "spatial_nn_in_final_rate": 1.0,
+      "putative_partner_rate_saved_proxy": 0.7314709236031927,
+      "putative_partner_rate_corrected": 0.7377423033067275,
+      "putative_partner_rate_null": 0.07525655644241733,
+      "proxy_vs_corrected_partner_agreement": 0.9976377952755906,
+      "partner_saved_proxy_in_spatial30": 0.9649259547934529,
+      "partner_saved_proxy_in_regional30": 0.8308651597817615,
+      "partner_saved_proxy_in_fingerprint30": 0.818394388152767,
+      "partner_saved_proxy_in_union": 0.9540140296180826,
+      "partner_saved_proxy_in_final30": 0.9438815276695246,
+      "partner_saved_proxy_is_top1": 0.000779423226812159,
+      "partner_saved_proxy_distance_median_um": 50.17002557832412,
+      "partner_saved_proxy_spatial_rank_median": 16.0
+    }
+  },
+  "reproducibility": {
+    "ncc_vectorized_vs_frozen": {
+      "anchors_equal": true,
+      "best_offsets_equal": true,
+      "best_ncc_max_abs_diff": 1.27675647831893e-15,
+      "second_ncc_max_abs_diff": 1.9984014443252818e-15,
+      "cell_offsets_equal": true,
+      "cell_confidence_max_abs_diff": 3.3306690738754696e-15,
+      "frozen_runtime_s": 18.279934406280518,
+      "vectorized_runtime_s": 5.148964166641235
+    },
+    "b2_refit_reproduces_stored": true,
+    "candidate_hash_reproduced": true,
+    "graph_fast_vs_frozen_max_abs_diff": 5.551115123125783e-17,
+    "all_uot_solvers_converged": true,
+    "all_costs_finite": true
+  },
+  "spatial_correlations_naive": {
+    "graph_support_vs_ncc18_boundary_hit_rate": {
+      "spearman_r": -0.4394273591139934,
+      "p_naive": 4.7863822931294585e-06,
+      "n_blocks": 100
+    },
+    "graph_support_vs_nn_distance_median_um": {
+      "spearman_r": -0.6371077107710771,
+      "p_naive": 1.032184578338344e-12,
+      "n_blocks": 100
+    },
+    "graph_support_vs_putative_partner_rate": {
+      "spearman_r": 0.18449183976084357,
+      "p_naive": 0.06613159621115569,
+      "n_blocks": 100
+    },
+    "graph_support_vs_moving_density_per_um2": {
+      "spearman_r": 0.09181791775999376,
+      "p_naive": 0.363584262415028,
+      "n_blocks": 100
+    },
+    "graph_support_vs_candidate_distance_median_um": {
+      "spearman_r": -0.5409900990099009,
+      "p_naive": 6.216773842465544e-09,
+      "n_blocks": 100
+    }
+  },
+  "codex_audit_compared": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/real-affine-candidate-audit-20261014",
+  "changes_outside_this_directory": "none (sha256 of tracked files and prior analysis files verified before/after)"
+}

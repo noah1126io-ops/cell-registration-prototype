@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-08",
+  "branch": "feature/gpu-slurm",
+  "git_head": "f66ecbe5bfb691dd18695d34702a3fd13c3dcf7a",
+  "python": "3.11.16",
+  "numpy": "2.4.6",
+  "source_files_modified": false,
+  "workflow_integration_performed": false
+}
