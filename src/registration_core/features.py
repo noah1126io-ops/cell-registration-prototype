@@ -1,0 +1,157 @@
+"""Modality-specific extraction of *comparable structural* maps on a common physical grid.
+
+Raw HE vs IF intensities are never compared. Each modality is mapped to the same three representations:
+  tissue   : continuous stain occupancy at ~6 um (HE optical density / IF any-channel signal), percentile
+             normalised -> outer boundaries, interstitial clefts, lumina (tissue_bin = Otsu of the same map)
+  nuclear  : nuclear stain probability (HE hematoxylin via colour deconvolution / IF B-R Hoechst estimate)
+  edt      : signed distance to the tissue envelope edge (um, clipped), inside positive
+  occ      : stain occupancy that does not come from nuclei (HE optical density / IF max(G, R), Hoechst B excluded),
+             cell-scale smoothed and saturated at the median tissue level -> myocardium ~1, clefts / lumen / slide ~0
+  cleft    : 1 + band-pass(1 - occ) (minus a 60 um local mean) -> interstitial cleft network (offset +1 because the
+             search normalises maps by their mean; masked NCC is offset invariant)
+(occ / cleft added 2026-10-27: the 'tissue' map of IF is max over all channels and is dominated by the nuclear
+ Hoechst channel, so on adjacent sections it carried nuclear texture instead of tissue structure.)
+All maps live on a frame-local grid: world_um = (col, row) * res_um  (origin = frame origin).
+"""
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass, field
+
+import numpy as np
+from scipy.ndimage import (binary_closing, binary_fill_holes, binary_opening, distance_transform_edt,
+                           gaussian_filter, zoom)
+from skimage.color import rgb2hed
+from skimage.filters import threshold_otsu
+
+import tifffile
+
+from .frames import Frame
+
+
+@dataclass
+class Modality:
+    """Minimal input for feature extraction (duck-type compatible with oir.sample.Modality)."""
+    frame: Frame
+    nuclei_um: np.ndarray
+
+
+def read_level(path, k):
+    with tifffile.TiffFile(path) as t:
+        return t.series[0].levels[k].asarray()
+
+FEATURES = ("tissue", "nuclear", "edt", "occ", "cleft")
+
+
+def occupancy(x, res_um, sigma_um=6.0):
+    """Saturated stain occupancy: clip((s - p5) / (median of s above Otsu - p5), 0, 1), s = cell-scale smoothed x."""
+    s = gaussian_filter(x, sigma_um / res_um)
+    p5 = float(np.percentile(s, 5))
+    thr = threshold_otsu(s[::2, ::2])
+    hi = float(np.median(s[s > thr]))
+    return np.clip((s - p5) / max(hi - p5, 1e-9), 0, 1)
+
+
+@dataclass
+class FeatureMaps:
+    frame: str
+    modality: str
+    res_um: float
+    maps: dict                        # name -> 2-D float array
+    fov: np.ndarray                   # 1 inside the imaged field
+    quality: dict = field(default_factory=dict)
+    runtime_s: float = 0.0
+    source_level: int = 0
+
+    @property
+    def shape(self):
+        return self.fov.shape
+
+
+def _pick_level(mod: Modality, res_um):
+    ds = np.asarray(mod.frame.pyramid_downsamples)
+    ok = np.where(ds * mod.frame.pixel_um <= res_um * 0.75 + 1e-9)[0]      # at least ~1.3x oversampling
+    return int(ok.max()) if len(ok) else 0
+
+
+def _to_grid(a, src_um, res_um, order=1):
+    return zoom(a, src_um / res_um, order=order, prefilter=False)
+
+
+def _norm01(x, mask):
+    v = x[mask > 0]
+    lo, hi = np.percentile(v, [1, 99.5]) if v.size else (0, 1)
+    return np.clip((x - lo) / max(hi - lo, 1e-9), 0, 1)
+
+
+def extract(mod: Modality, res_um=2.0, tissue_sigma_um=6.0, nuc_sigma_um=2.0, edt_clip_um=60.0, level=None, cleft_bandpass_um=60.0):
+    t0 = time.perf_counter()
+    lvl = _pick_level(mod, res_um) if level is None else level
+    ds = mod.frame.pyramid_downsamples[lvl]
+    src_um = mod.frame.pixel_um * ds
+    img = read_level(mod.frame.image_path, lvl).astype(np.float32)
+    if mod.frame.modality == "HE":
+        od = -np.log((img + 1.0) / 256.0).sum(-1)                     # optical density (sum RGB)
+        nuc = rgb2hed(np.clip(img / 255.0, 0, 1))[..., 0]               # hematoxylin
+        occ_src = od
+    else:
+        od = img.max(-1)                                                # any-channel signal (display rendering)
+        nuc = np.clip(img[..., 2] - img[..., 0], 0, None)               # Hoechst estimate (B - Desmoplakin R)
+        occ_src = np.maximum(img[..., 1], img[..., 0])                  # non-nuclear stains only (G, R)
+    od = _to_grid(od, src_um, res_um); nuc = _to_grid(nuc, src_um, res_um); occ_src = _to_grid(occ_src, src_um, res_um)
+    H, W = od.shape
+    fov = np.ones((H, W), np.float32)
+    ods = gaussian_filter(od, tissue_sigma_um / res_um)
+    thr = threshold_otsu(ods[::2, ::2])
+    tissue_bin = ods > thr
+    tissue_bin = binary_opening(tissue_bin, iterations=1)
+    env = binary_fill_holes(binary_closing(tissue_bin, iterations=int(round(30 / res_um)), border_value=0))
+    # envelope edges that coincide with the image border are not tissue edges
+    edt_in = distance_transform_edt(np.pad(env, 1, mode="edge"))[1:-1, 1:-1]
+    edt_out = distance_transform_edt(np.pad(~env, 1, mode="edge"))[1:-1, 1:-1]
+    edt = np.clip((edt_in - edt_out) * res_um, -edt_clip_um, edt_clip_um) / edt_clip_um
+    # continuous occupancy (stain present at ~cell scale): myocytes vs clefts / lumen / background
+    tissue = _norm01(ods, fov)
+    nucn = _norm01(gaussian_filter(nuc, nuc_sigma_um / res_um), tissue_bin)
+    occ = occupancy(occ_src, res_um, tissue_sigma_um)
+    cl = 1.0 - occ
+    cleft = 1.0 + cl - gaussian_filter(cl, cleft_bandpass_um / res_um)
+    # quality: own nuclei should sit on high nuclear signal and inside tissue
+    pts = mod.nuclei_um / res_um
+    ij = np.rint(pts).astype(int)
+    okp = (ij[:, 0] >= 0) & (ij[:, 0] < W) & (ij[:, 1] >= 0) & (ij[:, 1] < H)
+    at_n = nucn[ij[okp, 1], ij[okp, 0]]
+    rng = np.random.default_rng(0)
+    tis_idx = np.argwhere(tissue_bin)
+    rnd = tis_idx[rng.choice(len(tis_idx), min(20000, len(tis_idx)), replace=False)] if len(tis_idx) else np.zeros((0, 2), int)
+    at_r = nucn[rnd[:, 0], rnd[:, 1]]
+    from .metrics import auc
+    q = {"tissue_fraction_fov": float(tissue_bin.mean()), "envelope_fraction_fov": float(env.mean()),
+         "otsu_threshold": float(thr), "nuclei_in_tissue_fraction": float(tissue_bin[ij[okp, 1], ij[okp, 0]].mean()) if okp.any() else np.nan,
+         "nuclear_map_auc_own_nuclei_vs_tissue": auc(at_n, at_r) if len(at_n) and len(at_r) else np.nan,
+         "source_level": lvl, "source_um_per_px": src_um}
+    q["usable"] = bool(0.02 < q["tissue_fraction_fov"] < 0.995 and (q["nuclear_map_auc_own_nuclei_vs_tissue"] or 0) > 0.7)
+    q["reasons"] = [] if q["usable"] else [k for k, bad in (("tissue fraction out of range", not 0.02 < q["tissue_fraction_fov"] < 0.995),
+                                                             ("nuclear map does not match own nuclei (AUC<=0.7)", not (q["nuclear_map_auc_own_nuclei_vs_tissue"] or 0) > 0.7)) if bad]
+    return FeatureMaps(mod.frame.name, mod.frame.modality, res_um,
+                       {"tissue": tissue.astype(np.float32), "nuclear": nucn.astype(np.float32), "edt": edt.astype(np.float32),
+                        "occ": occ.astype(np.float32), "cleft": cleft.astype(np.float32),
+                        "tissue_bin": tissue_bin, "envelope": env},
+                       fov, q, time.perf_counter() - t0, lvl)
+
+
+def coarsen(fm: FeatureMaps, res_um):
+    """Area-average an existing FeatureMaps to a coarser grid (search pyramid)."""
+    f = fm.res_um / res_um
+    maps = {k: zoom(v.astype(np.float32), f, order=1, prefilter=False) for k, v in fm.maps.items() if k in FEATURES}
+    fov = zoom(fm.fov, f, order=0)
+    return FeatureMaps(fm.frame, fm.modality, res_um, maps, fov, fm.quality, 0.0, fm.source_level)
+
+
+def point_density(points_um, shape, res_um, sigma_um=8.0):
+    """A2-style Gaussian nuclear density on the same frame grid (for joint/point scores)."""
+    img = np.zeros(shape, np.float32)
+    ij = np.rint(np.asarray(points_um) / res_um).astype(int)
+    ok = (ij[:, 0] >= 0) & (ij[:, 0] < shape[1]) & (ij[:, 1] >= 0) & (ij[:, 1] < shape[0])
+    np.add.at(img, (ij[ok, 1], ij[ok, 0]), 1.0)
+    return gaussian_filter(img, sigma_um / res_um)

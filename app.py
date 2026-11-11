@@ -116,6 +116,7 @@ from src.workflow_d import (
     run_workflow_d_raster_deformation,
 )
 from src.runtime_instrumentation import RuntimeRecorder
+from src.registration_explorer import PAGE_LABEL as REGISTRATION_EXPLORER_LABEL, research_mode_enabled
 
 
 st.set_page_config(
@@ -1540,6 +1541,11 @@ def show_he_geojson_preparation() -> None:
             tr("Affine ICPの採用分位", "Affine ICP trim quantile"), 0.1, 1.0, 0.7, 0.05,
             key="workflow-c-affine-trim", help=tr("アフィンICPで残す近い対応の割合です。", "Fraction of nearest pairs retained during affine ICP."),
         )
+    # Research mode only (CELLREG_RESEARCH_MODE): explicit opt-in to an accepted research Workflow C global affine.
+    research_global_artifact = None
+    if research_mode_enabled():
+        from src import workflow_c_research
+        research_global_artifact = workflow_c_research.research_global_panel(st, tr)
 
     # Hidden methods keep the exact defaults from the original UI.
     match_radius, fine_bandwidth, grid_spacing, ridge = 10.0, 12.0, 6.0, 0.3
@@ -2357,11 +2363,16 @@ def show_he_geojson_preparation() -> None:
                     "auto": None, "none": ((False, False),), "x": ((True, False),),
                     "y": ((False, True),), "x+y": ((True, True),),
                 }[flip_mode]
-                prepared_affine = estimate_affine_with_y_flip(
-                    original_moving, fixed_all, image_height_px=image_height,
-                    image_width_px=image_width, flip_candidates=flip_candidates,
-                    similarity_trim_quantile=similarity_trim, affine_trim_quantile=affine_trim,
-                )
+                if research_global_artifact is not None:
+                    prepared_affine = workflow_c_research.affine_from_research(
+                        research_global_artifact, original_moving, fixed_all, image_width, image_height
+                    )
+                else:
+                    prepared_affine = estimate_affine_with_y_flip(
+                        original_moving, fixed_all, image_height_px=image_height,
+                        image_width_px=image_width, flip_candidates=flip_candidates,
+                        similarity_trim_quantile=similarity_trim, affine_trim_quantile=affine_trim,
+                    )
                 prepared_image = prepared_mask = prepared_metadata = None
                 fixed_for_flow = fixed_all
                 metric_fixed = fixed_all
@@ -2581,15 +2592,20 @@ def show_he_geojson_preparation() -> None:
             "x+y": ((True, True),),
         }[flip_mode]
         affine_started = workflow_runtime.start()
-        affine_result = estimate_affine_with_y_flip(
-            he_array,
-            geojson_array,
-            image_height_px=image_height_px,
-            image_width_px=image_width_px,
-            flip_candidates=flip_candidates,
-            similarity_trim_quantile=similarity_trim,
-            affine_trim_quantile=affine_trim,
-        )
+        if research_global_artifact is not None:
+            affine_result = workflow_c_research.affine_from_research(
+                research_global_artifact, he_array, geojson_array, image_width_px, image_height_px
+            )
+        else:
+            affine_result = estimate_affine_with_y_flip(
+                he_array,
+                geojson_array,
+                image_height_px=image_height_px,
+                image_width_px=image_width_px,
+                flip_candidates=flip_candidates,
+                similarity_trim_quantile=similarity_trim,
+                affine_trim_quantile=affine_trim,
+            )
         workflow_runtime.stop("affine_icp", affine_started)
         fine_target_array = geojson_array
         fine_target_weights = np.ones(len(geojson_array), dtype=float)
@@ -6128,16 +6144,24 @@ def main() -> None:
     st.title("Cell Registration Prototype")
     st.caption("Research prototype for point-based registration, matching, and QC. Not for diagnostic use.")
 
+    workflow_options = [
+        "Workflow A: Point registration",
+        "Workflow B: Mask-derived point registration",
+        "Workflow C: Point Registration",
+        WORKFLOW_D_LABEL,
+    ]
+    if research_mode_enabled():
+        workflow_options.append(REGISTRATION_EXPLORER_LABEL)
     workflow = st.sidebar.selectbox(
         "Workflow",
-        [
-            "Workflow A: Point registration",
-            "Workflow B: Mask-derived point registration",
-            "Workflow C: Point Registration",
-            WORKFLOW_D_LABEL,
-        ],
+        workflow_options,
         key=WORKFLOW_SELECTOR_KEY,
     )
+    if workflow == REGISTRATION_EXPLORER_LABEL:
+        from src.registration_explorer.page import show_registration_explorer
+
+        show_registration_explorer()
+        return
     st.sidebar.divider()
     density_sigma = st.sidebar.slider("Density map sigma", min_value=1.0, max_value=100.0, value=10.0, step=1.0)
     st.sidebar.divider()

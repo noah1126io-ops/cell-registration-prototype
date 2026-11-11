@@ -1,0 +1,192 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+:root{--bg:#0f1115;--panel:#181b22;--fg:#e8eaed;--mut:#9aa0a6;--acc:#4fc3f7}
+body{margin:0;background:var(--bg);color:var(--fg);font:12px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+#wrap{display:flex;gap:8px;height:560px}
+#side{width:240px;flex:none;background:var(--panel);padding:8px;overflow-y:auto;border-radius:6px}
+#cv{flex:1;min-width:0;background:#000;border-radius:6px;cursor:grab;touch-action:none}
+h4{margin:8px 0 4px;font-size:12px;color:var(--acc)}
+label{display:flex;align-items:center;gap:6px;margin:2px 0}
+input[type=range]{width:100%}
+.ban{padding:6px 8px;border-radius:4px;margin-bottom:6px;font-weight:600}
+.ban.ok{background:#1b5e20}.ban.warn{background:#8a5300}.ban.err{background:#8e1c1c}.ban.info{background:#263238}
+#hud{position:absolute;left:256px;top:6px;background:rgba(0,0,0,.6);padding:3px 6px;border-radius:4px;pointer-events:none;white-space:pre}
+#leg{margin-top:6px;color:var(--mut)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+button{background:#263238;color:var(--fg);border:1px solid #37474f;border-radius:4px;padding:3px 8px;cursor:pointer}
+select{background:#263238;color:var(--fg);border:1px solid #37474f;border-radius:4px}
+</style></head><body>
+<div id="wrap"><div id="side"></div><canvas id="cv"></canvas></div><div id="hud"></div>
+<script>
+function boot(S, API) {
+// (re)boot: drop listeners of a previous scene (component re-render) and clear the side panel
+if (window.__ac) window.__ac.abort();
+window.__ac = new AbortController(); const SIG = {signal: window.__ac.signal};
+if (window.__ro) window.__ro.disconnect();
+{ const old = document.getElementById('cv'); const fresh = old.cloneNode(false); old.replaceWith(fresh); }
+document.getElementById('side').innerHTML = '';
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), side = document.getElementById('side'), hud = document.getElementById('hud');
+const st = {mode: S.default_mode || 'overlay', alpha: 0.5, checker: S.checker_um || 100, ptsize: 1.0, view: null};
+window.__regx = {S: S, st: st, API: API};      // read-only handle for automated display checks
+const imgs = {};
+let pending = 0;
+for (const L of S.images) { const im = new Image(); pending++; im.onload = () => { if (--pending === 0) draw(); }; im.src = L.src; imgs[L.id] = im; }
+
+function el(tag, attrs, html){ const e = document.createElement(tag); Object.assign(e, attrs||{}); if (html!==undefined) e.innerHTML = html; return e; }
+function addCheck(parent, obj, label, color){
+  const l = el('label'); const c = el('input', {type:'checkbox', checked: obj.visible});
+  c.onchange = () => { obj.visible = c.checked; draw(); };
+  l.appendChild(c); if (color) l.appendChild(el('span', {className:'sw', style:'background:'+color})); l.appendChild(document.createTextNode(label)); parent.appendChild(l);
+}
+// ---------------- side panel
+for (const b of (S.banners||[])) side.appendChild(el('div', {className:'ban '+b.level, textContent: b.text}));
+side.appendChild(el('div', {style:'color:var(--mut)', textContent: S.frame_note || ''}));
+side.appendChild(el('h4', {}, '表示モード'));
+const sel = el('select'); for (const [k,v] of [['overlay','重ね合わせ'],['fixed','Fixed画像のみ'],['moving','Moving画像のみ'],['checker','チェッカーボード']]) sel.appendChild(el('option', {value:k}, v));
+sel.value = st.mode; sel.onchange = () => { st.mode = sel.value; draw(); saveView(); }; side.appendChild(sel);
+side.appendChild(el('h4', {}, 'Moving画像の透明度'));
+const al = el('input', {type:'range', min:0, max:1, step:0.05, value:st.alpha}); al.oninput = () => { st.alpha = +al.value; draw(); saveView(); }; side.appendChild(al);
+side.appendChild(el('h4', {}, 'チェッカー幅 (' + S.units + ')'));
+const ck = el('input', {type:'range', min:10, max:500, step:10, value:st.checker}); ck.oninput = () => { st.checker = +ck.value; draw(); }; side.appendChild(ck);
+if (S.images.length) { side.appendChild(el('h4', {}, '画像')); for (const L of S.images) addCheck(side, L, L.label); }
+if (S.points.length) { side.appendChild(el('h4', {}, '核点群')); for (const L of S.points) addCheck(side, L, L.label + ' (' + (L.xy.length/2) + ')', L.color);
+  side.appendChild(el('div', {style:'color:var(--mut)'}, 'マーカーサイズ'));
+  const ps = el('input', {type:'range', min:0.3, max:4, step:0.1, value:1}); ps.oninput = () => { st.ptsize = +ps.value; draw(); }; side.appendChild(ps); }
+if (S.vectors) { side.appendChild(el('h4', {}, '推定対応・残留変位')); addCheck(side, S.vectors, S.vectors.label);
+  side.appendChild(el('div', {style:'color:var(--mut)'}, '色: <span class="sw" style="background:#66bb6a"></span>≤3 <span class="sw" style="background:#ffa726"></span>≤5 <span class="sw" style="background:#ef5350"></span>>5 ' + S.units + '<br>推定対応は同一細胞の証明ではありません')); }
+if (S.polys.length) { side.appendChild(el('h4', {}, '領域')); for (const L of S.polys) if (L.label) addCheck(side, L, L.label, L.color); }
+const rb = el('button', {}, '表示をリセット'); rb.onclick = () => { saved = null; st.touched = false; fit(); draw(); saveView(); }; side.appendChild(el('div', {style:'margin-top:8px'})).appendChild(rb);
+side.appendChild(el('div', {id:'leg'}, 'ホイール: ズーム / ドラッグ: パン<br>座標: ' + S.frame_name + ' (' + S.units + ')'));
+
+// ---------------- view transform (world -> screen):  s = k * w + o
+function fit(){
+  const b = S.bounds; const W = cv.width, H = cv.height;
+  if (W < 2 || H < 2) { st.view = null; return; }      // hidden (e.g. inactive tab): fit once visible
+  const k = Math.min(W / (b[2]-b[0]), H / (b[3]-b[1])) * 0.95;
+  st.view = {k: k, ox: W/2 - k*(b[0]+b[2])/2, oy: H/2 - k*(b[1]+b[3])/2};
+}
+// optional view persistence across Streamlit reruns (manual adjustment): world centre + zoom, per view_key
+function saveView(){ if (!S.view_key || !st.view) return; try { sessionStorage.setItem('regx-view-' + S.view_key, JSON.stringify({k: st.view.k,
+  cx: (cv.width/2 - st.view.ox)/st.view.k, cy: (cv.height/2 - st.view.oy)/st.view.k, mode: st.mode, alpha: st.alpha})); } catch (e) {} }
+function loadView(){ if (!S.view_key) return null; try { return JSON.parse(sessionStorage.getItem('regx-view-' + S.view_key) || 'null'); } catch (e) { return null; } }
+let saved = loadView();
+if (saved) { st.mode = saved.mode || st.mode; st.alpha = (saved.alpha ?? st.alpha); sel.value = st.mode; al.value = st.alpha; }
+function resize(){ const r = cv.getBoundingClientRect(); const dpr = window.devicePixelRatio||1; cv.width = r.width*dpr; cv.height = r.height*dpr;
+  if (saved && !st.touched && cv.width > 1) { st.view = {k: saved.k, ox: cv.width/2 - saved.k*saved.cx, oy: cv.height/2 - saved.k*saved.cy}; st.touched = true; }
+  else if (!st.view || !st.touched) fit();
+  draw(); }
+if (window.ResizeObserver) { window.__ro = new ResizeObserver(() => resize()); window.__ro.observe(cv); }
+function setView(){ const v = st.view; ctx.setTransform(v.k, 0, 0, v.k, v.ox, v.oy); }
+function drawImageLayer(L){ const im = imgs[L.id]; if (!im || !im.complete) return; ctx.save(); setView(); ctx.transform(L.m[0],L.m[1],L.m[2],L.m[3],L.m[4],L.m[5]); ctx.imageSmoothingEnabled = st.view.k*Math.hypot(L.m[0],L.m[1]) < 2; ctx.drawImage(im, 0, 0); ctx.restore(); }
+function checkerClip(){
+  const v = st.view, c = st.checker; const x0 = (-v.ox)/v.k, y0 = (-v.oy)/v.k, x1 = (cv.width-v.ox)/v.k, y1 = (cv.height-v.oy)/v.k;
+  ctx.beginPath(); for (let i = Math.floor(x0/c); i*c < x1; i++) for (let j = Math.floor(y0/c); j*c < y1; j++) if (((i+j)%2+2)%2 === 0) ctx.rect(i*c, j*c, c, c);
+  ctx.clip();
+}
+function draw(){
+  if (!st.view) return;
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = '#000'; ctx.fillRect(0,0,cv.width,cv.height);
+  const fixedL = S.images.filter(L => L.role === 'fixed' && L.visible), movL = S.images.filter(L => L.role === 'moving' && L.visible);
+  if (st.mode !== 'moving') for (const L of fixedL) drawImageLayer(L);
+  if (st.mode !== 'fixed') {
+    ctx.save();
+    if (st.mode === 'checker') { setView(); checkerClip(); ctx.globalAlpha = 1; }
+    else if (st.mode === 'overlay') ctx.globalAlpha = st.alpha;
+    for (const L of movL) { const im = imgs[L.id]; if (!im) continue; ctx.save(); setView(); ctx.transform(L.m[0],L.m[1],L.m[2],L.m[3],L.m[4],L.m[5]); ctx.drawImage(im,0,0); ctx.restore(); }
+    ctx.restore();
+  }
+  const v = st.view;
+  for (const L of S.polys) { if (!L.visible) continue; ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.beginPath();
+    for (const P of (L.multi || [L.pts])) { for (let i = 0; i < P.length; i += 2) { const x = P[i]*v.k+v.ox, y = P[i+1]*v.k+v.oy; i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }
+      if (L.closed) ctx.closePath(); }
+    if (L.fill) { ctx.fillStyle = L.fill; ctx.fill(); }
+    ctx.setLineDash(L.dash); ctx.lineWidth = L.w; ctx.strokeStyle = L.color; ctx.stroke(); ctx.restore(); }
+  if (S.vectors && S.vectors.visible) { const V = S.vectors; ctx.setTransform(1,0,0,1,0,0); ctx.lineWidth = 1.2;
+    for (let i = 0, n = V.d.length; i < n; i++) { const d = V.d[i]; ctx.strokeStyle = d <= 3 ? '#66bb6a' : (d <= 5 ? '#ffa726' : '#ef5350');
+      ctx.beginPath(); ctx.moveTo(V.a[2*i]*v.k+v.ox, V.a[2*i+1]*v.k+v.oy); ctx.lineTo(V.b[2*i]*v.k+v.ox, V.b[2*i+1]*v.k+v.oy); ctx.stroke(); } }
+  for (const L of S.points) { if (!L.visible) continue; ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle = L.color;
+    const r = Math.max(0.6, L.r * st.ptsize * Math.min(1.5, Math.max(0.5, Math.sqrt(v.k)))); const xy = L.xy;
+    for (let i = 0; i < xy.length; i += 2) { const x = xy[i]*v.k+v.ox, y = xy[i+1]*v.k+v.oy; if (x < -5 || y < -5 || x > cv.width+5 || y > cv.height+5) continue; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); } }
+  // scale bar
+  ctx.setTransform(1,0,0,1,0,0); const target = 120 / v.k; const pw = Math.pow(10, Math.floor(Math.log10(target))); const len = [1,2,5,10].map(m=>m*pw).filter(x=>x<=target).pop() || pw;
+  ctx.fillStyle = '#fff'; ctx.fillRect(16, cv.height-24, len*v.k, 4); ctx.font = (12*(window.devicePixelRatio||1))+'px system-ui'; ctx.fillText(len + ' ' + S.units, 16, cv.height-30);
+  if (API) API.overlay(ctx, v);
+}
+function worldOf(e){ const dpr = window.devicePixelRatio||1; const r = cv.getBoundingClientRect();
+  return [((e.clientX - r.left)*dpr - st.view.ox)/st.view.k, ((e.clientY - r.top)*dpr - st.view.oy)/st.view.k]; }
+// ---------------- interaction
+let drag = null;
+cv.addEventListener('pointerdown', e => { if (!st.view) return; if (API && API.mode !== 'view') { cv.setPointerCapture(e.pointerId); API.down(worldOf(e), e); draw(); return; } st.touched = true; drag = {x: e.clientX, y: e.clientY, ox: st.view.ox, oy: st.view.oy}; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; });
+cv.addEventListener('pointerup', e => { if (API && API.mode !== 'view') { API.up(worldOf(e), e); draw(); return; } drag = null; cv.style.cursor = 'grab'; saveView(); });
+cv.addEventListener('pointermove', e => { if (!st.view) return; const dpr = window.devicePixelRatio||1; const r = cv.getBoundingClientRect();
+  const sx = (e.clientX - r.left)*dpr, sy = (e.clientY - r.top)*dpr; const wx = (sx - st.view.ox)/st.view.k, wy = (sy - st.view.oy)/st.view.k;
+  hud.textContent = S.frame_name + '  x=' + wx.toFixed(1) + '  y=' + wy.toFixed(1) + ' ' + S.units;
+  if (API && API.mode !== 'view') { if (API.move(worldOf(e), e)) draw(); return; }
+  if (drag) { st.view.ox = drag.ox + (e.clientX - drag.x)*dpr; st.view.oy = drag.oy + (e.clientY - drag.y)*dpr; draw(); } });
+cv.addEventListener('wheel', e => { e.preventDefault(); if (!st.view) return; st.touched = true; const dpr = window.devicePixelRatio||1; const r = cv.getBoundingClientRect();
+  const sx = (e.clientX - r.left)*dpr, sy = (e.clientY - r.top)*dpr; const f = Math.exp(-e.deltaY * 0.0015);
+  st.view.ox = sx - (sx - st.view.ox)*f; st.view.oy = sy - (sy - st.view.oy)*f; st.view.k *= f; draw(); saveView(); }, {passive: false});
+window.addEventListener('resize', resize, SIG);
+if (API) API.panel(side, el, () => draw());
+resize();
+}
+
+// ---- bidirectional Streamlit component (custom-component protocol, no build step)
+function send(type, data){ window.parent.postMessage(Object.assign({isStreamlitMessage: true, type: type}, data || {}), '*'); }
+function emit(data){ send('streamlit:setComponentValue', {value: Object.assign({nonce: Date.now() + '-' + Math.random().toString(16).slice(2)}, data), dataType: 'json'}); }
+function polyArea(P){ let a = 0; for (let i = 0, n = P.length/2; i < n; i++) { const j = (i+1)%n; a += P[2*i]*P[2*j+1] - P[2*j]*P[2*i+1]; } return Math.abs(a)/2; }
+function inPoly(x, y, P){ let c = false; for (let i = 0, n = P.length/2, j = n-1; i < n; j = i++) { const xi = P[2*i], yi = P[2*i+1], xj = P[2*j], yj = P[2*j+1];
+  if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) c = !c; } return c; }
+function makeAPI(S, key){
+  const store = (k, v) => { try { if (v === undefined) return JSON.parse(sessionStorage.getItem('regx-api-' + key + k) || 'null'); sessionStorage.setItem('regx-api-' + key + k, JSON.stringify(v)); } catch (e) { return null; } };
+  const A = {mode: store('mode') || 'view', pending: store('pending') || [], half: null, roi: null, roiStart: null};
+  const persist = () => { store('mode', A.mode); store('pending', A.pending); };
+  A.panel = (side, el, redraw) => {
+    side.appendChild(el('h4', {}, 'クリック操作（保存用）'));
+    const sel = el('select');
+    for (const [k, v] of [['view', '表示（ズーム・パン）'], ['landmark', '対応点（ランドマーク）を指定'], ['roi', '領域（ROI）を指定'], ['pick', '候補をクリックで選択']]) sel.appendChild(el('option', {value: k}, v));
+    sel.value = A.mode; side.appendChild(sel);
+    const msg = el('div', {style: 'color:var(--mut);margin-top:4px'}); side.appendChild(msg);
+    const row = el('div', {style: 'margin-top:4px;display:flex;gap:4px;flex-wrap:wrap'});
+    const bSend = el('button', {}, '送信'), bUndo = el('button', {}, '1つ戻す'), bClear = el('button', {}, '消去');
+    row.append(bSend, bUndo, bClear); side.appendChild(row);
+    A.info = () => { msg.innerHTML = {view: 'ホイール: ズーム / ドラッグ: パン',
+      landmark: '① Fixed側の構造をクリック → ② 対応するMoving側（重ねて表示中）の構造をクリック。ペア ' + A.pending.length + (A.half ? '（①のみ指定済み）' : '') + '。送信で記録',
+      roi: 'ドラッグで矩形を描き、送信で記録', pick: '候補の領域（紫の枠）の内側をクリックすると、その候補を表示'}[A.mode]; };
+    sel.onchange = () => { A.mode = sel.value; persist(); A.info(); redraw(); };
+    bSend.onclick = () => { if (A.mode === 'landmark' && A.pending.length) { emit({kind: 'landmarks', pairs: A.pending}); A.pending = []; persist(); }
+                            else if (A.mode === 'roi' && A.roi) emit({kind: 'roi', rect: A.roi}); A.info(); redraw(); };
+    bUndo.onclick = () => { if (A.half) A.half = null; else A.pending.pop(); persist(); A.info(); redraw(); };
+    bClear.onclick = () => { A.pending = []; A.half = null; A.roi = null; persist(); A.info(); redraw(); };
+    A.info();
+  };
+  A.down = (w) => { if (A.mode === 'roi') { A.roiStart = w; A.roi = [w[0], w[1], w[0], w[1]]; } };
+  A.move = (w) => { if (A.mode === 'roi' && A.roiStart) { A.roi = [A.roiStart[0], A.roiStart[1], w[0], w[1]]; return true; } return false; };
+  A.up = (w) => {
+    if (A.mode === 'roi') { A.roiStart = null; return; }
+    if (A.mode === 'landmark') { if (!A.half) A.half = w; else { A.pending.push({fixed: A.half, moving_display: w}); A.half = null; persist(); } A.info(); return; }
+    if (A.mode === 'pick') { let best = null, bd = Infinity;     // overlapping regions: the one whose centre is nearest the click
+      for (const L of S.polys) { if (!L.pick || !L.visible || !inPoly(w[0], w[1], L.pts)) continue;
+        let cx = 0, cy = 0, n = L.pts.length / 2; for (let i = 0; i < n; i++) { cx += L.pts[2*i]; cy += L.pts[2*i+1]; }
+        const d = Math.hypot(w[0] - cx / n, w[1] - cy / n); if (d < bd) { bd = d; best = L.pick; } }
+      if (best) emit({kind: 'pick', candidate: best}); }
+  };
+  A.overlay = (ctx, v) => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); const P = (q) => [q[0]*v.k + v.ox, q[1]*v.k + v.oy];
+    const dot = (q, c) => { const p = P(q); ctx.beginPath(); ctx.arc(p[0], p[1], 6, 0, 6.2832); ctx.lineWidth = 2.5; ctx.strokeStyle = c; ctx.stroke(); };
+    A.pending.forEach((pr, i) => { const a = P(pr.fixed), b = P(pr.moving_display); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+      ctx.strokeStyle = '#ffeb3b'; ctx.lineWidth = 1.5; ctx.stroke(); dot(pr.fixed, '#ff1744'); dot(pr.moving_display, '#00e5ff');
+      ctx.fillStyle = '#ffeb3b'; ctx.font = (13*(window.devicePixelRatio||1)) + 'px system-ui'; ctx.fillText(String(i+1), a[0]+8, a[1]-8); });
+    if (A.half) dot(A.half, '#ff1744');
+    if (A.roi) { const a = P([A.roi[0], A.roi[1]]), b = P([A.roi[2], A.roi[3]]); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#76ff03'; ctx.lineWidth = 2;
+      ctx.strokeRect(a[0], a[1], b[0]-a[0], b[1]-a[1]); ctx.setLineDash([]); }
+  };
+  return A;
+}
+let lastScene = null;
+window.addEventListener('message', ev => { const d = ev.data; if (!d || d.type !== 'streamlit:render') return; const a = d.args;
+  if (a.scene_id !== lastScene) { lastScene = a.scene_id; boot(a.scene, makeAPI(a.scene, a.view_key || 'default')); }
+  send('streamlit:setFrameHeight', {height: a.height + 24}); });
+send('streamlit:componentReady', {apiVersion: 1});
+
+</script></body></html>

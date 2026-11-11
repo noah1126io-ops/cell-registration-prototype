@@ -153,6 +153,54 @@ Workflow C が保存した registration result と元の HE image を入力し�
 | 出力 | affine HE PNG, attempted warped HE PNG, final applied HE PNG, raster QC JSON, warp metadata JSON, Workflow D result ZIP |
 | 未実装 | full-resolution tiled raster export, GPU backend, Slurm integration |
 
+### Registration Explorer (Research) と研究Workflow C
+
+研究モード専用の画面です。異なる切片の対応する組織領域を探し、候補を比べ、位置合わせを検証・修正し、その結果を保存します。Production Workflow C/D の既定の処理は変わりません。
+
+**処理の流れ**（共通エンジン `src/registration_core`。Slurmの研究Runner・Explorer・Workflow Cの研究モードは、どれもこのエンジンを使います）
+
+1. **C1 対応領域の探索**：両側の画像が位置合わせに使える品質なら、画像（組織・核の構造map）で先に探索します。核点群による探索も必ず別に行い、両方の候補を残します。画像が使えない、または画像がない場合は、核点群だけで探索します。
+2. **C2 精密化**：候補ごとに、重なり領域の核だけでICPを行います。ICPが候補を別の領域へ動かした場合は記録します。
+3. **C3 検証**：事前に固定した規則で判定します。探索が一意（UNIQUE）で、≤3 µm ≥ 0.25 かつ偶然一致の3倍以上の場合に採択です。注釈を使った実行は自動採択しません。
+4. **C4 記録**：`artifact.json`（`cellreg-registration-artifact/1`）に、候補・判定・入力のfingerprint・版を保存します。
+
+**起動と停止**（研究室サーバー上。localhostのみで待ち受けます）
+
+```bash
+analysis/e0x-difficulty-and-web-integration-20261020/dev_server.sh start 8511    # CELLREG_RESEARCH_MODE=1 で起動
+analysis/e0x-difficulty-and-web-integration-20261020/dev_server.sh status 8511
+analysis/e0x-difficulty-and-web-integration-20261020/dev_server.sh stop 8511
+```
+
+コードを変えたら、`stop` → `start` で反映します（file watcherは無効です）。ブラウザからは、SSHのポート転送（`ssh -N -L 8511:127.0.0.1:8511 <user>@<gateway>`）を通して `http://localhost:8511` を開き、サイドバーの「Workflow」で **Registration Explorer (Research)** を選びます。
+
+**画面の使い方**
+
+| タブ | できること |
+|---|---|
+| 対応領域の探索 | Fixed全体に、全候補の対応領域を探索方法ごとの色で表示します。候補の表（回転・倍率・平行移動・推定重なり・スコア・ICPの移動量・核配置・レビュー）と、どの段階（C1/C2/C3）で止まったかを確認できます。表の行や地図上の候補をクリックすると、Viewerがその候補に切り替わります |
+| Viewer（重ね合わせ・手動調整） | H&E・蛍光の重ね合わせ、Before/After、Zoom/Pan、核と推定対応、FOV・組織・候補領域を表示します。手動調整（回転・倍率・平行移動。自動推定との比較つき）もここで行います。左の『クリック操作』で、対応点（Fixed → Moving の順にクリック）やROI（ドラッグ）を指定し、注釈として保存できます。表示中の配置は、『誤りの候補（除外）』や『手動の初期位置』として保存できます |
+| 評価・注釈 | 候補ごとに『正しい / 間違い / 判断できない』と問題の種類（領域・Rotation・Scale・Translation・核配置・画像構造・表示座標系・その他）、コメントを保存します |
+| Warp Preview | 逆写像による画像の重ね合わせです。手動調整中の変換でも確認できます（PREVIEW ONLY） |
+| 新規実行 | 研究Workflow CをSlurmに投入します。選べる処理は、自動（画像優先＋核）、核のみ、従来法A2、注釈を使った探索です。旧Runner（X0–X3）は折りたたみの中にあります |
+| 実験記録 | セッション内やサンプル全体の実行・変換・評価・注釈・操作履歴を表示し、JSON / CSV（zip）でエクスポートします |
+| Artifact | 保存されたartifactを表示します。採択済みで完全自動の結果だけは、Workflow Dが読み込める形式（Workflow C result artifact、affineのみ）で書き出せます |
+
+**保存**：画面上部で実験セッションを選ぶか、新しく作ります。評価・注釈・手動変換・実行は、`runs/research-store/research.sqlite`（SQLite、追記のみ、schema v1）に記録されます。ブラウザを再読込しても、アプリを再起動しても残ります。保存した注釈は、『新規実行』で明示的に選んだときだけ探索に使われます（assistedとして記録）。
+
+**Workflow C（Production画面）との接続**：研究モードでは、STEP 2に「研究モード：Global位置合わせを『研究Workflow C』の採択済み結果にする」の欄が出ます（既定はOFF）。チェックして採択済みの結果を選ぶと、global affineがその結果に置き換わります。STEP 3以降は従来どおりです。
+
+| 環境変数 | 役割（既定） |
+| --- | --- |
+| `CELLREG_RESEARCH_MODE` | `1` のとき研究機能を表示する（未設定なら非表示） |
+| `CELLREG_RESEARCH_STORE` | 研究ストアのSQLite（`runs/research-store/research.sqlite`） |
+| `CELLREG_EXPLORER_MANIFEST` | サンプル登録のJSON（`analysis/e0x-difficulty-and-web-integration-20261020/viewer_sample_manifest.json`） |
+| `CELLREG_EXPLORER_RUNS_DIR` | UIから実行した研究ジョブの保存先（`runs/registration-explorer`） |
+| `CELLREG_EXPLORER_MAX_ACTIVE` | 同時に動かせる研究ジョブの上限（2） |
+| `CELLREG_PYTHON` / `CELLREG_E0X_LAB_DIR` | Slurmジョブで使うPythonと、旧Runnerの研究コードのディレクトリ |
+
+**コマンドラインから実行する場合**：`python -c "from src.registration_core import run_workflow, WorkflowConfig; ..."` と書くか、`analysis/workflow-c-unification-and-registration-review-20261022/run_core_checks.py` を参考にしてください。設計は `analysis/workflow-c-unification-and-registration-review-20261022/to_be_architecture.md` にあります。
+
 ## 既存 HE-to-GeoJSON 研究パイプラインの設計メモ
 
 参考資料の既存パイプラインでは、1枚の HE image と fluorescence nuclei GeoJSON を対応させます。
