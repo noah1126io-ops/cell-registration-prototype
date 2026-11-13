@@ -16,6 +16,7 @@ import streamlit.components.v1 as components
 from . import catalog, imaging, jobs, manual, research_ui as rui, results, scene, viewer
 from .. import research_store as rs
 from . import reference_ui as refui
+from . import region_cell_ui as rcm_ui   # research tab, disabled unless CELLREG_REGION_CELL_MATCHING=1 (2026-11-13)
 from ..registration_core import reference as refreg
 
 KEY = "regx"
@@ -866,7 +867,9 @@ def show_registration_explorer() -> None:
         effective = next((r for r in recs if r.source == rec.source and r.config == rec.fallback_source), None)
     _safety_panel(rec, effective)
     st.caption(f"内部ID: {results.INTERNAL_IDS.get(rec.method, rec.method)} / {rec.rid}")
-    tabs = st.tabs(["対応領域の探索", "Viewer（重ね合わせ・手動調整）", "評価・注釈", "方式比較", "Warp Preview", "新規実行", "実験記録", "Artifact"])
+    tab_labels = ["対応領域の探索", "Viewer（重ね合わせ・手動調整）", "評価・注釈", "方式比較", "Warp Preview", "新規実行", "実験記録", "Artifact"]
+    show_rcm = rcm_ui.enabled()
+    tabs = st.tabs(tab_labels + ([rcm_ui.TAB_LABEL] if show_rcm else []))
     with tabs[0]:
         _candidate_map_tab(S, avail, rec, fixed_key)
     with tabs[1]:
@@ -883,3 +886,6 @@ def show_registration_explorer() -> None:
         rui.record_tab(sid, session_id)
     with tabs[7]:
         _artifact_tab(rec)
+    if show_rcm:
+        with tabs[8]:
+            rcm_ui.render(S.sample_id)
