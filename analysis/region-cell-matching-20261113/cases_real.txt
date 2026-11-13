@@ -1,0 +1,16 @@
+P8_6_orig
+P8_6_IFhalfL
+P8_6_IF500
+P8_6_HEpartial60
+N8_6_IFmirror
+N8_6_HEexclude
+N8_6_IF500xHEexclude
+P6_2_orig
+P6_2_IFhalfL
+P6_2_IF500
+P6_2_HEpartial60
+N6_2_IFmirror
+N6_2_HEexclude
+N6_2_IF500xHEexclude
+Ncross_HE6_2xIF8_6
+Ncross_HE8_6xIF6_2

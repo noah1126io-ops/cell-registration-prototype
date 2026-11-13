@@ -1,0 +1,198 @@
+{
+ "created_at": "2026-11-13T08:18:57.527910+00:00",
+ "note": "written before any Phase 1 / Phase 2 result of this study was inspected",
+ "git": {
+  "head": "dd68fcac4ca0b88886fdfbe74c1ab8253bc80ce3",
+  "branch": "feature/gpu-slurm",
+  "status_porcelain": [
+   "?? analysis/region-cell-matching-20261113/",
+   "?? src/registration_research/"
+  ]
+ },
+ "core_version": "registration_core 1.2 (2026-11-10)",
+ "engine_rules": {
+  "ACCEPT": {
+   "inlier_radius_um": 3.0,
+   "min_inlier": 0.25,
+   "min_inlier_over_null": 3.0
+  },
+  "TRUST": {
+   "max_scale_change": 0.03,
+   "max_rot_change_deg": 2.0,
+   "max_shift_um": 15.0
+  },
+  "QUADRANT_RULE": {
+   "min_agree": 3,
+   "max_shift_um": 30.0,
+   "max_dtheta_deg": 2.0,
+   "half_deg": 4.0,
+   "step_deg": 1.0,
+   "scales": [
+    0.97,
+    1.0,
+    1.03
+   ],
+   "window_um": 100.0
+  },
+  "WorkflowConfig_defaults": {
+   "localization": "auto",
+   "image_feature": "occ+cleft",
+   "image_combine": "zsum",
+   "feature_res_um": 2.0,
+   "n_candidates": 6,
+   "search": {},
+   "run_points_with_images": true,
+   "local_half_deg": 10.0,
+   "local_step_deg": 1.0,
+   "local_scales": [
+    0.95,
+    0.975,
+    1.0,
+    1.025,
+    1.05
+   ],
+   "local_window_um": 150.0,
+   "section_relation": "auto"
+  }
+ },
+ "production_and_engine_sha256": {
+  "app.py": "73f2fda841e68b06e96da1509f57589125bad28f723f5fd6da708d06609b1c30",
+  "src/registration_core/__init__.py": "93eb20a3b321b39c41b5f1f609add0d25797d6e28aa80dd86774f137dd0111a3",
+  "src/registration_core/a2.py": "31f175fb66e325d405ba0fa206165e0bd0c33464f32b9f4e76a5eef822256282",
+  "src/registration_core/features.py": "c13847c5b0364a8380068c3776969eda7bace664a6d474f96f2372b8bba25cfa",
+  "src/registration_core/frames.py": "9f8005a7ed9a39f2408bf7d5ef906751715f7786fdb315e354bd3bbdbf7e947c",
+  "src/registration_core/metrics.py": "927b9c0d7107c29ebceb76f0a3f82ada67ebe9d18c807a7dc128d86ca929f076",
+  "src/registration_core/pipeline.py": "7a114a4f17bef8b1809fddbdcce4e67057ec743eeea289a2942c6f8eb7f74e0e",
+  "src/registration_core/reference.py": "95aba8bd7420699baab9abf44673c2e8766d06189980ab00af49c32134098aee",
+  "src/registration_core/search.py": "507f4a6b83a14fd0eefb3703ede33404b71df14ba8208e53e6150069a233376c",
+  "src/registration_core/workflow.py": "b04d1005df4cd7469e6d42670cd1035d20e7a7a90911e9606090b9eaa250f444",
+  "src/registration_core/workflow_d_bridge.py": "1a35528c0a9386a78ff9426fe426d64fbd1a79c4d11cd00684f837024343573b",
+  "src/registration_explorer/__init__.py": "01a12d25680b7a26b9d7c7fb3df5907bf1a2f4a620a48c8fdc89297735491567",
+  "src/registration_explorer/catalog.py": "2e00b32c8431fd8bc7ca33d2b8849fdcf75014e923220518dc696cb44cbb8e0c",
+  "src/registration_explorer/imaging.py": "9ea7ca0ef139b6916436dc239c14cda7dbef5ecdb46fd49fa386722c7a056a57",
+  "src/registration_explorer/jobs.py": "fc0e7bb3b001bee0a3c157efc7ba9d2f38a324c1980af3956af1c45c33202773",
+  "src/registration_explorer/manual.py": "c076f2cf1ecde4d14e57b354b906a066371a02c1ac690ef109875d6667c1c40a",
+  "src/registration_explorer/page.py": "512d9487c1a2aa04cca0284536a1d86f4e04e37c8a5b677c937cbc9d8085ecf6",
+  "src/registration_explorer/reference_ui.py": "d2c5506ca5dbde213b89e352d9bbf61e33b473fc43fc66e09aa550077f73bad2",
+  "src/registration_explorer/research_ui.py": "5216c23251d60ffcade74adee8c7eda604fe411308fba5759cd0c33d1a6dad5b",
+  "src/registration_explorer/results.py": "b7bba4a1e4510bd023cb16c6eb59e3014e5f6ffb476c01fec3e8ccc38dc1eb6e",
+  "src/registration_explorer/scene.py": "647fe74e2f4da75bfbe75a1dc68a365ee31d6e75fb415e0fbeb85dc1883f37ce",
+  "src/registration_explorer/viewer.py": "57ec55db193f1cce2e1d7171530dc8ecab69a99670c7992d1e5fd133e0b7405d",
+  "src/registration_explorer/interactive/index.html": "73b12ebb31074386a914202df5a184c91e9a102a64192acbab54bdc6445f6348",
+  "src/workflow_d.py": "a831540a5714a3480f0895430f019b327077c784c30cb630d132d5bc392d6659",
+  "src/workflow_c_research.py": "59778028551dece7afe8b0a54b59adb680a56f89d29cc85fe3078933709cb3cf",
+  "src/workflow_c_result.py": "72de5649a49f8fc8ca1c357ecf1a06bbff143dd12ba09966983b5fdcc1916cdf",
+  "src/workflow_c_run_export.py": "8ab27a2322ab90eaf14f9226d6327af34d33e944fc98f1cb9af450187a654b09",
+  "src/workflow_c_slurm.py": "c6721c645b7aca57fdde70f6cd39cad556cb2350336b4d664885d887d9ea9b87",
+  "src/workflow_c_slurm_ui.py": "8fbed1f134a417fa59c2a1f88f05163a062c33cd97c85e08da88f02ad57ffe4f",
+  "src/workflow_c_sweep.py": "da0ed90061e15d0356aa1c4aff3b57d5364ed3259f04d4165861bf163de60298",
+  "src/workflow_c_worker.py": "f4510518b5f19f1618cad6642d347909cdf233536ebf43ae8a7b12e532c6f36e",
+  "src/pointset_registration.py": "8377608324e62321d260cf72bf003943567dee67de1f2e32ecec5ab74f67e25e",
+  "src/density_flow.py": "72663a54aca7dab64bbccd49106e7791a3b66c4d3953f42ac6bfddcb3025999b",
+  "src/joint_flow.py": "85edf530a96642eff249789784900328694c72587b93cc6726ca26aa7f7ed13f",
+  "src/research_store.py": "a1ac4997bdd945e1b6304661a1760ff7cdb119ab7aa082baa6296e0496c28b99"
+ },
+ "reused_research_sha256": {
+  "analysis/contextual-graph-uot-20261008/config.py": "9a6bee0afbe32a98ceee2893663f96ae30307cc10a5a669ef78782135425ce0e",
+  "analysis/contextual-graph-uot-20261008/candidate_generation.py": "38a8920098023413e9ead153899d838d90bb358cf3f90eddf28f850eb0651ed6",
+  "analysis/contextual-graph-uot-20261008/graph_consistency.py": "c82785101591fec563671dbb8dae2c02cf1d43a41a2269705a61fe9635a5d643",
+  "analysis/contextual-graph-uot-20261008/contextual_uot.py": "5029298da2efed6c4d9bd591b9a09a78b44dc56400ffdc677879ec466c52223c",
+  "analysis/contextual-graph-uot-20261008/local_fingerprint.py": "5adcf89d696e7ea1b4817d6036ddc78010104288008ea81efe46a6cd76fbf470",
+  "analysis/contextual-graph-uot-20261008/regional_pattern.py": "9315e8d49388a9ba14dc0a2f943f3a34ef847d5eda8f26fd79e30c75aef83173",
+  "analysis/contextual-graph-uot-20261008/synthetic_correspondence.py": "eec544165760560454e8cde4b3010f83d2fdc9380fb6becc10c3f5fd0420a6a7",
+  "analysis/contextual-uot-cost-ablation-20261008/run_cost_ablation.py": "dcd9709a68a21cb269998ab6a3a3f98c5f85ab21d1eda3f1789975b3a0944da6",
+  "analysis/graph-matching-adoption-separation-20261014/experiment_lib.py": "07cdee6d750aeaebad08e8bf8c18db232d485fa925eb73443549b779950d81e1",
+  "analysis/graph-matching-adoption-separation-20261014/diagnostic_summary.json": "eae33b0ea4326f1e7154fa786aae4219507cd7c2fa8924997471e3003c40a281",
+  "analysis/uot-adoption-validation-20260911/validation_lib.py": "cd5a0180223a1a1025626fb514223b17864a9bcf223505d83effc2480f3925c0",
+  "src/pointset_registration.py": "8377608324e62321d260cf72bf003943567dee67de1f2e32ecec5ab74f67e25e",
+  "src/density_flow.py": "72663a54aca7dab64bbccd49106e7791a3b66c4d3953f42ac6bfddcb3025999b"
+ },
+ "frozen_b2": {
+  "source": "analysis/graph-matching-adoption-separation-20261014/diagnostic_summary.json",
+  "thresholds": {
+   "match": {
+    "threshold": 0.8086750699201961,
+    "validation_precision": 0.950381679389313,
+    "validation_coverage": 0.46371681415929206,
+    "selected_n": 524,
+    "achieved": true
+   },
+   "unmatched": {
+    "threshold": 0.4331617778398369,
+    "validation_f1": 0.8556430446194226
+   },
+   "source_method": "Relative-cost Graph-UOT",
+   "output_method": "Separated Matching / Adoption"
+  },
+  "decision": "A. SEPARATED MATCHING SUPPORTED"
+ },
+ "uot_conservative": {
+  "cost_scale_um": 10.0,
+  "entropic_regularization": 0.1,
+  "mass_relaxation_kl": 0.5,
+  "minimum_row_mass_ratio": 0.25,
+  "confidence_weighting": "min(row_mass / source_mass, 1)",
+  "field_kernel": "linear",
+  "field_smoothing": 10.0,
+  "field_neighbors": 40,
+  "solver": "sinkhorn_translation_invariant",
+  "reg_type": "kl",
+  "max_iterations": 2000,
+  "stop_threshold": 1e-07,
+  "source_trial": "coarse_09 / cost10_e0.1_m0.5"
+ },
+ "safety": {
+  "jacobian_min_threshold": 0.1,
+  "jacobian_max_threshold": 3.0,
+  "max_displacement": 35.0,
+  "displacement_p95_limit": 30.0,
+  "minimum_jacobian_p05": 0.8,
+  "maximum_jacobian_p95": 1.25,
+  "minimum_absolute_median_improvement": 0.1,
+  "minimum_relative_median_improvement": 0.005,
+  "maximum_mutual_nearest_decrease": 0.005,
+  "maximum_within_fraction_decrease": 0.01
+ },
+ "graph_uot_config": {
+  "UOT": {
+   "cost_scale_um": 10.0,
+   "entropic_regularization": 0.1,
+   "mass_relaxation_kl": 0.5,
+   "minimum_row_mass_ratio": 0.25,
+   "solver": "sinkhorn_translation_invariant",
+   "reg_type": "kl",
+   "max_iterations": 2000,
+   "stop_threshold": 1e-07,
+   "source_trial": "coarse_09 / cost10_e0.1_m0.5"
+  },
+  "CANDIDATES": {
+   "top_k": 30,
+   "source_k": 20,
+   "fingerprint_spatial_pool": 80,
+   "position_scale_um": 10.0,
+   "region_residual_scale_um": 10.0,
+   "outside_cost": 25.0,
+   "weights_without_region": {
+    "position": 0.55,
+    "fingerprint": 0.9
+   },
+   "weights_full": {
+    "position": 0.45,
+    "fingerprint": 0.85,
+    "region": 0.7
+   },
+   "graph_weight": 0.75
+  },
+  "GRAPH": {
+   "mutual_knn": 10,
+   "length_tolerance_um": 5.0,
+   "angle_tolerance_radians": 0.45
+  }
+ },
+ "pot_vendor": "/mnt/mib-dbia08_1/users/noa.ganeko/analysis/cpd-uot-comparison-20260909/vendor/ot/__init__.py",
+ "pot_version": "0.9.7.post1",
+ "inputs": {
+  "real_derived_runs": "analysis/adaptive-registration-validation-20261111/runs/*__D/result.json",
+  "serial_section_pair": "sweeps/real-grid27-20260908-v2/input/success_metric_*_points.npy"
+ }
+}

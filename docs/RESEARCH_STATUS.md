@@ -1,6 +1,6 @@
 # 研究の進捗と引き継ぎ（エージェント向け）
 
-- 最終更新：2026-11-13（11-11 の作業が終わった時点の状態）
+- 最終更新：2026-11-13（region-cell-matching-20261113 の作業が終わった時点の状態）
 - 対象：このリポジトリで作業を引き継ぐエージェント（Claude Code などの AI エージェント）
 - 位置づけ：研究の現状、決まったこと、未解決の問題、作業のルールをまとめた入口です。詳しい内容は、各研究ディレクトリの `REPORT.md` にあります。
 - 更新のしかた：研究のタスクが終わるたびに、この文書の §2〜§6 を更新してください。過去の記述は消さずに、§7 の履歴に追記してください。
@@ -11,7 +11,7 @@
 
 1. この文書
 2. `README.md` の「Registration Explorer (Research) と研究Workflow C」
-3. 最新の研究：`analysis/adaptive-registration-validation-20261111/REPORT.md` と、同じディレクトリの `v1_roadmap_recommendations.md`
+3. 最新の研究：`analysis/region-cell-matching-20261113/REPORT.md`（核対応による候補の再評価と局所変形。結論は §3）。ロードマップは `analysis/adaptive-registration-validation-20261111/REPORT.md` と `v1_roadmap_recommendations.md`
 4. サンプルの来歴：`analysis/e0x-difficulty-and-web-integration-20261020/sample_provenance.md`
 5. エンジンの本体：`src/registration_core/workflow.py`（`CORE_VERSION`、`WorkflowConfig`、`infer_section_relation`、C3 の規則）
 
@@ -29,11 +29,13 @@
 
 | 項目 | 状態 |
 |---|---|
-| ブランチ | `feature/gpu-slurm`（worktree `projects/cell-registration-prototype-gpu`）。`origin` と同期済みで、HEAD は `82f1376`、未コミットの変更なし |
+| ブランチ | `feature/gpu-slurm`（worktree `projects/cell-registration-prototype-gpu`）。HEAD は git log で確認する（11-13 の作業はコミット・push 済み） |
 | エンジン | `registration_core 1.2 (2026-11-10)` |
 | 実行中のジョブ | なし |
 | 未完了の作業 | なし。次の作業はユーザーの承認待ち（§5） |
-| テスト | `pytest tests`：270 成功、1 スキップ。条件は §6 を参照 |
+| テスト | `pytest tests`：270 成功、1 スキップ。条件は §6 を参照。研究テスト：`analysis/region-cell-matching-20261113/tests_rcm`（13 件） |
+| 研究用コード | `src/registration_research/`（C1 の候補アダプタ、凍結済み Graph/UOT/B2 の呼び出し、再順位付け、局所変形の比較）。本番からは使われない |
+| Explorer の研究タブ | 「核対応（研究）」。既定で無効（`CELLREG_REGION_CELL_MATCHING=1` で有効）。保存済みの結果を表示するだけ |
 
 ### エンジン（`src/registration_core`）の処理の流れ
 1. **C1 対応領域の探索**：画像の探索と、核点群の探索の両方を行う。
@@ -63,6 +65,14 @@
     - HEpartial60：象限チェックが 2/4（HE の外にはみ出した象限が失敗と数えられる）。
 - **過学習の注意**：occ/cleft は 8_6 を見ながら設計し、正規化は 6_2 を見た後に決めた。独立と言えるのは合成データのテストだけ。
 - 合成データでの難易度の掃引（10-20、132 ケース）：誤採択 0 / 177 実行。反復構造の割合が 0.5 以上、重なり 0.3、共有されない構造 0.85、変形 10 µm では失敗する。
+- **核対応（Graph/UOT/B2）で C1 の候補を並べ替えても、救済はほぼできない**（11-13）。
+  - 合成 39 件で救済 0 件。実データ由来では、points の候補だけの場合に 1 件で、それは既存の C3 でも救えた。
+  - 主な原因は、正しい領域が上位 6 件に入っていないこと（候補生成の再現率）。
+  - 候補の識別力は既存の C3 と同程度（AUC 0.972 と 0.977）。周期的な組織では、誤った領域でも B2 が 6 割を matched にする。
+- **局所変形**（11-13）：Global が正しい合成データでは、B2 の対応をアンカーにした linear RBF（C）が最良（EPE 2.92→0.89 µm）。
+  - ただし、変形が小さいときは Affine を悪化させる。
+  - 8_6 のランドマークの残差は改善しない。
+  - 既存の監査は領域の正しさを見ないので、誤った領域でも B′ / D の局所変形が適用される。
 
 ## 4. 未解決のリスクと問題
 
@@ -72,6 +82,8 @@
 2. **鏡像の誤採択の危険**：6_2 の IF を鏡像にした負例が、隣接切片の規則では画像 UNIQUE ＋ 象限 3/4 → TISSUE_LEVEL まで通ってしまう。本番は 6_2 に同一切片の規則を使うので、今は止まっている。切片の関係を直すと、この問題が表に出る。
 3. **Explorer のストア**に残っている 8_6 の結果は、10-27 の古い実行のまま。UI からの再実行はユーザーに任せている（ストアへの書き込みになるため）。
 4. **artifact が `git_dirty=True` で記録されている過去の実行**がある。11-11 にすべてコミットしたので、今後の実行は clean な状態で行える。
+5. **局所変形を本番に入れる場合**は、領域の検証を前提条件にする必要がある。誤った領域でも、既存の `common_audit` は B′ / D の変形を通す（11-13、failure_analysis.md §3.1）。
+6. **UOT conservative が 6_2 で数値的に失敗する**（translation-invariant な Sinkhorn がほぼ 0 の輸送量を返す）。研究ラッパーは Affine に戻している。既存の `run_uot` は直していない。
 
 ## 5. 次の作業（ユーザーの判断待ち）
 
@@ -86,6 +98,9 @@
   - 6_2 / 8_6 の変換が 11-10 と同一であること。
   - 鏡像の負例が本番の規則で NOT_ACCEPTED になること。
 - その後の作業：A3（Data Profiler を artifact に入れる）→ A4（戦略の提案）、A5（判定理由の表示）→ A6（失敗時の手動補助）、A7（再現できる実行履歴）、A9（IF チャンネルの設定化）。
+- 11-13 の研究からの候補（どれも承認待ち、優先度は低い）：
+  - C1 の候補生成の再現率を上げる（K30 の結果は 11-13 の REPORT §4）。
+  - B2 アンカーの局所変形を、領域の検証後、同一切片に限って条件付きで使う研究。
 - 外部検証には新しいデータが必要（仕様は `v1_roadmap_recommendations.md` の「必要なデータ」）。データが届いたら、`data_profiler_spec.md` の §5 の手順と、`benchmark_runner.py` / `collect.py` で再実行できる。
 
 ## 6. 作業のルール（必ず守る）
@@ -134,3 +149,4 @@
 | 11-10 | `landmark-reference-failure-analysis-20261110` | 核の C3 規則は隣接切片に使えない。象限チェックで 8_6 → TISSUE_LEVEL（core 1.2） |
 | 11-11 | `adaptive-registration-validation-20261111` | 未使用データ 0 件。派生ケース 16 件でのストレステスト。鏡像のリスクと、6_2 の CONFLICT を発見。適応型レジストレーションの設計と v1.0 のロードマップ。初めて GitHub に push（`e79a8ac`..`82f1376`） |
 | 11-13 | — | この引き継ぎ文書を作成 |
+| 11-13 | `region-cell-matching-20261113` | C1 の上位 k 候補を Graph/UOT/B2 で再評価：救済はほぼない（候補生成がボトルネック）。B2 アンカーの局所変形は、合成データでは最良だが、変形が小さいときや誤った領域では危険。研究用コードは `src/registration_research/`、Explorer の研究タブは既定で無効 |
