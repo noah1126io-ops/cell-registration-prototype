@@ -4,6 +4,8 @@
 
 本アプリは研究用プロトタイプです。診断、治療方針決定、臨床判断、その他の医療用途には使用しないでください。
 
+研究の現状と引き継ぎ（エージェント向け）は [docs/RESEARCH_STATUS.md](docs/RESEARCH_STATUS.md) にまとめています。
+
 ## 現在の実装状況
 
 Workflow C の実験的な Density Flow と Joint Density + Tissue-Structure Flow は、同一の計算実装を NumPy/SciPy（CPU）または CuPy/cupyx（CUDA）で実行できます。Joint FlowもStage A/Bの両方で既存Density Flow backendを再利用します。CPU が既定で、CUDA は Python API の `device="cuda"` または `device="auto"` から選択します。Streamlit UIでは既存のローカルCPU実行を維持し、明示的なGPUボタンからSlurmへ非同期投入できます。CUDAをgateway上のStreamlitプロセスで直接実行することはありません。
