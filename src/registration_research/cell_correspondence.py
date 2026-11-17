@@ -75,7 +75,7 @@ def run_pipeline(fixed, moving, true_fixed_index=None, seed=0, label="candidate"
     frames["B2"] = E.apply_separated_adoption(frames["B1"], b2["match_model"], b2["unmatched_model"], b2["match_threshold"],
                                               b2["unmatched_threshold"], method=E.METHOD_B2)
     uot = {k: runs[name].metrics for k, name in (("B0", E.METHOD_B0), ("B1", E.METHOD_B1), ("B3", E.METHOD_B3))}
-    return {"frames": frames, "uot": uot, "context": ctx, "runtime_s": time.perf_counter() - t0, "context_runtime_s": t_ctx}
+    return {"frames": frames, "uot": uot, "context": ctx, "runs": runs, "runtime_s": time.perf_counter() - t0, "context_runtime_s": t_ctx}
 
 
 def matched_pairs(frame: pd.DataFrame):

@@ -1,0 +1,243 @@
+{
+ "sample": "031-8_6",
+ "global_source": "P8_6_orig__D gate=adjacent candidate image#0 (inverted to HE->IF)",
+ "roi": [
+  2.649288,
+  1.735464,
+  1025.0840759999999,
+  1016.1282
+ ],
+ "n_he_roi": 1099,
+ "n_if_candidates": 1552,
+ "status_counts": {
+  "unmatched": 988,
+  "ambiguous": 103,
+  "matched": 8
+ },
+ "conflicting_auto_pairs": 0,
+ "auto_dir": "runs/cell_review/031-8_6/auto/auto-a388a4f3df42",
+ "review_file": "runs/cell_review/031-8_6/reviews/rev-62d5c1592d/v0001.json",
+ "review_ops": 9,
+ "reviewed_pairs": 6,
+ "review_conflicts": 0,
+ "fields": {
+  "A": {
+   "method": "A",
+   "label": "Affineのみ",
+   "applied": true,
+   "reason": null,
+   "taper_gradient_max": 0.0,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": null,
+   "rejection_reason": null,
+   "jacobian_min": 1.0,
+   "jacobian_p05": 1.0,
+   "jacobian_median": 1.0,
+   "jacobian_p95": 1.0,
+   "jacobian_max": 1.0,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 0.0,
+   "displacement_p95_um": 0.0,
+   "displacement_median_um": 0.0,
+   "finite": true,
+   "anchors_n": 0
+  },
+  "AUTO": {
+   "method": "AUTO",
+   "label": "自動推定の核対応（B2）＋linear RBF",
+   "applied": false,
+   "reason": "ANCHORS_INSUFFICIENT",
+   "taper_gradient_max": 0.0,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": null,
+   "rejection_reason": null,
+   "jacobian_min": 1.0,
+   "jacobian_p05": 1.0,
+   "jacobian_median": 1.0,
+   "jacobian_p95": 1.0,
+   "jacobian_max": 1.0,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 0.0,
+   "displacement_p95_um": 0.0,
+   "displacement_median_um": 0.0,
+   "finite": true,
+   "anchors_n": 8,
+   "anchor_coverage_cells": 0.06666666666666667,
+   "cells_occupied": 105,
+   "exclude_conflicts": false
+  },
+  "REVIEWED": {
+   "method": "REVIEWED",
+   "label": "手動修正後の核対応＋linear RBF",
+   "applied": false,
+   "reason": "ANCHORS_INSUFFICIENT",
+   "taper_gradient_max": 0.0,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": null,
+   "rejection_reason": null,
+   "jacobian_min": 1.0,
+   "jacobian_p05": 1.0,
+   "jacobian_median": 1.0,
+   "jacobian_p95": 1.0,
+   "jacobian_max": 1.0,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 0.0,
+   "displacement_p95_um": 0.0,
+   "displacement_median_um": 0.0,
+   "finite": true,
+   "anchors_n": 6,
+   "anchor_coverage_cells": 0.05714285714285714,
+   "cells_occupied": 105,
+   "exclude_conflicts": false
+  },
+  "D": {
+   "method": "D",
+   "label": "UOT conservative（既存）",
+   "applied": true,
+   "reason": null,
+   "taper_gradient_max": 0.07526495027830787,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": true,
+   "rejection_reason": null,
+   "jacobian_min": 0.7641687547577579,
+   "jacobian_p05": 0.928707584364789,
+   "jacobian_median": 0.9985156323865206,
+   "jacobian_p95": 1.0747846967554775,
+   "jacobian_max": 1.3495151655807331,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 4.683440655862768,
+   "displacement_p95_um": 2.6451689146615274,
+   "displacement_median_um": 1.3158859872665671,
+   "finite": true,
+   "anchors_n": 574
+  }
+ },
+ "review_effect": {
+  "n": 1099,
+  "median_um": 0.0,
+  "p95_um": 0.0,
+  "max_um": 0.0,
+  "moved_gt_1um": 0,
+  "auto_applied": false,
+  "reviewed_applied": false
+ },
+ "images": {
+  "he_affine": {
+   "mapping": "inverse: IF-frame target pixel centre -> field inverse (fixed point) -> affine inverse -> HE level pixel",
+   "direction_forward": "HE -> IF:  x_IF = A(x_HE) + d(A(x_HE))",
+   "target_frame": "IF (fixed) frame-local µm",
+   "roi_if_frame": [
+    2.649288,
+    1.735464,
+    1025.0840759999999,
+    1016.1282
+   ],
+   "target_um_per_px": 2.0,
+   "target_shape": [
+    508,
+    512
+   ],
+   "source_level": 3,
+   "source_um_per_px": 1.510710097623721,
+   "source_region_px": [
+    281,
+    484,
+    1097,
+    1296
+   ],
+   "interpolation": "bilinear",
+   "outside": "0 and invalid (no extrapolation)",
+   "inverse_tol_um": 0.05,
+   "inverse_max_iter": 60,
+   "inverse_residual_max_um": 0.0,
+   "inverse_not_converged_px": 0,
+   "valid_fraction": 1.0,
+   "status": "AFFINE_ONLY",
+   "nonrigid_applied": false,
+   "field_method": null
+  },
+  "he_reviewed": {
+   "mapping": "inverse: IF-frame target pixel centre -> field inverse (fixed point) -> affine inverse -> HE level pixel",
+   "direction_forward": "HE -> IF:  x_IF = A(x_HE) + d(A(x_HE))",
+   "target_frame": "IF (fixed) frame-local µm",
+   "roi_if_frame": [
+    2.649288,
+    1.735464,
+    1025.0840759999999,
+    1016.1282
+   ],
+   "target_um_per_px": 2.0,
+   "target_shape": [
+    508,
+    512
+   ],
+   "source_level": 3,
+   "source_um_per_px": 1.510710097623721,
+   "source_region_px": [
+    281,
+    484,
+    1097,
+    1296
+   ],
+   "interpolation": "bilinear",
+   "outside": "0 and invalid (no extrapolation)",
+   "inverse_tol_um": 0.05,
+   "inverse_max_iter": 60,
+   "inverse_residual_max_um": 0.0,
+   "inverse_not_converged_px": 0,
+   "valid_fraction": 1.0,
+   "status": "NOT_APPLIED (field rejected: ANCHORS_INSUFFICIENT)",
+   "nonrigid_applied": false,
+   "field_method": "REVIEWED"
+  },
+  "he_D": {
+   "mapping": "inverse: IF-frame target pixel centre -> field inverse (fixed point) -> affine inverse -> HE level pixel",
+   "direction_forward": "HE -> IF:  x_IF = A(x_HE) + d(A(x_HE))",
+   "target_frame": "IF (fixed) frame-local µm",
+   "roi_if_frame": [
+    2.649288,
+    1.735464,
+    1025.0840759999999,
+    1016.1282
+   ],
+   "target_um_per_px": 2.0,
+   "target_shape": [
+    508,
+    512
+   ],
+   "source_level": 3,
+   "source_um_per_px": 1.510710097623721,
+   "source_region_px": [
+    282,
+    484,
+    1096,
+    1296
+   ],
+   "interpolation": "bilinear",
+   "outside": "0 and invalid (no extrapolation)",
+   "inverse_tol_um": 0.05,
+   "inverse_max_iter": 60,
+   "inverse_residual_max_um": 1.6077746776921858e-13,
+   "inverse_not_converged_px": 0,
+   "valid_fraction": 1.0,
+   "status": "APPLIED",
+   "nonrigid_applied": true,
+   "field_method": "D"
+  }
+ },
+ "export_dir": "runs/cell_review/031-8_6/exports/exp-20261117-175445-410da9",
+ "timing_s": {
+  "auto": 153.63354257959872,
+  "fields": 2.7467133519239724,
+  "images": 2.6311170971021056
+ },
+ "peak_tracemalloc_mb": 236.133381
+}

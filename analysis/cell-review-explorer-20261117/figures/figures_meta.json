@@ -1,0 +1,30 @@
+[
+ {
+  "sample": "031-6_2",
+  "method": "REVIEWED",
+  "roi": [
+   406.0233180174064,
+   699.240289237729,
+   626.0233180174064,
+   919.240289237729
+  ],
+  "status": "APPLIED",
+  "max_field_um_in_crop_centre_region": 5.762938353773793,
+  "affine_valid": 1.0,
+  "nonrigid_valid": 1.0
+ },
+ {
+  "sample": "031-8_6",
+  "method": "D",
+  "roi": [
+   870.9762398186044,
+   648.8935181222399,
+   1090.9762398186044,
+   868.8935181222399
+  ],
+  "status": "APPLIED",
+  "max_field_um_in_crop_centre_region": 4.6159519551651265,
+  "affine_valid": 1.0,
+  "nonrigid_valid": 1.0
+ }
+]

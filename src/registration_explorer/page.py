@@ -17,6 +17,7 @@ from . import catalog, imaging, jobs, manual, research_ui as rui, results, scene
 from .. import research_store as rs
 from . import reference_ui as refui
 from . import region_cell_ui as rcm_ui   # research tab, disabled unless CELLREG_REGION_CELL_MATCHING=1 (2026-11-13)
+from . import cell_review_ui as crv_ui   # research tab, disabled unless CELLREG_CELL_REVIEW=1 (2026-11-17)
 from ..registration_core import reference as refreg
 
 KEY = "regx"
@@ -869,7 +870,12 @@ def show_registration_explorer() -> None:
     st.caption(f"内部ID: {results.INTERNAL_IDS.get(rec.method, rec.method)} / {rec.rid}")
     tab_labels = ["対応領域の探索", "Viewer（重ね合わせ・手動調整）", "評価・注釈", "方式比較", "Warp Preview", "新規実行", "実験記録", "Artifact"]
     show_rcm = rcm_ui.enabled()
-    tabs = st.tabs(tab_labels + ([rcm_ui.TAB_LABEL] if show_rcm else []))
+    show_crv = crv_ui.enabled()
+    if show_crv:     # the cell-review tab goes last, so the existing tab indices are unchanged
+        tab_labels_crv = tab_labels + ([rcm_ui.TAB_LABEL] if show_rcm else []) + [crv_ui.TAB_LABEL]
+        tabs = st.tabs(tab_labels_crv)
+    else:
+        tabs = st.tabs(tab_labels + ([rcm_ui.TAB_LABEL] if show_rcm else []))
     with tabs[0]:
         _candidate_map_tab(S, avail, rec, fixed_key)
     with tabs[1]:
@@ -889,3 +895,6 @@ def show_registration_explorer() -> None:
     if show_rcm:
         with tabs[8]:
             rcm_ui.render(S.sample_id)
+    if show_crv:
+        with tabs[-1]:
+            crv_ui.render(S, avail, rec, fixed_key)
