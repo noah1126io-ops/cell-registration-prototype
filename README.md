@@ -201,6 +201,7 @@ analysis/e0x-difficulty-and-web-integration-20261020/dev_server.sh stop 8511
 | `CELLREG_EXPLORER_MAX_ACTIVE` | 同時に動かせる研究ジョブの上限（2） |
 | `CELLREG_PYTHON` / `CELLREG_E0X_LAB_DIR` | Slurmジョブで使うPythonと、旧Runnerの研究コードのディレクトリ |
 | `CELLREG_REGION_CELL_MATCHING` | `1` のとき、Explorer に研究用タブ「核対応（研究）」を表示する（未設定なら非表示）。`analysis/region-cell-matching-20261113` の保存済みの結果を表示するだけで、計算も保存もしない |
+| `CELLREG_CELL_REVIEW` | `1` のとき、Explorer に研究用タブ「細胞対応レビュー（研究）」を表示する（未設定なら非表示）。核対応の推定 → 手動レビュー → 点群の変形 → H&E 画像の逆写像。結果は `runs/cell_review/`（`CELLREG_CELL_REVIEW_ROOT` で変更可）にファイルとして保存し、研究ストアには書き込まない。Workflow D には送らない（`analysis/cell-review-explorer-20261117`） |
 
 **コマンドラインから実行する場合**：`python -c "from src.registration_core import run_workflow, WorkflowConfig; ..."` と書くか、`analysis/workflow-c-unification-and-registration-review-20261022/run_core_checks.py` を参考にしてください。設計は `analysis/workflow-c-unification-and-registration-review-20261022/to_be_architecture.md` にあります。
 

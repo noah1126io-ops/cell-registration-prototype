@@ -1,0 +1,243 @@
+{
+ "sample": "031-6_2",
+ "global_source": "P6_2_orig__D gate=same candidate image#0 (inverted to HE->IF)",
+ "roi": [
+  7.875719999999999,
+  340.2291,
+  996.74952,
+  1002.294588
+ ],
+ "n_he_roi": 827,
+ "n_if_candidates": 1091,
+ "status_counts": {
+  "matched": 612,
+  "unmatched": 120,
+  "ambiguous": 95
+ },
+ "conflicting_auto_pairs": 4,
+ "auto_dir": "runs/cell_review/031-6_2/auto/auto-2a63830bb26f",
+ "review_file": "runs/cell_review/031-6_2/reviews/rev-d2e81c257d/v0001.json",
+ "review_ops": 9,
+ "reviewed_pairs": 610,
+ "review_conflicts": 1,
+ "fields": {
+  "A": {
+   "method": "A",
+   "label": "Affineのみ",
+   "applied": true,
+   "reason": null,
+   "taper_gradient_max": 0.0,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": null,
+   "rejection_reason": null,
+   "jacobian_min": 1.0,
+   "jacobian_p05": 1.0,
+   "jacobian_median": 1.0,
+   "jacobian_p95": 1.0,
+   "jacobian_max": 1.0,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 0.0,
+   "displacement_p95_um": 0.0,
+   "displacement_median_um": 0.0,
+   "finite": true,
+   "anchors_n": 0
+  },
+  "AUTO": {
+   "method": "AUTO",
+   "label": "自動推定の核対応（B2）＋linear RBF",
+   "applied": true,
+   "reason": null,
+   "taper_gradient_max": 0.0760113686373907,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": true,
+   "rejection_reason": null,
+   "jacobian_min": 0.7083912016273062,
+   "jacobian_p05": 0.9504741992758678,
+   "jacobian_median": 1.0019184175710616,
+   "jacobian_p95": 1.0546058764020567,
+   "jacobian_max": 1.2477361602913826,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 5.006700707035029,
+   "displacement_p95_um": 2.16165766842629,
+   "displacement_median_um": 0.8556728888525882,
+   "finite": true,
+   "anchors_n": 612,
+   "anchor_coverage_cells": 1.0,
+   "cells_occupied": 52,
+   "exclude_conflicts": false
+  },
+  "REVIEWED": {
+   "method": "REVIEWED",
+   "label": "手動修正後の核対応＋linear RBF",
+   "applied": true,
+   "reason": null,
+   "taper_gradient_max": 0.05426399669535763,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": true,
+   "rejection_reason": null,
+   "jacobian_min": 0.6826192724480659,
+   "jacobian_p05": 0.9514461686678632,
+   "jacobian_median": 1.0023378790744555,
+   "jacobian_p95": 1.0550558243163672,
+   "jacobian_max": 1.288753616444711,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 5.839038267083697,
+   "displacement_p95_um": 1.904326407437887,
+   "displacement_median_um": 0.8333810555078742,
+   "finite": true,
+   "anchors_n": 610,
+   "anchor_coverage_cells": 1.0,
+   "cells_occupied": 52,
+   "exclude_conflicts": false
+  },
+  "D": {
+   "method": "D",
+   "label": "UOT conservative（既存）",
+   "applied": true,
+   "reason": null,
+   "taper_gradient_max": 0.04663876934911629,
+   "common_audit_pass": true,
+   "hard_safety_pass": true,
+   "topology_percentiles_pass": true,
+   "point_improvement_gate_pass": true,
+   "rejection_reason": null,
+   "jacobian_min": 0.8044006846551068,
+   "jacobian_p05": 0.953050298731749,
+   "jacobian_median": 1.0024263380783467,
+   "jacobian_p95": 1.0519805278661238,
+   "jacobian_max": 1.2143023447571826,
+   "foldover_fraction": 0.0,
+   "displacement_max_um": 3.0375907332713683,
+   "displacement_p95_um": 1.8477270761005482,
+   "displacement_median_um": 0.7094784436411047,
+   "finite": true,
+   "anchors_n": 738
+  }
+ },
+ "review_effect": {
+  "n": 827,
+  "median_um": 0.0,
+  "p95_um": 0.6126619614469151,
+  "max_um": 5.46218434264501,
+  "moved_gt_1um": 32,
+  "auto_applied": true,
+  "reviewed_applied": true
+ },
+ "images": {
+  "he_affine": {
+   "mapping": "inverse: IF-frame target pixel centre -> field inverse (fixed point) -> affine inverse -> HE level pixel",
+   "direction_forward": "HE -> IF:  x_IF = A(x_HE) + d(A(x_HE))",
+   "target_frame": "IF (fixed) frame-local µm",
+   "roi_if_frame": [
+    7.875719999999999,
+    340.2291,
+    996.74952,
+    1002.294588
+   ],
+   "target_um_per_px": 2.0,
+   "target_shape": [
+    332,
+    495
+   ],
+   "source_level": 3,
+   "source_um_per_px": 1.5101701294335708,
+   "source_region_px": [
+    359,
+    545,
+    1011,
+    983
+   ],
+   "interpolation": "bilinear",
+   "outside": "0 and invalid (no extrapolation)",
+   "inverse_tol_um": 0.05,
+   "inverse_max_iter": 60,
+   "inverse_residual_max_um": 0.0,
+   "inverse_not_converged_px": 0,
+   "valid_fraction": 1.0,
+   "status": "AFFINE_ONLY",
+   "nonrigid_applied": false,
+   "field_method": null
+  },
+  "he_reviewed": {
+   "mapping": "inverse: IF-frame target pixel centre -> field inverse (fixed point) -> affine inverse -> HE level pixel",
+   "direction_forward": "HE -> IF:  x_IF = A(x_HE) + d(A(x_HE))",
+   "target_frame": "IF (fixed) frame-local µm",
+   "roi_if_frame": [
+    7.875719999999999,
+    340.2291,
+    996.74952,
+    1002.294588
+   ],
+   "target_um_per_px": 2.0,
+   "target_shape": [
+    332,
+    495
+   ],
+   "source_level": 3,
+   "source_um_per_px": 1.5101701294335708,
+   "source_region_px": [
+    359,
+    545,
+    1011,
+    983
+   ],
+   "interpolation": "bilinear",
+   "outside": "0 and invalid (no extrapolation)",
+   "inverse_tol_um": 0.05,
+   "inverse_max_iter": 60,
+   "inverse_residual_max_um": 1.6077746776921858e-13,
+   "inverse_not_converged_px": 0,
+   "valid_fraction": 1.0,
+   "status": "APPLIED",
+   "nonrigid_applied": true,
+   "field_method": "REVIEWED"
+  },
+  "he_D": {
+   "mapping": "inverse: IF-frame target pixel centre -> field inverse (fixed point) -> affine inverse -> HE level pixel",
+   "direction_forward": "HE -> IF:  x_IF = A(x_HE) + d(A(x_HE))",
+   "target_frame": "IF (fixed) frame-local µm",
+   "roi_if_frame": [
+    7.875719999999999,
+    340.2291,
+    996.74952,
+    1002.294588
+   ],
+   "target_um_per_px": 2.0,
+   "target_shape": [
+    332,
+    495
+   ],
+   "source_level": 3,
+   "source_um_per_px": 1.5101701294335708,
+   "source_region_px": [
+    359,
+    545,
+    1011,
+    984
+   ],
+   "interpolation": "bilinear",
+   "outside": "0 and invalid (no extrapolation)",
+   "inverse_tol_um": 0.05,
+   "inverse_max_iter": 60,
+   "inverse_residual_max_um": 1.6077746776921858e-13,
+   "inverse_not_converged_px": 0,
+   "valid_fraction": 1.0,
+   "status": "APPLIED",
+   "nonrigid_applied": true,
+   "field_method": "D"
+  }
+ },
+ "export_dir": "runs/cell_review/031-6_2/exports/exp-20261117-175408-8de318",
+ "timing_s": {
+  "auto": 113.75783838704228,
+  "fields": 6.366476846393198,
+  "images": 2.7804682408459485
+ },
+ "peak_tracemalloc_mb": 150.768733
+}
