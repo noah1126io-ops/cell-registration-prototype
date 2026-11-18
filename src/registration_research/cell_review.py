@@ -43,7 +43,8 @@ from . import deformation_experiment as DE
 from .legacy import REPO, frozen_b2, modules
 
 SCHEMA_AUTO = "cellreg-cell-review-auto/1"
-SCHEMA_REVIEW = "cellreg-cell-review-edits/1"
+SCHEMA_REVIEW = "cellreg-cell-review-edits/2"          # /2 (2026-11-18): verdict ops, tags, scope, context
+SCHEMA_REVIEW_READABLE = ("cellreg-cell-review-edits/1", "cellreg-cell-review-edits/2")
 DIRECTION = "HE->IF"                    # moving = HE, fixed = IF
 ROI_MARGIN_UM = 30.0                    # IF nuclei this far outside the ROI stay candidates for HE nuclei near the border
 TOP_K = 5                               # candidates shown per HE nucleus
@@ -56,8 +57,21 @@ TAPER_UM = 50.0                         # outside the field grid the border disp
 FIELD_METHODS = ("A", "AUTO", "REVIEWED", "D")
 FIELD_LABELS = {"A": "Affineのみ", "AUTO": "自動推定の核対応（B2）＋linear RBF", "REVIEWED": "手動修正後の核対応＋linear RBF",
                 "D": "UOT conservative（既存）"}
-OPS = ("support", "exclude", "reassign", "add", "unset")
-OP_LABELS = {"support": "支持", "exclude": "除外", "reassign": "対応先を変更", "add": "対応ペアを追加", "unset": "未確定にする"}
+OPS = ("support", "exclude", "reassign", "add", "unset", "not_identified", "absent", "uncertain", "reset")
+OP_LABELS = {"support": "支持（対応確認）", "exclude": "対応を解除", "reassign": "対応先を変更（対応確認）", "add": "対応ペアを追加（対応確認）",
+             "unset": "対応を外す（未確定）", "not_identified": "未特定として記録", "absent": "非観測として記録", "uncertain": "判断不能として保留",
+             "reset": "未レビューに戻す"}
+VERDICT_OPS = ("not_identified", "absent", "uncertain")
+# Human review result -- kept apart from the algorithm state (auto.table["status"]: matched / ambiguous / unmatched).
+REVIEW_STATUSES = {"unreviewed": "未レビュー", "confirmed_match": "対応確認（Confirmed Match）", "not_identified": "未特定（Not Identified）",
+                   "absent": "非観測（Absent / Not Observed）", "uncertain": "判断不能（Uncertain）", "released": "対応を解除（判定なし）"}
+DECISION_TO_REVIEW = {"auto": "unreviewed", "none": "unreviewed", "supported": "confirmed_match", "reassigned": "confirmed_match",
+                      "added": "confirmed_match", "excluded": "released", "undecided": "released", "not_identified": "not_identified",
+                      "absent": "absent", "uncertain": "uncertain"}
+REVIEW_TAGS = {"seg_error_source": "H&E側のセグメンテーション異常", "seg_error_target": "IF側のセグメンテーション異常",
+               "split_merge": "核の分割・結合の疑い", "image_quality": "画像品質（ぼけ・染色・折れ・汚れ）", "competing_candidates": "候補が競合",
+               "edge_of_observation": "対象切片の観察範囲の端・外", "registration_doubt": "位置合わせの誤差の疑い"}
+SOURCE_SECTION, TARGET_SECTION = "HE", "IF"
 DEFAULT_ROOT = REPO / "runs" / "cell_review"      # runs/ is git-ignored; research.sqlite is never touched
 
 
@@ -294,6 +308,7 @@ class Review:
     cursor: int = 0
     history: list = field(default_factory=list)
     version: int = 0
+    context: dict = field(default_factory=dict)      # e.g. segmentation identifiers (schema /2); informational only
 
     @classmethod
     def start(cls, auto: AutoResult):
@@ -303,7 +318,11 @@ class Review:
     # -- state
     def state(self) -> dict:
         """{he_index: {"if_index": int | None, "decision": str}} for every HE nucleus touched (auto pairs + edits)."""
+        return self._replay()[0]
+
+    def _replay(self):
         s = {h: {"if_index": f, "decision": "auto"} for h, f in self.auto_pairs.items()}
+        v = {}
         for op in self.ops[:self.cursor]:
             h = op["he_index"]
             cur = s.get(h, {"if_index": None, "decision": "none"})
@@ -315,7 +334,30 @@ class Review:
                 s[h] = {"if_index": None, "decision": "undecided"}
             elif op["op"] in ("reassign", "add"):
                 s[h] = {"if_index": op["if_index"], "decision": "reassigned" if op["op"] == "reassign" else "added"}
-        return s
+            elif op["op"] in VERDICT_OPS:                       # no partner: not an anchor (like "exclude")
+                s[h] = {"if_index": None, "decision": op["op"]}
+            elif op["op"] == "reset":                           # back to the automatic estimate (unreviewed)
+                if h in self.auto_pairs:
+                    s[h] = {"if_index": self.auto_pairs[h], "decision": "auto"}
+                else:
+                    s.pop(h, None)
+                v.pop(h, None)
+                continue
+            d = s[h]
+            v[h] = {"review_status": DECISION_TO_REVIEW[d["decision"]], "decision": d["decision"], "if_index": d["if_index"],
+                    "held_if_index": op.get("held_if_index"), "seq": op["seq"], "user": op["user"], "at": op["at"],
+                    "reason": op.get("reason", ""), "tags": list(op.get("tags") or []), "scope": op.get("scope")}
+        return s, v
+
+    def verdicts(self) -> dict:
+        """{he_index: human review record} for every reviewed HE nucleus (the last op in effect; 'reset' removes it).
+
+        review_status is one of REVIEW_STATUSES; it is never derived from the algorithm state (unreviewed nuclei are not listed)."""
+        return self._replay()[1]
+
+    def review_status(self, he_index) -> str:
+        v = self.verdicts().get(int(he_index))
+        return v["review_status"] if v else "unreviewed"
 
     def pairs(self) -> dict:
         return {h: v["if_index"] for h, v in self.state().items() if v["if_index"] is not None}
@@ -334,12 +376,31 @@ class Review:
         if if_index is not None and not (isinstance(if_index, (int, np.integer)) and 0 <= int(if_index) < self.n_if):
             raise ReviewError(f"不正なIF核インデックス: {if_index}")
 
-    def apply(self, op: str, he_index: int, if_index: int | None = None, *, user: str | None = None, reason: str = "") -> dict:
+    def apply(self, op: str, he_index: int, if_index: int | None = None, *, user: str | None = None, reason: str = "",
+              tags=None, scope: dict | None = None) -> dict:
         if op not in OPS:
             raise ReviewError(f"不明な操作: {op}")
         self._check_ids(he_index, if_index)
         he_index = int(he_index)
+        tags = sorted(set(tags or []))
+        bad = [x for x in tags if x not in REVIEW_TAGS]
+        if bad:
+            raise ReviewError(f"不明な補助タグ: {bad}")
         cur = self.state().get(he_index, {"if_index": None, "decision": "none"})
+        extra = {}
+        if op in VERDICT_OPS:
+            if op == "absent" and not (reason or "").strip():
+                raise ReviewError("非観測には根拠のコメントが必要です（候補がない・確信度が低いだけでは非観測にしない）")
+            extra["held_if_index"] = cur["if_index"]
+            extra["scope"] = {"source_section": SOURCE_SECTION, "target_section": TARGET_SECTION,
+                              **({"absent_in": TARGET_SECTION} if op == "absent" else {}), **(scope or {})}
+            if_index = None
+        elif op == "reset":
+            if he_index not in self.verdicts() and cur["decision"] in ("auto", "none"):
+                raise ReviewError("すでに未レビューです")
+            if_index = None
+        elif scope:
+            extra["scope"] = dict(scope)
         if op == "support" and cur["if_index"] is None:
             raise ReviewError("支持する対応がありません（この核には現在の対応先がない）。『対応ペアを追加』を使ってください")
         if op in ("reassign", "add"):
@@ -352,13 +413,13 @@ class Review:
                 op = "reassign"                                   # the nucleus already has a partner: this is a change
             if op == "reassign" and cur["if_index"] is None:
                 op = "add"
-        else:
+        elif op not in VERDICT_OPS and op != "reset":
             if_index = None
         if op in ("exclude", "unset") and cur["if_index"] is None and cur["decision"] in ("excluded", "undecided"):
             raise ReviewError("すでに対応先がありません")
         rec = {"seq": len(self.history) + 1, "op": op, "he_index": he_index, "if_index": if_index, "before": cur,
                "auto": {"if_index": self.auto_pairs.get(he_index)}, "user": user or getpass.getuser(), "at": now_iso(),
-               "reason": reason or ""}
+               "reason": reason or "", "tags": tags, **extra}
         dropped = self.ops[self.cursor:]
         self.ops = self.ops[:self.cursor] + [rec]
         self.cursor = len(self.ops)
@@ -385,15 +446,17 @@ class Review:
                 "created_at": self.created_at, "saved_at": now_iso(), "version": self.version, "n_he": self.n_he, "n_if": self.n_if,
                 "auto_pairs": {str(k): v for k, v in self.auto_pairs.items()}, "ops": self.ops, "cursor": self.cursor,
                 "history": self.history, "effective_pairs_n": len(self.pairs()), "conflicts": {str(k): v for k, v in self.conflicts().items()},
-                "note": "手動の採択は生物学的に同じ細胞であることの証明ではない。自動推定の結果（auto_id）は変更していない。"}
+                "verdicts": {str(k): v for k, v in self.verdicts().items()}, "context": self.context,
+                "note": "手動の採択は生物学的に同じ細胞であることの証明ではない。非観測は対象切片・観察範囲についての判断で、"
+                        "生物学的な非存在の証明ではない。自動推定の結果（auto_id）は変更していない。"}
 
     @classmethod
     def from_json(cls, d: dict):
-        if d.get("schema") != SCHEMA_REVIEW:
+        if d.get("schema") not in SCHEMA_REVIEW_READABLE:
             raise ReviewError("レビューファイルの形式が違います")
         return cls(d["auto_id"], d["auto_sha"], int(d["n_he"]), int(d["n_if"]), {int(k): int(v) for k, v in d["auto_pairs"].items()},
                    review_id=d["review_id"], created_at=d["created_at"], ops=d["ops"], cursor=int(d["cursor"]), history=d["history"],
-                   version=int(d["version"]))
+                   version=int(d["version"]), context=d.get("context") or {})
 
     def save(self, sample_id: str, root: Path | None = None) -> Path:
         d = sample_dir(sample_id, root) / "reviews" / self.review_id
@@ -431,6 +494,102 @@ def pairs_frame(pairs: dict, he_ids, if_ids, he_mapped, if_pts, state=None) -> p
 
 def _scalar(v):
     return v.item() if hasattr(v, "item") else v
+
+
+# ----------------------------------------------------------------------------- human review annotations (2026-11-18)
+ANNOTATION_COLUMNS = ["sample_id", "auto_id", "review_id", "review_version", "source_section", "target_section", "source_index", "source_cell_id",
+                      "algorithm_status", "algorithm_top1_target_id", "algorithm_top1_rank_score", "algorithm_b2_match_prob",
+                      "algorithm_b2_unmatched_prob", "review_status", "target_index", "target_cell_id", "target_algorithm_rank",
+                      "target_mass_share", "target_distance_um", "agrees_with_algorithm_top1", "held_target_cell_id", "decision",
+                      "reviewed_at", "reviewer", "comment", "tags", "absent_in", "if_conflict", "source_contour_status",
+                      "target_contour_status", "source_segmentation_sha256", "target_segmentation_sha256"]
+
+
+def review_annotations(sample_id, auto: AutoResult, review: Review | None, he_ids, if_ids, he_mapped=None, if_pts=None,
+                       he_contours=None, if_contours=None) -> pd.DataFrame:
+    """One row per HE nucleus of the auto ROI: algorithm state and human review result side by side (never merged).
+
+    Unreviewed nuclei keep review_status 'unreviewed' -- in particular an algorithm 'unmatched' is never turned into 'absent'."""
+    ver = review.verdicts() if review is not None else {}
+    stt = review.state() if review is not None else {}
+    confl = {f for f in (review.conflicts() if review is not None else {})}
+    cand = auto.candidates
+    ctx = (review.context if review is not None else {}) or {}
+    seg = ctx.get("segmentation") or {}
+    rows = []
+    for r in auto.table.itertuples(index=False):
+        h = int(r.he_index)
+        v = ver.get(h)
+        tgt = (v or {}).get("if_index") if v else None
+        if v is None and h in stt:                         # unreviewed: the effective (automatic) partner is NOT a review result
+            tgt = None
+        crow = cand[(cand["he_index"] == h) & (cand["if_index"] == tgt)] if tgt is not None else cand.iloc[0:0]
+        held = (v or {}).get("held_if_index")
+        rows.append({
+            "sample_id": sample_id, "auto_id": auto.auto_id, "review_id": review.review_id if review else None,
+            "review_version": review.version if review else None, "source_section": SOURCE_SECTION, "target_section": TARGET_SECTION,
+            "source_index": h, "source_cell_id": _scalar(he_ids[h]), "algorithm_status": r.status,
+            "algorithm_top1_target_id": _scalar(if_ids[int(r.top1_if_index)]) if pd.notna(r.top1_if_index) and int(r.top1_if_index) >= 0 else None,
+            "algorithm_top1_rank_score": r.top1_mass_share, "algorithm_b2_match_prob": r.b2_match_prob,
+            "algorithm_b2_unmatched_prob": r.b2_unmatched_prob,
+            "review_status": v["review_status"] if v else "unreviewed",
+            "target_index": tgt, "target_cell_id": _scalar(if_ids[tgt]) if tgt is not None else None,
+            "target_algorithm_rank": int(crow["rank"].iloc[0]) if len(crow) else None,
+            "target_mass_share": float(crow["mass_share"].iloc[0]) if len(crow) else None,
+            "target_distance_um": float(np.linalg.norm(if_pts[tgt] - he_mapped[h])) if (tgt is not None and he_mapped is not None) else None,
+            "agrees_with_algorithm_top1": (bool(tgt == int(r.top1_if_index)) if (v and v["review_status"] == "confirmed_match") else None),
+            "held_target_cell_id": _scalar(if_ids[held]) if held is not None else None,
+            "decision": v["decision"] if v else "unreviewed", "reviewed_at": v["at"] if v else None, "reviewer": v["user"] if v else None,
+            "comment": v["reason"] if v else "", "tags": ";".join(v["tags"]) if v else "",
+            "absent_in": ((v.get("scope") or {}).get("absent_in") if v else None),
+            "if_conflict": bool(tgt in confl) if tgt is not None else False,
+            "source_contour_status": he_contours.status[h] if he_contours is not None else "no_segmentation",
+            "target_contour_status": (if_contours.status[tgt] if (if_contours is not None and tgt is not None) else
+                                      ("no_segmentation" if if_contours is None else None)),
+            "source_segmentation_sha256": (seg.get("HE") or {}).get("sha256"), "target_segmentation_sha256": (seg.get("IF") or {}).get("sha256")})
+    return pd.DataFrame(rows, columns=ANNOTATION_COLUMNS)
+
+
+def review_metrics(ann: pd.DataFrame) -> dict:
+    """Counts and rates for later Precision / Recall / non-match / agreement evaluation (reviewed nuclei only).
+
+    precision_of_algorithm_matched: among algorithm-matched nuclei with a decisive review (confirmed / not identified / absent),
+      the share confirmed to the algorithm's own top-1 target.  Uncertain and released reviews are excluded from the denominator.
+    algorithm_recall_of_confirmed: among confirmed matches, the share the algorithm had as 'matched' with the same target."""
+    rv = ann[ann["review_status"] != "unreviewed"]
+    counts = {k: int((ann["review_status"] == k).sum()) for k in REVIEW_STATUSES}
+    dec = rv[rv["review_status"].isin(["confirmed_match", "not_identified", "absent"])]
+    dm = dec[dec["algorithm_status"] == "matched"]
+    ok = dm[(dm["review_status"] == "confirmed_match") & (dm["agrees_with_algorithm_top1"] == True)]  # noqa: E712
+    conf = rv[rv["review_status"] == "confirmed_match"]
+    found = conf[(conf["algorithm_status"] == "matched") & (conf["agrees_with_algorithm_top1"] == True)]  # noqa: E712
+    by_alg = {a: {k: int(((rv["algorithm_status"] == a) & (rv["review_status"] == k)).sum()) for k in REVIEW_STATUSES if k != "unreviewed"}
+              for a in ("matched", "ambiguous", "unmatched")}
+    n = len(rv)
+    return {"n_nuclei": int(len(ann)), "n_reviewed": int(n), "review_status_counts": counts, "reviewed_by_algorithm_status": by_alg,
+            "precision_of_algorithm_matched": (len(ok) / len(dm)) if len(dm) else None, "precision_denominator": int(len(dm)),
+            "algorithm_recall_of_confirmed": (len(found) / len(conf)) if len(conf) else None, "recall_denominator": int(len(conf)),
+            "non_match_rate": ((counts["not_identified"] + counts["absent"]) / n) if n else None,
+            "absent_rate": (counts["absent"] / n) if n else None, "uncertain_rate": (counts["uncertain"] / n) if n else None,
+            "n_conflicting_targets": int(ann["if_conflict"].sum()),
+            "note": "人のレビューは生物学的な正解の証明ではない。未レビューの核は分母に入れていない。"}
+
+
+def review_agreement(a: pd.DataFrame, b: pd.DataFrame) -> dict:
+    """Agreement of two reviews of the same auto result on nuclei reviewed in both (status, and status + target)."""
+    k = ["source_index"]
+    m = a[a["review_status"] != "unreviewed"].merge(b[b["review_status"] != "unreviewed"], on=k, suffixes=("_a", "_b"))
+    n = len(m)
+    if n == 0:
+        return {"n_both_reviewed": 0, "status_agreement": None, "status_target_agreement": None, "cohen_kappa_status": None}
+    sa, sb = m["review_status_a"].to_numpy(str), m["review_status_b"].to_numpy(str)
+    po = float(np.mean(sa == sb))
+    cats = sorted(set(sa) | set(sb))
+    pe = float(sum(np.mean(sa == c) * np.mean(sb == c) for c in cats))
+    same_t = (sa == sb) & ((m["target_index_a"].isna() & m["target_index_b"].isna()) |
+                           (m["target_index_a"].fillna(-1).to_numpy(float) == m["target_index_b"].fillna(-1).to_numpy(float)))
+    return {"n_both_reviewed": int(n), "status_agreement": po, "status_target_agreement": float(np.mean(same_t)),
+            "cohen_kappa_status": ((po - pe) / (1 - pe)) if pe < 1 else None}
 
 
 # ----------------------------------------------------------------------------- Phase 4: local deformation
@@ -645,7 +804,7 @@ def nuclei_pixel_positions(he_pts_he_frame, M, t, fr: FieldResult | None, roi, d
 
 # ----------------------------------------------------------------------------- Phase 6: outputs
 def export_bundle(sample_id, auto: AutoResult, review: Review | None, fields: dict, he_pts, he_ids, if_pts, if_ids, *, images=None,
-                  image_records=None, settings=None, root: Path | None = None) -> Path:
+                  image_records=None, settings=None, root: Path | None = None, contours=None) -> Path:
     """Write every output of one comparison into a new directory (never overwrites)."""
     M, t = np.asarray(auto.meta["global"]["M"]), np.asarray(auto.meta["global"]["t"])
     ex = sample_dir(sample_id, root) / "exports" / f"exp-{_dt.datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
@@ -656,6 +815,9 @@ def export_bundle(sample_id, auto: AutoResult, review: Review | None, fields: di
     if review is not None:
         pairs_frame(review.pairs(), he_ids, if_ids, he_mapped, if_pts, review.state()).to_csv(ex / "reviewed_pairs.csv", index=False)
         (ex / "review_history.json").write_text(json.dumps(review.to_json(), indent=1, ensure_ascii=False, default=_json_default))
+    ann = review_annotations(sample_id, auto, review, he_ids, if_ids, he_mapped, if_pts, *(contours or (None, None)))
+    ann.to_csv(ex / "review_annotations.csv", index=False)
+    (ex / "review_metrics.json").write_text(json.dumps(review_metrics(ann), indent=1, ensure_ascii=False, default=_json_default))
     coords = pd.DataFrame({"he_index": np.arange(len(he_pts)), "he_id": [_scalar(v) for v in he_ids], "he_x": he_pts[:, 0], "he_y": he_pts[:, 1],
                            "affine_x": he_mapped[:, 0], "affine_y": he_mapped[:, 1]})
     sel = np.zeros(len(he_pts), bool); sel[auto.he_idx] = True
