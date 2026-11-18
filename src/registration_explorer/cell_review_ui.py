@@ -269,9 +269,32 @@ def _review_section(S, auto, he_pts, he_ids, if_pts, if_ids, mapped, avail):
     _deformation_section(S, auto, rv, he_pts, he_ids, if_pts, if_ids, mapped, avail)
 
 
+# Display modes shared with the Viewer tab: the Viewer's widget state (regx-hem / regx-ifm) is the single source of truth.
+# Two widgets cannot share one key, so this tab has its own widgets that copy from / write back to the Viewer's keys.
+HE_MODE_LABELS = {"rgb": "RGB", "nuclear": "核強調（反転グレー）"}          # same labels as the Viewer tab (page.py)
+IF_MODE_LABELS = {"rgb": "表示用RGB", "nuclear": "核推定 B−R（シアン）"}
+SHARED_MODE_KEYS = {"he": "regx-hem", "if": "regx-ifm"}
+
+
+def _shared_mode(which, label, labels, col):
+    shared, own = SHARED_MODE_KEYS[which], f"{KEY}-{which}m"
+    st.session_state[own] = st.session_state.get(shared, st.session_state.get(own, "rgb"))   # default RGB, as in the Viewer
+
+    def _write_back():
+        st.session_state[shared] = st.session_state[own]
+    return col.selectbox(label, list(labels), format_func=labels.get, key=own, on_change=_write_back)
+
+
+def display_modes(col_he=st, col_if=st):
+    """(he_mode, if_mode) shared with the Viewer tab; default RGB."""
+    return (_shared_mode("he", "H&E表示", HE_MODE_LABELS, col_he), _shared_mode("if", "蛍光表示", IF_MODE_LABELS, col_if))
+
+
 def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
     Ma, ta = np.asarray(auto.meta["global"]["M"]), np.asarray(auto.meta["global"]["t"])
-    show_img = st.toggle("画像を重ねる（概観）", value=any(avail[k]["image"] for k in ("HE", "IF")), key=f"{KEY}-img")
+    c_img, c_he, c_if = st.columns([1.2, 1, 1])
+    show_img = c_img.toggle("画像を重ねる（概観）", value=any(avail[k]["image"] for k in ("HE", "IF")), key=f"{KEY}-img")
+    he_mode, if_mode = display_modes(c_he, c_if)
     av = {k: dict(v) for k, v in avail.items()}
     if not show_img:
         for k in av:
@@ -279,7 +302,7 @@ def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
     try:
         sc, _, _ = scene.build_scene(S, av, "IF", Ma, ta, state_label="細胞対応レビュー", banners=[
             {"level": "warn", "text": "研究用プレビュー — 推定・手動の対応は同一細胞の証明ではありません"}],
-            opts=scene.ImageOptions(target_um=1.6, he_mode="nuclear", if_mode="nuclear"), show_vectors=False)
+            opts=scene.ImageOptions(target_um=1.6, he_mode=he_mode, if_mode=if_mode), show_vectors=False)
     except FileNotFoundError as exc:
         st.error(str(exc))
         return None
