@@ -46,3 +46,13 @@
 - そこで、部品の JS は Node で単体テストした。
 - ヘッドレスブラウザ（Playwright）の導入は、このセッションの権限で拒否されたため、実際のブラウザでのクリックは自動では確認していない。
 - 開発サーバー（8511、`CELLREG_CELL_REVIEW=1`）を起動してあるので、ユーザーの環境で確認できる。
+
+## 追記（2026-11-18）：表示モードの共有
+- `test_display_modes_shared_and_colours_identical`（slow）を追加した。tests_crx は全部で 25 件。
+- 確かめること：両タブの既定は RGB。Viewer で変えるとレビューに、レビューで変えると Viewer に反映される。同じ元画像と同じモードなら、IF・H&E とも画像レイヤーの JPEG のバイト列（＝色）と配置行列が一致する。
+- 対象を絞った実行（job 939033）：8 passed（新しいテスト、UI フロー 4 件、ページ全体 2 件、既存ファイル不変）。全体の結果は下に記す。
+- 全体（`pytest.sbatch all`、job 939035）：
+  - `tests/` 270 passed, 1 skipped
+  - 凍結済みの研究テスト 10 ＋ 7 passed
+  - 11-13 のテスト 13 passed
+  - tests_crx 24 passed, 1 skipped（skip は node がないためで、前回と同じ）

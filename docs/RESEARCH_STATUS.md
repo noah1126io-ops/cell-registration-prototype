@@ -11,7 +11,7 @@
 
 1. この文書
 2. `README.md` の「Registration Explorer (Research) と研究Workflow C」
-3. 最新の作業：`analysis/cell-review-explorer-20261117/REPORT.md`（Explorer での細胞対応のレビュー → 点群の変形 → H&E 画像の変形）。その前の研究は `analysis/region-cell-matching-20261113/REPORT.md`（核対応による候補の再評価と局所変形。結論は §3）。ロードマップは `analysis/adaptive-registration-validation-20261111/REPORT.md` と `v1_roadmap_recommendations.md`
+3. 最新の作業：`analysis/cell-review-annotation-20261118/REPORT.md`（核輪郭の表示、H&E と IF の左右比較、人のレビュー状態：対応確認／未特定／非観測／判断不能）。その前は `analysis/cell-review-explorer-20261117/REPORT.md`（Explorer での細胞対応のレビュー → 点群の変形 → H&E 画像の変形）。その前の研究は `analysis/region-cell-matching-20261113/REPORT.md`（核対応による候補の再評価と局所変形。結論は §3）。ロードマップは `analysis/adaptive-registration-validation-20261111/REPORT.md` と `v1_roadmap_recommendations.md`
 4. サンプルの来歴：`analysis/e0x-difficulty-and-web-integration-20261020/sample_provenance.md`
 5. エンジンの本体：`src/registration_core/workflow.py`（`CORE_VERSION`、`WorkflowConfig`、`infer_section_relation`、C3 の規則）
 
@@ -25,7 +25,7 @@
 - 最も大事な要件は、**誤った位置合わせを採択しないこと（誤採択 0）**。見逃し（採択できない）は、手動の補助で補う方針。
 - 目標：研究用 v1.0 を 2026-12-31 に完成させる（`v1_roadmap_recommendations.md`）。
 
-## 2. 現在の状態（2026-11-17）
+## 2. 現在の状態（2026-11-18）
 
 | 項目 | 状態 |
 |---|---|
@@ -33,8 +33,8 @@
 | エンジン | `registration_core 1.2 (2026-11-10)` |
 | 実行中のジョブ | なし |
 | 未完了の作業 | なし。次の作業はユーザーの承認待ち（§5） |
-| テスト | `pytest tests`：270 成功、1 スキップ。条件は §6 を参照。研究テスト：`analysis/region-cell-matching-20261113/tests_rcm`（13 件）、`analysis/cell-review-explorer-20261117/tests_crx`（24 件。slow を含む。`pytest.sbatch all`） |
-| 研究用コード | `src/registration_research/`（C1 の候補アダプタ、凍結済み Graph/UOT/B2 の呼び出し、再順位付け、局所変形の比較、`cell_review.py`＝レビュー・変形・画像の逆写像）。本番からは使われない |
+| テスト | `pytest tests`：270 成功、1 スキップ。条件は §6 を参照。研究テスト：`analysis/region-cell-matching-20261113/tests_rcm`（13 件）、`analysis/cell-review-explorer-20261117/tests_crx`（25 件）、`analysis/cell-review-annotation-20261118/tests_cra`（16 件。slow を含む。`pytest.sbatch all`。GPU の一致テストがあるので `--gres=gpu:1` が必要） |
+| 研究用コード | `src/registration_research/`（C1 の候補アダプタ、凍結済み Graph/UOT/B2 の呼び出し、再順位付け、局所変形の比較、`cell_review.py`＝レビュー・人のレビュー状態・評価用の表・変形・画像の逆写像、`nuclear_contours.py`＝既存のGeoJSONの核輪郭をIDで中心点に結ぶ）。本番からは使われない |
 | Explorer の研究タブ | 「核対応（研究）」：既定で無効（`CELLREG_REGION_CELL_MATCHING=1` で有効）。保存済みの結果を表示するだけ。「細胞対応レビュー（研究）」：既定で無効（`CELLREG_CELL_REVIEW=1` で有効）。計算し、`runs/cell_review/` にファイルとして保存する（研究ストアには書き込まない）。開発サーバー 8511 は 11-17 からこのフラグ付きで動かしている |
 
 ### エンジン（`src/registration_core`）の処理の流れ
@@ -105,6 +105,10 @@
   - 6_2 / 8_6 の変換が 11-10 と同一であること。
   - 鏡像の負例が本番の規則で NOT_ACCEPTED になること。
 - その後の作業：A3（Data Profiler を artifact に入れる）→ A4（戦略の提案）、A5（判定理由の表示）→ A6（失敗時の手動補助）、A7（再現できる実行履歴）、A9（IF チャンネルの設定化）。
+- 11-18 の作業からの候補（REPORT §7〜8）：
+  - 実データで人のレビューを行い（2 人で一致を見る）、`review_metrics` で B2 の matched の精度と未対応の率を求める → UOT のコスト・採否の判定の見直し。
+  - IF 核を起点とした判定（H&E に核がない）。大きな ROI での輪郭のタイルごとの読み込み。
+  - 6_2 の H&E の StarDist の検出漏れ・淡い領域の誤検出（図で確認）。
 - 11-17 の作業からの候補（REPORT §8）：
   - 実際のブラウザでのクリック操作の確認（ユーザーに依頼済み。Playwright の導入はセッションの権限で拒否された）。
   - 人による実データのレビューと、独立のランドマークでの評価。
@@ -162,4 +166,5 @@
 | 11-11 | `adaptive-registration-validation-20261111` | 未使用データ 0 件。派生ケース 16 件でのストレステスト。鏡像のリスクと、6_2 の CONFLICT を発見。適応型レジストレーションの設計と v1.0 のロードマップ。初めて GitHub に push（`e79a8ac`..`82f1376`） |
 | 11-13 | — | この引き継ぎ文書を作成 |
 | 11-13 | `region-cell-matching-20261113` | C1 の上位 k 候補を Graph/UOT/B2 で再評価：救済はほぼない（候補生成がボトルネック）。B2 アンカーの局所変形は、合成データでは最良だが、変形が小さいときや誤った領域では危険。研究用コードは `src/registration_research/`、Explorer の研究タブは既定で無効 |
-| 11-17 | `cell-review-explorer-20261117` | Explorer の研究タブ「細胞対応レビュー（研究）」（既定で無効）：核対応の上位 5 候補、手動レビュー（支持・除外・変更・追加・未確定・取り消し・やり直し、版ごとの保存）、Affine／自動推定＋RBF／手動修正後＋RBF／UOT の変位場、H&E 画像の逆写像（収束を確認）、出力。既存のテストはすべて同じ結果、新しいテストは 24 件 |
+| 11-17 | `cell-review-explorer-20261117` | Explorer の研究タブ「細胞対応レビュー（研究）」（既定で無効）：核対応の上位 5 候補、手動レビュー（支持・除外・変更・追加・未確定・取り消し・やり直し、版ごとの保存）、Affine／自動推定＋RBF／手動修正後＋RBF／UOT の変位場、H&E 画像の逆写像（収束を確認）、出力。既存のテストはすべて同じ結果、新しいテストは 24 件。11-18：レビューの画像表示モード（RGB／核強調）を Viewer の `regx-hem`/`regx-ifm` と共有し、既定を RGB にした（テストは 25 件） |
+| 11-18 | `cell-review-annotation-20261118` | Cell Review：既存のGeoJSONの核輪郭（IDで結合・整合性を検査）、H&E と IF の左右比較（未変形）、人のレビュー状態（対応確認／未特定／非観測／判断不能を、アルゴリズムの状態とは別に保存）、補助タグ、評価用の表と集計。推定・変形・Workflow C/D は変更なし。tests_cra 15+1 |

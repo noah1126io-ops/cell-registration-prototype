@@ -1,0 +1,86 @@
+[
+ {
+  "sample": "031-6_2",
+  "he_index": 340,
+  "section": "HE",
+  "level_um_per_px": 0.18872089583333335,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-6_2",
+  "he_index": 340,
+  "section": "IF",
+  "level_um_per_px": 0.1002,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-6_2",
+  "he_index": 695,
+  "section": "HE",
+  "level_um_per_px": 0.18872089583333335,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-6_2",
+  "he_index": 695,
+  "section": "IF",
+  "level_um_per_px": 0.1002,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-6_2",
+  "he_index": 717,
+  "section": "HE",
+  "level_um_per_px": 0.18872089583333335,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-6_2",
+  "he_index": 717,
+  "section": "IF",
+  "level_um_per_px": 0.1002,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-8_6",
+  "he_index": 1201,
+  "section": "HE",
+  "level_um_per_px": 0.18872089583333335,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-8_6",
+  "he_index": 1201,
+  "section": "IF",
+  "level_um_per_px": 0.1002,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-8_6",
+  "he_index": 1890,
+  "section": "HE",
+  "level_um_per_px": 0.18872089583333335,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-8_6",
+  "he_index": 1890,
+  "section": "IF",
+  "level_um_per_px": 0.1002,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-8_6",
+  "he_index": 441,
+  "section": "HE",
+  "level_um_per_px": 0.18872089583333335,
+  "contour_contains_centre": true
+ },
+ {
+  "sample": "031-8_6",
+  "he_index": 441,
+  "section": "IF",
+  "level_um_per_px": 0.1002,
+  "contour_contains_centre": true
+ }
+]

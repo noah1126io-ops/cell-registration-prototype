@@ -469,3 +469,91 @@ def test_full_explorer_page_with_and_without_tab(monkeypatch, tmp_path, on):
     labels = [t.label for t in at.tabs]
     assert labels[:8] == ["対応領域の探索", "Viewer（重ね合わせ・手動調整）", "評価・注釈", "方式比較", "Warp Preview", "新規実行", "実験記録", "Artifact"]
     assert ("細胞対応レビュー（研究）" in labels) == on
+
+
+# ----------------------------------------------------------------------------- display modes shared with the Viewer tab (2026-11-18)
+def _both_tabs(root):
+    """The Viewer tab and the review tab rendered in one run, as on the page; the scenes sent to both viewers are recorded."""
+    import os
+    import sys
+    sys.path.insert(0, "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu")
+    os.environ["CELLREG_CELL_REVIEW_ROOT"] = root
+    import streamlit as st
+    from src.registration_explorer import catalog, page, results, viewer
+    from src.registration_explorer import cell_review_ui as U
+    from src.registration_explorer import cell_review_viewer as crv
+    cap = {}
+
+    def rec_(name, fn):
+        def w(sc, *a, **k):
+            cap[name] = [(L["role"], L["id"], L["src"], L["m"]) for L in sc["images"]]
+            return fn(sc, *a, **k)
+        w._orig = fn
+        return w
+    viewer.interactive = rec_("viewer", getattr(viewer.interactive, "_orig", viewer.interactive))
+    crv.interactive = rec_("review", getattr(crv.interactive, "_orig", crv.interactive))
+    S = catalog.load_manifest()["031-6_2"]
+    avail = catalog.availability(S)
+    recs = [r for r in results.load_records(S) if r.M is not None]
+    rec = next((r for r in recs if r.method == "WF"), recs[0])
+    st.session_state.setdefault("regx-crv-roisrc", "manual")
+    t1, t2 = st.tabs(["Viewer", "review"])
+    with t1:
+        page._viewer_tab(S, avail, rec, None, "IF")
+    with t2:
+        U.render(S, avail, rec, "IF")
+    st.session_state["_cap"] = cap
+    viewer.interactive, crv.interactive = viewer.interactive._orig, crv.interactive._orig
+
+
+@pytest.mark.slow
+def test_display_modes_shared_and_colours_identical(tmp_path):
+    """Default RGB in both tabs; the H&E / IF modes are shared both ways; same image + same mode -> identical pixels and layer placement."""
+    from streamlit.testing.v1 import AppTest
+    from src.registration_explorer import catalog, results
+    from src.registration_research import cell_review as CR
+    S = catalog.load_manifest()["031-6_2"]
+    recs = [r for r in results.load_records(S) if r.M is not None]
+    rec = next((r for r in recs if r.method == "WF"), recs[0])
+    M, t, _ = results.oriented(rec.M, rec.t, rec.fixed, "IF")
+    he, _ = catalog.load_nuclei(S.modality("HE"))
+    iff, _ = catalog.load_nuclei(S.modality("IF"))
+    roi = CR.default_roi(CR.map_points(M, t, he), iff, S.modality("IF").extent())
+    c = [(roi[0] + roi[2]) / 2, (roi[1] + roi[3]) / 2]
+    at = AppTest.from_function(_both_tabs, kwargs={"root": str(tmp_path)}, default_timeout=600)
+    at.run()
+    assert not at.exception, at.exception
+    for i, v in enumerate([c[0] - 120, c[1] - 120, c[0] + 120, c[1] + 120]):
+        next(w for w in at.number_input if w.key.startswith(f"regx-crv-roi{i}-manual")).set_value(v)
+    at.run()
+    at.button(key="regx-crv-run").click().run()
+    assert not at.exception, at.exception
+
+    def layers():
+        cap = at.session_state["_cap"]
+        assert "viewer" in cap and "review" in cap
+        by = {n: {role: (src, m) for role, lid, src, m in cap[n] if lid in ("fixed", "moving")} for n in ("viewer", "review")}
+        assert set(by["viewer"]) == set(by["review"]) == {"fixed", "moving"}       # IF = fixed, H&E = moving in both
+        return by
+
+    def check(he_mode, if_mode):
+        assert at.selectbox(key="regx-hem").value == at.selectbox(key="regx-crv-hem").value == he_mode
+        assert at.selectbox(key="regx-ifm").value == at.selectbox(key="regx-crv-ifm").value == if_mode
+        by = layers()
+        for role in ("fixed", "moving"):
+            assert by["viewer"][role][0] == by["review"][role][0], role                  # same JPEG bytes -> same colours
+            assert np.allclose(by["viewer"][role][1], by["review"][role][1], atol=1e-6), role   # same placement
+        return by
+
+    rgb = check("rgb", "rgb")                                   # 1. default RGB in both tabs
+    at.selectbox(key="regx-hem").set_value("nuclear").run()     # changed in the Viewer -> review follows
+    assert not at.exception, at.exception
+    he_nuc = check("nuclear", "rgb")
+    assert he_nuc["review"]["moving"][0] != rgb["review"]["moving"][0] and he_nuc["review"]["fixed"][0] == rgb["review"]["fixed"][0]
+    at.selectbox(key="regx-crv-ifm").set_value("nuclear").run()  # changed in the review tab -> Viewer follows
+    assert not at.exception, at.exception
+    both = check("nuclear", "nuclear")
+    assert both["viewer"]["fixed"][0] != rgb["viewer"]["fixed"][0]
+    at.selectbox(key="regx-crv-hem").set_value("rgb").run()
+    at.selectbox(key="regx-ifm").set_value("rgb").run()
+    assert check("rgb", "rgb")["viewer"]["moving"][0] == rgb["viewer"]["moving"][0]

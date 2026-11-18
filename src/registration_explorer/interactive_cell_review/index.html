@@ -136,6 +136,12 @@ function emit(data){ send('streamlit:setComponentValue', {value: Object.assign({
 function makeAPI(S, key){
   const store = (k, v) => { try { if (v === undefined) return JSON.parse(sessionStorage.getItem('crv-' + key + k) || 'null'); sessionStorage.setItem('crv-' + key + k, JSON.stringify(v)); } catch (e) { return null; } };
   const A = {mode: store('mode') || 'pick_he'};
+  const opt = Object.assign({contours: true, ids: false, centres: true, alpha: 0.45}, store('opt') || {});
+  A.opt = opt;
+  const groups = S.contours || [];
+  for (const G of groups) G.bb = G.poly.map(P => { let a = 1e30, b = 1e30, c = -1e30, d = -1e30;
+    for (let i = 0; i < P.length; i += 2) { a = Math.min(a, P[i]); c = Math.max(c, P[i]); b = Math.min(b, P[i+1]); d = Math.max(d, P[i+1]); } return [a, b, c, d]; });
+  const applyCentres = () => { for (const L of S.points) { if (L._userVis === undefined) L._userVis = L.visible; L.visible = opt.centres ? L._userVis : false; } };
   A.panel = (side, el, redraw) => {
     side.appendChild(el('h4', {}, 'クリック操作'));
     const sel = el('select');
@@ -146,6 +152,16 @@ function makeAPI(S, key){
       pick_if: 'IF核をクリックすると、選択中のH&E核の対応先候補として下に送ります'}[A.mode]; };
     sel.onchange = () => { A.mode = sel.value; store('mode', A.mode); A.info(); redraw(); };
     A.info();
+    side.appendChild(el('h4', {}, 'セグメンテーション表示'));
+    const chk = (k, label) => { const l = el('label'); const c = el('input', {type: 'checkbox', checked: !!opt[k]});
+      c.onchange = () => { opt[k] = c.checked; store('opt', opt); if (k === 'centres') applyCentres(); redraw(); };
+      l.appendChild(c); l.appendChild(document.createTextNode(label)); side.appendChild(l); };
+    chk('contours', '核輪郭（拡大時に薄く表示）'); chk('ids', '細胞ID（さらに拡大時）'); chk('centres', '核中心点');
+    side.appendChild(el('div', {style: 'color:var(--mut)'}, '輪郭の濃さ'));
+    const ca = el('input', {type: 'range', min: 0.1, max: 1, step: 0.05, value: opt.alpha});
+    ca.oninput = () => { opt.alpha = +ca.value; store('opt', opt); redraw(); }; side.appendChild(ca);
+    side.appendChild(el('div', {style: 'color:var(--mut)'}, groups.length ? '選択中の核と候補の輪郭は常に強調表示します' : '輪郭データなし（中心点でレビュー）'));
+    applyCentres();
   };
   A.down = () => {};
   A.move = () => false;
@@ -153,7 +169,7 @@ function makeAPI(S, key){
     const role = A.mode === 'pick_he' ? 'he' : (A.mode === 'pick_if' ? 'if' : null); if (!role) return;
     const v = window.__regx.st.view; const tol = 12 / v.k;      // 12 screen px
     let best = -1, bd = tol * tol;
-    for (const L of S.points) { if (L.pick !== role || !L.visible) continue;
+    for (const L of S.points) { if (L.pick !== role || !(L.visible || (!opt.centres && L._userVis))) continue;
       for (let i = 0, n = L.xy.length / 2; i < n; i++) { const dx = L.xy[2*i] - w[0], dy = L.xy[2*i+1] - w[1], d = dx*dx + dy*dy; if (d < bd) { bd = d; best = L.idx[i]; } } }
     if (best >= 0) emit({kind: 'nucleus', role: role, index: best});
   };
@@ -161,6 +177,26 @@ function makeAPI(S, key){
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const ring = (q, c, r) => { if (!q) return; ctx.beginPath(); ctx.arc(q[0]*v.k + v.ox, q[1]*v.k + v.oy, r, 0, 6.2832); ctx.lineWidth = 2.5; ctx.strokeStyle = c; ctx.stroke(); };
     const sp = S.selected || {};
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    const vx0 = -v.ox / v.k, vy0 = -v.oy / v.k, vx1 = (W - v.ox) / v.k, vy1 = (H - v.oy) / v.k;
+    const path = (P) => { ctx.beginPath(); for (let i = 0; i < P.length; i += 2) { const x = P[i]*v.k + v.ox, y = P[i+1]*v.k + v.oy; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); };
+    A.drawn = 0;
+    if (opt.contours && v.k >= (S.contour_min_k || 1.2)) {            // level of detail: outlines only when zoomed in
+      ctx.save(); ctx.globalAlpha = opt.alpha; ctx.lineWidth = Math.min(1.6, 0.5 + 0.08 * v.k);
+      for (const G of groups) { if (G.visible === false) continue; ctx.strokeStyle = G.color;
+        for (let j = 0; j < G.poly.length; j++) { const b = G.bb[j]; if (b[2] < vx0 || b[0] > vx1 || b[3] < vy0 || b[1] > vy1) continue; path(G.poly[j]); ctx.stroke(); A.drawn++; } }
+      ctx.restore();
+    }
+    if (opt.ids && v.k >= (S.label_min_k || 4)) {
+      ctx.save(); const fs = Math.max(9, Math.min(14, v.k * 1.1)); ctx.font = fs + 'px sans-serif'; ctx.textBaseline = 'bottom'; let nl = 0;
+      for (const G of groups) { if (!G.ids) continue; ctx.fillStyle = G.label_color || G.color;
+        for (let j = 0; j < G.ids.length && nl < 800; j++) { const q = G.at[j]; if (q[0] < vx0 || q[0] > vx1 || q[1] < vy0 || q[1] > vy1) continue;
+          ctx.fillText(String(G.ids[j]), q[0]*v.k + v.ox + 3, q[1]*v.k + v.oy - 3); nl++; } }
+      ctx.restore();
+    }
+    const hl = (P, c, w, dash) => { if (!P || !P.length) return; ctx.save(); ctx.setLineDash(dash || []); ctx.lineWidth = w; ctx.strokeStyle = c; path(P); ctx.stroke(); ctx.restore(); };
+    for (const P of (sp.cand_polys || [])) hl(P, '#ffffff', 1.6, [4, 3]);
+    hl(sp.he_poly, '#ffeb3b', 2.6); hl(sp.if_poly, '#00e5ff', 2.6);
     ring(sp.he, '#ffeb3b', 9); ring(sp.if, '#00e5ff', 9);
     for (const q of (sp.candidates || [])) ring(q, '#ffffff', 6);
   };
