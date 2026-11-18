@@ -1,0 +1,42 @@
+{
+ "031-6_2": {
+  "n_cells": 656,
+  "n_nuclei": 1091,
+  "area_um2_median": 216.25,
+  "relations_nuclei": {
+   "nucleus_without_cell": 533,
+   "nucleus_outside_cell": 342,
+   "assigned": 214,
+   "nucleus_competing_cells": 2
+  },
+  "relations_cells": {
+   "cell_without_nucleus": 467,
+   "one_nucleus": 168,
+   "multi_nucleus": 21
+  },
+  "frac_nucleus_sized": 0.019817073170731708,
+  "tissue_covered_by_cells": 0.3889983099532827,
+  "boundary_contrast": 2.3982040882110596,
+  "export_seconds": 3.901087760925293
+ },
+ "031-8_6": {
+  "n_cells": 926,
+  "n_nuclei": 1552,
+  "area_um2_median": 741.625,
+  "relations_nuclei": {
+   "assigned": 723,
+   "nucleus_outside_cell": 522,
+   "nucleus_without_cell": 242,
+   "nucleus_competing_cells": 65
+  },
+  "relations_cells": {
+   "cell_without_nucleus": 424,
+   "one_nucleus": 319,
+   "multi_nucleus": 183
+  },
+  "frac_nucleus_sized": 0.005399568034557235,
+  "tissue_covered_by_cells": 0.7562501262694798,
+  "boundary_contrast": 1.9560091495513916,
+  "export_seconds": 8.353994846343994
+ }
+}

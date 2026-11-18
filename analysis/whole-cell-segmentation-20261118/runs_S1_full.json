@@ -1,0 +1,30 @@
+{
+ "method": "S1_cpsam_if_mem_full",
+ "variant": "if_mem",
+ "cellprob_threshold": 0.0,
+ "flow_threshold": 0.4,
+ "runs": [
+  {
+   "sample": "031-6_2",
+   "shape": [
+    2052,
+    2052,
+    3
+   ],
+   "seconds": 3.1874711513519287,
+   "gpu_peak_mb": 1498.16552734375,
+   "n_labels": 656
+  },
+  {
+   "sample": "031-8_6",
+   "shape": [
+    2052,
+    2052,
+    3
+   ],
+   "seconds": 3.6388070583343506,
+   "gpu_peak_mb": 1618.5634765625,
+   "n_labels": 926
+  }
+ ]
+}

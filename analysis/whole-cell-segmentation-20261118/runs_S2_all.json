@@ -1,0 +1,16 @@
+{
+ "method": "S2_mesmer",
+ "inputs": {
+  "nuclear": "clip(B-R) of display RGB (proxy)",
+  "membrane": "G+R of display RGB (proxy)"
+ },
+ "image_mpp": 0.5,
+ "compartment": "whole-cell",
+ "token_present": false,
+ "runs": [],
+ "deepcell": "0.12.10",
+ "tensorflow": "2.8.4",
+ "gpu": [],
+ "model_error": "ValueError(\"\\nDEEPCELL_ACCESS_TOKEN not found.\\nPlease set your access token to the DEEPCELL_ACCESS_TOKEN\\nenvironment variable.\\nFor example:\\n\\n\\texport DEEPCELL_ACCESS_TOKEN=<your-token>.\\n\\nIf you don't yet have a token, you can create one at\\nhttps://users.deepcell.org\")",
+ "traceback": "Traceback (most recent call last):\n  File \"/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/run_mesmer.py\", line 38, in main\n    app = Mesmer()\n  File \"/mnt/mib-dbia08_1/users/noa.ganeko/miniconda3/envs/cellseg-mesmer/lib/python3.10/site-packages/deepcell/applications/mesmer.py\", line 216, in __init__\n    archive_path = fetch_data(\n  File \"/mnt/mib-dbia08_1/users/noa.ganeko/miniconda3/envs/cellseg-mesmer/lib/python3.10/site-packages/deepcell/utils/_auth.py\", line 77, in fetch_data\n    raise ValueError(\nValueError: \nDEEPCELL_ACCESS_TOKEN not found.\nPlease set your access token to the DEEPCELL_ACCESS_TOKEN\nenvironment variable.\nFor example:\n\n\texport DEEPCELL_ACCESS_TOKEN=<your-token>.\n\nIf you don't yet have a token, you can create one at\nhttps://users.deepcell.org\n"
+}
