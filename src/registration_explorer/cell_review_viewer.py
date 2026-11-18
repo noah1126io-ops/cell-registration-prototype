@@ -23,9 +23,10 @@ function emit(data){ send('streamlit:setComponentValue', {value: Object.assign({
 function makeAPI(S, key){
   const store = (k, v) => { try { if (v === undefined) return JSON.parse(sessionStorage.getItem('crv-' + key + k) || 'null'); sessionStorage.setItem('crv-' + key + k, JSON.stringify(v)); } catch (e) { return null; } };
   const A = {mode: store('mode') || 'pick_he'};
-  const opt = Object.assign({contours: true, ids: false, centres: true, alpha: 0.45}, store('opt') || {});
+  const opt = Object.assign({contours: true, ids: false, centres: true, alpha: 0.45, cells: true, cell_ids: false}, store('opt') || {});
   A.opt = opt;
   const groups = S.contours || [];
+  const hasCells = groups.some(G => G.kind === 'cell');
   for (const G of groups) G.bb = G.poly.map(P => { let a = 1e30, b = 1e30, c = -1e30, d = -1e30;
     for (let i = 0; i < P.length; i += 2) { a = Math.min(a, P[i]); c = Math.max(c, P[i]); b = Math.min(b, P[i+1]); d = Math.max(d, P[i+1]); } return [a, b, c, d]; });
   const applyCentres = () => { for (const L of S.points) { if (L._userVis === undefined) L._userVis = L.visible; L.visible = opt.centres ? L._userVis : false; } };
@@ -43,7 +44,8 @@ function makeAPI(S, key){
     const chk = (k, label) => { const l = el('label'); const c = el('input', {type: 'checkbox', checked: !!opt[k]});
       c.onchange = () => { opt[k] = c.checked; store('opt', opt); if (k === 'centres') applyCentres(); redraw(); };
       l.appendChild(c); l.appendChild(document.createTextNode(label)); side.appendChild(l); };
-    chk('contours', '核輪郭（拡大時に薄く表示）'); chk('ids', '細胞ID（さらに拡大時）'); chk('centres', '核中心点');
+    chk('contours', '核輪郭（実線・拡大時に表示）'); chk('ids', '核ID（さらに拡大時）'); chk('centres', '核中心点');
+    if (hasCells) { chk('cells', '細胞全体の輪郭（破線）'); chk('cell_ids', '細胞ID（さらに拡大時）'); }
     side.appendChild(el('div', {style: 'color:var(--mut)'}, '輪郭の濃さ'));
     const ca = el('input', {type: 'range', min: 0.1, max: 1, step: 0.05, value: opt.alpha});
     ca.oninput = () => { opt.alpha = +ca.value; store('opt', opt); redraw(); }; side.appendChild(ca);
@@ -68,20 +70,24 @@ function makeAPI(S, key){
     const vx0 = -v.ox / v.k, vy0 = -v.oy / v.k, vx1 = (W - v.ox) / v.k, vy1 = (H - v.oy) / v.k;
     const path = (P) => { ctx.beginPath(); for (let i = 0; i < P.length; i += 2) { const x = P[i]*v.k + v.ox, y = P[i+1]*v.k + v.oy; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); };
     A.drawn = 0;
-    if (opt.contours && v.k >= (S.contour_min_k || 1.2)) {            // level of detail: outlines only when zoomed in
-      ctx.save(); ctx.globalAlpha = opt.alpha; ctx.lineWidth = Math.min(1.6, 0.5 + 0.08 * v.k);
-      for (const G of groups) { if (G.visible === false) continue; ctx.strokeStyle = G.color;
+    {                                                                 // level of detail: outlines only when zoomed in
+      ctx.save(); ctx.globalAlpha = opt.alpha; const lw = Math.min(1.6, 0.5 + 0.08 * v.k);
+      for (const G of groups) { if (G.visible === false) continue; const cell = G.kind === 'cell';
+        if (cell ? (!opt.cells || v.k < (S.cell_min_k || 0.6)) : (!opt.contours || v.k < (S.contour_min_k || 1.2))) continue;
+        ctx.strokeStyle = G.color; ctx.setLineDash(G.dash || []); ctx.lineWidth = lw * (G.wmul || 1);
         for (let j = 0; j < G.poly.length; j++) { const b = G.bb[j]; if (b[2] < vx0 || b[0] > vx1 || b[3] < vy0 || b[1] > vy1) continue; path(G.poly[j]); ctx.stroke(); A.drawn++; } }
       ctx.restore();
     }
-    if (opt.ids && v.k >= (S.label_min_k || 4)) {
+    if ((opt.ids || opt.cell_ids) && v.k >= (S.label_min_k || 4)) {
       ctx.save(); const fs = Math.max(9, Math.min(14, v.k * 1.1)); ctx.font = fs + 'px sans-serif'; ctx.textBaseline = 'bottom'; let nl = 0;
-      for (const G of groups) { if (!G.ids) continue; ctx.fillStyle = G.label_color || G.color;
+      for (const G of groups) { if (!G.ids || G.visible === false || !(G.kind === 'cell' ? (opt.cell_ids && opt.cells) : opt.ids)) continue; ctx.fillStyle = G.label_color || G.color;
         for (let j = 0; j < G.ids.length && nl < 800; j++) { const q = G.at[j]; if (q[0] < vx0 || q[0] > vx1 || q[1] < vy0 || q[1] > vy1) continue;
           ctx.fillText(String(G.ids[j]), q[0]*v.k + v.ox + 3, q[1]*v.k + v.oy - 3); nl++; } }
       ctx.restore();
     }
     const hl = (P, c, w, dash) => { if (!P || !P.length) return; ctx.save(); ctx.setLineDash(dash || []); ctx.lineWidth = w; ctx.strokeStyle = c; path(P); ctx.stroke(); ctx.restore(); };
+    if (opt.cells) { for (const P of (sp.cand_cell_polys || [])) hl(P, '#ffcc80', 1.4, [7, 4]);
+      for (const P of (sp.he_cell_polys || [])) hl(P, '#ff9800', 2.4, [8, 4]); for (const P of (sp.if_cell_polys || [])) hl(P, '#ff6d00', 2.4, [8, 4]); }
     for (const P of (sp.cand_polys || [])) hl(P, '#ffffff', 1.6, [4, 3]);
     hl(sp.he_poly, '#ffeb3b', 2.6); hl(sp.if_poly, '#00e5ff', 2.6);
     ring(sp.he, '#ffeb3b', 9); ring(sp.if, '#00e5ff', 9);
@@ -105,9 +111,17 @@ def pick_points_layer(layer_id, label, xy, idx, role, color, visible=True, radiu
     return lay
 
 
-def contour_group(group_id, label, packed: dict, color, ids=None, at=None, visible=True, label_color=None):
-    """Outlines drawn by the overlay (level of detail + viewport culling in the browser).  packed = Contours.pack(...)."""
-    g = {"id": group_id, "label": label, "color": color, "poly": packed["poly"], "idx": packed["idx"], "visible": visible}
+def contour_group(group_id, label, packed: dict, color, ids=None, at=None, visible=True, label_color=None, kind="nucleus", dash=None,
+                  wmul=1.0):
+    """Outlines drawn by the overlay (level of detail + viewport culling in the browser).  packed = Contours.pack(...).
+
+    kind "nucleus" (solid, toggle 核輪郭 / 核ID) or "cell" (whole-cell outlines: dashed, toggle 細胞全体の輪郭 / 細胞ID)."""
+    assert kind in ("nucleus", "cell"), kind
+    g = {"id": group_id, "label": label, "color": color, "poly": packed["poly"], "idx": packed["idx"], "visible": visible, "kind": kind}
+    if dash:
+        g["dash"] = list(dash)
+    if wmul != 1.0:
+        g["wmul"] = float(wmul)
     if ids is not None:
         g["ids"] = [str(v) for v in ids]
         g["at"] = np.round(np.asarray(at, float).reshape(-1, 2), 2).tolist()

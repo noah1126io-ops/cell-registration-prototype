@@ -1,0 +1,187 @@
+{
+ "note": "top-1 vs other candidates is a proxy (no human-confirmed pairs yet); differences do not show usefulness for matching",
+ "samples": {
+  "031-6_2": {
+   "auto": "auto-8bd12fc11952",
+   "n_cells": 656
+  },
+  "031-8_6": {
+   "auto": "auto-83cf822baef4",
+   "n_cells": 926
+  }
+ },
+ "cells": {
+  "031-6_2": {
+   "area_um2": {
+    "median": 216.25,
+    "p10": 69.1,
+    "p90": 563.45
+   },
+   "aspect_ratio": {
+    "median": 1.4598233719590346,
+    "p10": 1.1631591063949744,
+    "p90": 2.1660607163992807
+   },
+   "solidity": {
+    "median": 0.9413680781758957,
+    "p10": 0.8765950587614666,
+    "p90": 0.9621242454460337
+   },
+   "nucleus_cell_area_ratio": {
+    "median": 0.2490504612045578,
+    "p10": 0.1303570003078127,
+    "p90": 0.6020351860104839
+   },
+   "nucleus_offset_rel": {
+    "median": 0.33475438265142315,
+    "p10": 0.13059289803224575,
+    "p90": 0.7364771657573218
+   },
+   "nn_cell_distance_um": {
+    "median": 15.17682196640653,
+    "p10": 9.222699972903841,
+    "p90": 25.619514019649557
+   },
+   "n_contacts": {
+    "median": 2.0,
+    "p10": 0.0,
+    "p90": 4.0
+   },
+   "n": 655
+  },
+  "031-8_6": {
+   "area_um2": {
+    "median": 741.625,
+    "p10": 333.85,
+    "p90": 1455.0750000000003
+   },
+   "aspect_ratio": {
+    "median": 1.7470030752192398,
+    "p10": 1.2422970275037748,
+    "p90": 2.7737882712409134
+   },
+   "solidity": {
+    "median": 0.9371210487615736,
+    "p10": 0.855733850933718,
+    "p90": 0.9697739434076543
+   },
+   "nucleus_cell_area_ratio": {
+    "median": 0.19125277983691624,
+    "p10": 0.06339333217519563,
+    "p90": 0.4097288277012932
+   },
+   "nucleus_offset_rel": {
+    "median": 0.42078929057235354,
+    "p10": 0.14723129420295406,
+    "p90": 0.950277811480307
+   },
+   "nn_cell_distance_um": {
+    "median": 22.95329544204854,
+    "p10": 16.56489254417301,
+    "p90": 32.05530991463184
+   },
+   "n_contacts": {
+    "median": 3.0,
+    "p10": 2.0,
+    "p90": 6.0
+   },
+   "n": 898
+  }
+ },
+ "candidates": {
+  "031-6_2": {
+   "n_candidates": 4135,
+   "share_with_one_cell": 0.1717049576783555,
+   "share_with_no_cell": 0.8282950423216445,
+   "area_um2": {
+    "top1_median": 411.5,
+    "others_median": 366.0,
+    "n_top1": 167,
+    "n_others": 543
+   },
+   "aspect_ratio": {
+    "top1_median": 1.4996592989185722,
+    "others_median": 1.5644389103270981,
+    "n_top1": 167,
+    "n_others": 543
+   },
+   "solidity": {
+    "top1_median": 0.9323843416370107,
+    "others_median": 0.9346631974559121,
+    "n_top1": 167,
+    "n_others": 543
+   },
+   "nucleus_cell_area_ratio": {
+    "top1_median": 0.25773599686643167,
+    "others_median": 0.2662162162162162,
+    "n_top1": 167,
+    "n_others": 543
+   },
+   "nucleus_offset_rel": {
+    "top1_median": 0.3225206037300675,
+    "others_median": 0.3199343783563482,
+    "n_top1": 167,
+    "n_others": 543
+   },
+   "nn_cell_distance_um": {
+    "top1_median": 16.811119683114523,
+    "others_median": 15.688897730560948,
+    "n_top1": 167,
+    "n_others": 543
+   },
+   "n_contacts": {
+    "top1_median": 2.0,
+    "others_median": 2.0,
+    "n_top1": 167,
+    "n_others": 543
+   }
+  },
+  "031-8_6": {
+   "n_candidates": 5495,
+   "share_with_one_cell": 0.4964513193812557,
+   "share_with_no_cell": 0.5035486806187444,
+   "area_um2": {
+    "top1_median": 1019.875,
+    "others_median": 1015.5,
+    "n_top1": 536,
+    "n_others": 2192
+   },
+   "aspect_ratio": {
+    "top1_median": 1.738256062588091,
+    "others_median": 1.7061088932613084,
+    "n_top1": 536,
+    "n_others": 2192
+   },
+   "solidity": {
+    "top1_median": 0.9299768518518519,
+    "others_median": 0.9301762114537445,
+    "n_top1": 536,
+    "n_others": 2192
+   },
+   "nucleus_cell_area_ratio": {
+    "top1_median": 0.19563924677898908,
+    "others_median": 0.20790906938195597,
+    "n_top1": 536,
+    "n_others": 2192
+   },
+   "nucleus_offset_rel": {
+    "top1_median": 0.3902037708453844,
+    "others_median": 0.3800994259712176,
+    "n_top1": 536,
+    "n_others": 2192
+   },
+   "nn_cell_distance_um": {
+    "top1_median": 24.46780120893576,
+    "others_median": 24.49936675005861,
+    "n_top1": 536,
+    "n_others": 2192
+   },
+   "n_contacts": {
+    "top1_median": 4.0,
+    "others_median": 4.0,
+    "n_top1": 536,
+    "n_others": 2192
+   }
+  }
+ }
+}

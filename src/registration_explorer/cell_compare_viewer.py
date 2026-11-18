@@ -13,6 +13,9 @@ Item styles (contours and points):
   target     IF nucleus picked in the main viewer     cyan, thick
   current    current partner in the review           green, thick
   faint      other nuclei in the window (neighbours)  thin, low opacity
+Whole-cell outlines (item kind "cell", 2026-11-18; separate toggles 細胞輪郭 / 細胞ID, always dashed, never filled):
+  cell_sel     cell(s) containing the selected / compared nucleus   orange, dashed, thick
+  cell         other cells in the window                            light orange, dashed, thin, low opacity
 """
 from __future__ import annotations
 
@@ -22,7 +25,8 @@ import json
 import numpy as np
 
 STYLES = {"sel": ("#ffeb3b", 2.6, []), "active": ("#ff40ff", 2.8, []), "cand": ("#ffffff", 1.5, [4, 3]), "target": ("#00e5ff", 2.6, []),
-          "current": ("#00e676", 2.4, [2, 2]), "faint": ("#b0bec5", 0.9, [])}
+          "current": ("#00e676", 2.4, [2, 2]), "faint": ("#b0bec5", 0.9, []), "cell_sel": ("#ff9100", 2.4, [8, 4]),
+          "cell": ("#ffcc80", 1.1, [6, 4])}
 
 _HTML = r"""<!doctype html><html><head><meta charset="utf-8"><style>
 :root{--bg:#10161a;--fg:#e0e6ea;--mut:#90a4ae}
@@ -41,11 +45,12 @@ button{background:#263238;color:var(--fg);border:1px solid #37474f;border-radius
 <div id="bar"></div><div id="panes"></div><div id="leg"></div>
 <script>
 const D = __DATA__;
-const opt = {img: true, contours: true, centres: true, ids: true, sync: D.sync_default, alpha: 0.55};
+const opt = {img: true, contours: true, centres: true, ids: true, cells: true, cellids: false, sync: D.sync_default, alpha: 0.55};
 const bar = document.getElementById('bar');
 function chk(k, label){ const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = opt[k];
   c.onchange = () => { opt[k] = c.checked; if (k === 'sync' && opt.sync) syncFrom(0); drawAll(); }; l.appendChild(c); l.appendChild(document.createTextNode(' ' + label)); bar.appendChild(l); }
-chk('img', '元画像'); chk('contours', '核輪郭'); chk('centres', '中心点'); chk('ids', 'ID'); if (D.sync) chk('sync', '位置を同期（Global Affine）');
+chk('img', '元画像'); chk('contours', '核輪郭'); chk('centres', '核中心点'); chk('ids', '核ID');
+if (D.panes.some(S => S.items.some(it => it.k === 'cell'))) { chk('cells', '細胞輪郭（破線）'); chk('cellids', '細胞ID'); } if (D.sync) chk('sync', '位置を同期（Global Affine）');
 { const l = document.createElement('label'); l.textContent = '周辺の輪郭の濃さ '; const r = document.createElement('input'); r.type = 'range'; r.min = 0.05; r.max = 1; r.step = 0.05; r.value = opt.alpha;
   r.oninput = () => { opt.alpha = +r.value; drawAll(); }; l.appendChild(r); bar.appendChild(l); }
 { const b = document.createElement('button'); b.textContent = '選択核を中心に戻す'; b.onclick = () => { P.forEach(p => p.fit()); drawAll(); }; bar.appendChild(b); }
@@ -71,8 +76,14 @@ function Pane(i, S){
     if (opt.img && im && im.complete) { const m = S.image.m; ctx.save(); ctx.setTransform(v.k, 0, 0, v.k, v.ox, v.oy); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       ctx.imageSmoothingEnabled = v.k * Math.hypot(m[0], m[1]) < 2; ctx.drawImage(im, 0, 0); ctx.restore(); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const items = S.items.slice().sort((a, b) => (a.s === 'faint') === (b.s === 'faint') ? 0 : (a.s === 'faint' ? -1 : 1));
-    for (const it of items) { const st = D.styles[it.s]; const faint = it.s === 'faint';
+    const lo = it => (it.s === 'faint' || it.s === 'cell') ? 0 : (it.k === 'cell' ? 1 : 2);
+    const items = S.items.slice().sort((a, b) => lo(a) - lo(b));
+    for (const it of items) { const st = D.styles[it.s]; const faint = it.s === 'faint' || it.s === 'cell';
+      if (it.k === 'cell') {
+        if (opt.cells && it.poly) { ctx.save(); ctx.globalAlpha = faint ? opt.alpha : 1; ctx.setLineDash(st[2]); ctx.lineWidth = st[1]; ctx.strokeStyle = st[0]; path(it.poly); ctx.stroke(); ctx.restore(); }
+        if (opt.cells && opt.cellids && it.label && it.c) { const x = it.c[0] * v.k + v.ox, y = it.c[1] * v.k + v.oy;
+          ctx.save(); ctx.font = 'italic 10px sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(it.label, x, y); ctx.fillStyle = st[0]; ctx.fillText(it.label, x, y); ctx.restore(); }
+        continue; }
       if (opt.contours && it.poly) { ctx.save(); ctx.globalAlpha = faint ? opt.alpha : 1; ctx.setLineDash(st[2]); ctx.lineWidth = st[1]; ctx.strokeStyle = st[0]; path(it.poly); ctx.stroke(); ctx.restore(); }
       if (opt.centres && it.c) { const x = it.c[0] * v.k + v.ox, y = it.c[1] * v.k + v.oy; ctx.save(); ctx.globalAlpha = faint ? Math.max(0.35, opt.alpha) : 1;
         ctx.fillStyle = st[0]; ctx.beginPath(); ctx.arc(x, y, faint ? 2 : 3.5, 0, 6.2832); ctx.fill();
@@ -107,6 +118,7 @@ window.__cmp = {D: D, P: P, opt: opt};
 
 LEGEND = {"sel": "選択中のH&E核", "active": "比較中の候補", "cand": "その他の候補（#順位）", "current": "現在の対応先", "target": "クリックしたIF核",
           "faint": "周辺の核"}
+CELL_LEGEND = {"cell_sel": "核を含む細胞（破線）", "cell": "周辺の細胞（破線）"}
 
 
 def image_entry(rgb: np.ndarray, um_per_px: float, origin_xy) -> dict:
@@ -117,9 +129,13 @@ def image_entry(rgb: np.ndarray, um_per_px: float, origin_xy) -> dict:
             "m": [float(um_per_px), 0.0, 0.0, float(um_per_px), float(origin_xy[0]), float(origin_xy[1])]}
 
 
-def item(style, centre=None, poly=None, label=None) -> dict:
+def item(style, centre=None, poly=None, label=None, kind="nucleus") -> dict:
     assert style in STYLES, style
+    assert kind in ("nucleus", "cell"), kind
+    assert (kind == "cell") == style.startswith("cell"), (kind, style)
     d = {"s": style}
+    if kind == "cell":
+        d["k"] = "cell"
     if centre is not None:
         d["c"] = np.round(np.asarray(centre, float), 3).tolist()
     if poly is not None:
@@ -141,5 +157,7 @@ def sync_spec(M, t) -> dict:
 
 
 def html(left: dict, right: dict, sync: dict | None = None, height: int = 420, sync_default: bool = False) -> str:
-    data = {"panes": [left, right], "sync": sync, "sync_default": bool(sync_default and sync), "styles": STYLES, "legend": LEGEND}
+    has_cells = any(it.get("k") == "cell" for p in (left, right) for it in p["items"])
+    data = {"panes": [left, right], "sync": sync, "sync_default": bool(sync_default and sync), "styles": STYLES,
+            "legend": {**LEGEND, **(CELL_LEGEND if has_cells else {})}}
     return _HTML.replace("__DATA__", json.dumps(data, allow_nan=False)).replace("__H__", str(int(height)))

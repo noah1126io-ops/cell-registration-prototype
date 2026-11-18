@@ -44,7 +44,8 @@ from .legacy import REPO, frozen_b2, modules
 
 SCHEMA_AUTO = "cellreg-cell-review-auto/1"
 SCHEMA_REVIEW = "cellreg-cell-review-edits/2"          # /2 (2026-11-18): verdict ops, tags, scope, context
-SCHEMA_REVIEW_READABLE = ("cellreg-cell-review-edits/1", "cellreg-cell-review-edits/2")
+SCHEMA_REVIEW_CELL = "cellreg-cell-review-edits/3"     # written only when an op carries a whole-cell `cell` record (2026-11-18)
+SCHEMA_REVIEW_READABLE = ("cellreg-cell-review-edits/1", "cellreg-cell-review-edits/2", "cellreg-cell-review-edits/3")
 DIRECTION = "HE->IF"                    # moving = HE, fixed = IF
 ROI_MARGIN_UM = 30.0                    # IF nuclei this far outside the ROI stay candidates for HE nuclei near the border
 TOP_K = 5                               # candidates shown per HE nucleus
@@ -346,7 +347,7 @@ class Review:
             d = s[h]
             v[h] = {"review_status": DECISION_TO_REVIEW[d["decision"]], "decision": d["decision"], "if_index": d["if_index"],
                     "held_if_index": op.get("held_if_index"), "seq": op["seq"], "user": op["user"], "at": op["at"],
-                    "reason": op.get("reason", ""), "tags": list(op.get("tags") or []), "scope": op.get("scope")}
+                    "reason": op.get("reason", ""), "tags": list(op.get("tags") or []), "scope": op.get("scope"), "cell": op.get("cell")}
         return s, v
 
     def verdicts(self) -> dict:
@@ -377,7 +378,9 @@ class Review:
             raise ReviewError(f"不正なIF核インデックス: {if_index}")
 
     def apply(self, op: str, he_index: int, if_index: int | None = None, *, user: str | None = None, reason: str = "",
-              tags=None, scope: dict | None = None) -> dict:
+              tags=None, scope: dict | None = None, cell: dict | None = None) -> dict:
+        """`cell` (optional, schema /3): whole-cell display and judgement at the time of the verdict -- see
+        cell_segmentation.validate_annotation.  It never changes the nucleus correspondence."""
         if op not in OPS:
             raise ReviewError(f"不明な操作: {op}")
         self._check_ids(he_index, if_index)
@@ -388,6 +391,12 @@ class Review:
             raise ReviewError(f"不明な補助タグ: {bad}")
         cur = self.state().get(he_index, {"if_index": None, "decision": "none"})
         extra = {}
+        if cell and op != "reset":
+            from . import cell_segmentation as CS
+            try:
+                extra["cell"] = CS.validate_annotation(cell)
+            except ValueError as exc:
+                raise ReviewError(str(exc)) from exc
         if op in VERDICT_OPS:
             if op == "absent" and not (reason or "").strip():
                 raise ReviewError("非観測には根拠のコメントが必要です（候補がない・確信度が低いだけでは非観測にしない）")
@@ -442,7 +451,8 @@ class Review:
 
     # -- persistence: each save is a new version file; earlier versions are kept
     def to_json(self) -> dict:
-        return {"schema": SCHEMA_REVIEW, "review_id": self.review_id, "auto_id": self.auto_id, "auto_sha": self.auto_sha,
+        schema = SCHEMA_REVIEW_CELL if any(o.get("cell") for o in self.ops) else SCHEMA_REVIEW
+        return {"schema": schema, "review_id": self.review_id, "auto_id": self.auto_id, "auto_sha": self.auto_sha,
                 "created_at": self.created_at, "saved_at": now_iso(), "version": self.version, "n_he": self.n_he, "n_if": self.n_if,
                 "auto_pairs": {str(k): v for k, v in self.auto_pairs.items()}, "ops": self.ops, "cursor": self.cursor,
                 "history": self.history, "effective_pairs_n": len(self.pairs()), "conflicts": {str(k): v for k, v in self.conflicts().items()},
@@ -502,7 +512,11 @@ ANNOTATION_COLUMNS = ["sample_id", "auto_id", "review_id", "review_version", "so
                       "algorithm_b2_unmatched_prob", "review_status", "target_index", "target_cell_id", "target_algorithm_rank",
                       "target_mass_share", "target_distance_um", "agrees_with_algorithm_top1", "held_target_cell_id", "decision",
                       "reviewed_at", "reviewer", "comment", "tags", "absent_in", "if_conflict", "source_contour_status",
-                      "target_contour_status", "source_segmentation_sha256", "target_segmentation_sha256"]
+                      "target_contour_status", "source_segmentation_sha256", "target_segmentation_sha256",
+                      # whole-cell review (schema /3; empty for older reviews)
+                      "cell_method_source", "cell_version_source", "cell_ids_source", "cell_method_target", "cell_version_target",
+                      "cell_ids_target", "cell_contour_reliability", "cell_seg_anomaly", "nucleus_cell_mismatch", "cell_boundary_unclear",
+                      "cell_comment"]
 
 
 def review_annotations(sample_id, auto: AutoResult, review: Review | None, he_ids, if_ids, he_mapped=None, if_pts=None,
@@ -546,8 +560,19 @@ def review_annotations(sample_id, auto: AutoResult, review: Review | None, he_id
             "source_contour_status": he_contours.status[h] if he_contours is not None else "no_segmentation",
             "target_contour_status": (if_contours.status[tgt] if (if_contours is not None and tgt is not None) else
                                       ("no_segmentation" if if_contours is None else None)),
-            "source_segmentation_sha256": (seg.get("HE") or {}).get("sha256"), "target_segmentation_sha256": (seg.get("IF") or {}).get("sha256")})
+            "source_segmentation_sha256": (seg.get("HE") or {}).get("sha256"), "target_segmentation_sha256": (seg.get("IF") or {}).get("sha256"),
+            **_cell_columns((v or {}).get("cell"))})
     return pd.DataFrame(rows, columns=ANNOTATION_COLUMNS)
+
+
+def _cell_columns(c: dict | None) -> dict:
+    c = c or {}
+    s, t, fl = c.get("source") or {}, c.get("target") or {}, set(c.get("flags") or [])
+    return {"cell_method_source": s.get("method"), "cell_version_source": s.get("version"), "cell_ids_source": ";".join(s.get("cell_ids") or []),
+            "cell_method_target": t.get("method"), "cell_version_target": t.get("version"), "cell_ids_target": ";".join(t.get("cell_ids") or []),
+            "cell_contour_reliability": c.get("reliability"), "cell_seg_anomaly": ("seg_anomaly" in fl) if c else None,
+            "nucleus_cell_mismatch": ("nucleus_cell_mismatch" in fl) if c else None, "cell_boundary_unclear": ("boundary_unclear" in fl) if c else None,
+            "cell_comment": c.get("comment", "") if c else ""}
 
 
 def review_metrics(ann: pd.DataFrame) -> dict:

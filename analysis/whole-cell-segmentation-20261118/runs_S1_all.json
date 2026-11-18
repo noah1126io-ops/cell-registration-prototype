@@ -1,0 +1,1040 @@
+{
+ "method": "S1_cpsam",
+ "cellpose_version": "4.2.1.1",
+ "torch": "2.15.0+cu132",
+ "cuda_available": true,
+ "device": "NVIDIA RTX 6000 Ada Generation",
+ "pretrained_model": "cpsam",
+ "cellprob_threshold": 0.0,
+ "flow_threshold": 0.4,
+ "model_load_s": 3.7482972145080566,
+ "model_error": null,
+ "runs": [
+  {
+   "sample": "031-6_2",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.4983232021331787,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 90,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/stardist_suspect/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.12698626518249512,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 1,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/stardist_suspect/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.13291716575622559,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 96,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/stardist_suspect/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1401510238647461,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 87,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/stardist_suspect/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11872410774230957,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 87,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/dense/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11250829696655273,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 1,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/dense/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.12753844261169434,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 101,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/dense/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.14715099334716797,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 63,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/dense/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.12035799026489258,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 32,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/sparse/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.12303376197814941,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 3,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/sparse/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.12494325637817383,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 42,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/sparse/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15078306198120117,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 20,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/sparse/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11964011192321777,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 57,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/clear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.12226271629333496,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 1,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/clear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1255185604095459,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 75,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/clear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15201854705810547,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 28,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/clear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11741304397583008,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 36,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/unclear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11764240264892578,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 11,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/unclear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.11774063110351562,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 51,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/unclear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1254575252532959,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 21,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/unclear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11685609817504883,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 34,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/tissue_edge/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.13602614402770996,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 8,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/tissue_edge/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.11968994140625,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 51,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/tissue_edge/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1296243667602539,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 5,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/tissue_edge/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11871814727783203,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 56,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/tune_1/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11406612396240234,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 2,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/tune_1/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.13171100616455078,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 148,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/tune_1/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.13923883438110352,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 6,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/tune_1/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.12267184257507324,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 55,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-6_2/tune_2/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    295,
+    297,
+    3
+   ],
+   "seconds": 0.11657404899597168,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 14,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-6_2/tune_2/HE.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1319413185119629,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 178,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-6_2/tune_2/IF.npz"
+  },
+  {
+   "sample": "031-6_2",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.12244749069213867,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 22,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-6_2/tune_2/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1371750831604004,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 135,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/stardist_suspect/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1184244155883789,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 3,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/stardist_suspect/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.14473319053649902,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 99,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/stardist_suspect/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "stardist_suspect",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.150407075881958,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 35,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/stardist_suspect/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1320631504058838,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 107,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/dense/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.13762474060058594,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 6,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/dense/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.14536476135253906,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 82,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/dense/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "dense",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15147614479064941,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 35,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/dense/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.13173389434814453,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 52,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/sparse/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1230165958404541,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 6,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/sparse/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15114212036132812,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 35,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/sparse/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "sparse",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15702366828918457,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 20,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/sparse/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1335444450378418,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 98,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/clear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.12379789352416992,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 11,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/clear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15142512321472168,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 61,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/clear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "clear_boundary",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.16184473037719727,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 37,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/clear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1308605670928955,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 61,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/unclear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.12276625633239746,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 11,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/unclear_boundary/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.13936924934387207,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 61,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/unclear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "unclear_boundary",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15306949615478516,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 26,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/unclear_boundary/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.12920832633972168,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 49,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/tissue_edge/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.08601260185241699,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 0,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/tissue_edge/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1375102996826172,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 83,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/tissue_edge/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tissue_edge",
+   "role": "evaluation",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.15689897537231445,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 43,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/tissue_edge/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.13048362731933594,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 92,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/tune_1/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.16344141960144043,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 32,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/tune_1/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.13718247413635254,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 79,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/tune_1/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_1",
+   "role": "tuning",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1574554443359375,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 26,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/tune_1/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "he_rgb",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1354973316192627,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 56,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_rgb/031-8_6/tune_2/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "he_eosin",
+   "key": "HE",
+   "shape": [
+    361,
+    361,
+    3
+   ],
+   "seconds": 0.1279902458190918,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 9,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_he_eosin/031-8_6/tune_2/HE.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "if_rgb",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.1345229148864746,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 93,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_rgb/031-8_6/tune_2/IF.npz"
+  },
+  {
+   "sample": "031-8_6",
+   "roi": "tune_2",
+   "role": "tuning",
+   "variant": "if_mem",
+   "key": "IF",
+   "shape": [
+    300,
+    300,
+    3
+   ],
+   "seconds": 0.14867258071899414,
+   "gpu_peak_mb": 1040.16552734375,
+   "n_labels": 30,
+   "out": "/mnt/mib-dbia08_1/users/noa.ganeko/projects/cell-registration-prototype-gpu/analysis/whole-cell-segmentation-20261118/cache/seg/S1_cpsam_if_mem/031-8_6/tune_2/IF.npz"
+  }
+ ],
+ "weights": "/home/noa.ganeko/.cellpose/models/cpsam",
+ "weights_sha256": "e1440429eb384f95afe32bcba6510f90d518eaedc917ede549bed6804004abe2"
+}

@@ -22,6 +22,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from ..registration_research import cell_review as CR
+from ..registration_research import cell_segmentation as CS
 from ..registration_research import nuclear_contours as NC
 from . import catalog, imaging, results, scene, viewer
 from . import cell_compare_viewer as cmpv
@@ -38,6 +39,8 @@ CAT_STYLE = {   # effective state -> (label, colour).  Algorithm states (未レ�
     "absent": ("非観測（Absent・IF切片）", "#7c4dff"), "uncertain": ("判断不能（Uncertain）", "#ffee58"),
     "excluded": ("対応を解除（判定なし）", "#9e9e9e"), "undecided": ("対応を外した（未確定）", "#bcaaa4")}
 CMP_WINDOWS = (30.0, 60.0, 120.0)        # µm, local comparison window
+CELL_COLORS = {"HE": "#ff9800", "IF": "#ff6d00"}                       # whole-cell outlines: dashed orange (nuclei: solid)
+CELL_CMP_COLORS = ("#ffd54f", "#f06292", "#4dd0e1", "#aed581")         # extra methods overlaid for comparison
 MAX_IMAGE_PX = 2400 * 2400
 
 
@@ -275,6 +278,7 @@ def _review_section(S, auto, he_pts, he_ids, if_pts, if_ids, mapped, avail):
         cats = effective_categories(auto, rv)
         sel_he = st.session_state.get(f"{KEY}-selhe-{auto.auto_id}")
         sel_if = st.session_state.get(f"{KEY}-selif-{auto.auto_id}")
+        cell_selector(S)
         ev = _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if)
         if ev and isinstance(ev, dict) and ev.get("kind") == "nucleus":
             seen = st.session_state.setdefault(f"{KEY}-nonce", set())
@@ -366,6 +370,52 @@ def display_modes(col_he=st, col_if=st):
     return (_shared_mode("he", "H&E表示", HE_MODE_LABELS, col_he), _shared_mode("if", "蛍光表示", IF_MODE_LABELS, col_if))
 
 
+# ----------------------------------------------------------------------------- whole-cell outlines (research, 2026-11-18)
+def _cell_key(sec):
+    return f"{KEY}-cellm-{sec}"
+
+
+def cell_selector(S) -> None:
+    """Per-section choice of the whole-cell segmentation to show (default: none).  Unavailable methods show the reason."""
+    with st.expander("細胞全体の輪郭（研究・既定は表示しない）", expanded=any(st.session_state.get(_cell_key(k), CS.NONE) != CS.NONE for k in CS.SECTIONS)):
+        st.caption("核の中心点・核輪郭とは別のデータです（核のIDや輪郭は変更しません）。輪郭は自動セグメンテーションの結果で、"
+                   "病理学的に正しい細胞境界とは限りません。正解データはありません。")
+        cols = st.columns(2)
+        for col, sec in zip(cols, CS.SECTIONS):
+            ms = CS.methods_for(S.sample_id, sec)
+            ok = {m: (a, r) for m, a, r in ms}
+            fmt = lambda m, ok=ok: CS.label(m) + ("" if ok[m][0] else "（利用不可）")
+            col.selectbox(f"{'H&E' if sec == 'HE' else 'IF'} の細胞輪郭", [m for m, _, _ in ms], format_func=fmt, key=_cell_key(sec))
+            cur = st.session_state.get(_cell_key(sec), CS.NONE)
+            a, r = ok.get(cur, (False, ""))
+            if not a:
+                col.warning(f"{CS.label(cur)}: {r}")
+            elif r:
+                col.caption(r)
+            other = [m for m, a_, _ in ms if a_ and m not in (CS.NONE, "S0_nuclei", cur)]
+            col.multiselect("比較のため重ねる方式", other, format_func=CS.label, key=f"{KEY}-cellcmp-{sec}")
+            with col.popover("利用できない方式と理由"):
+                st.dataframe(pd.DataFrame([{"方式": CS.label(m), "理由": r_} for m, a_, r_ in ms if not a_]), hide_index=True)
+
+
+def cell_segs(S) -> dict:
+    """{"HE": seg | None, "IF": seg | None, "cmp": [(sec, seg)]} for the current selection (no selection -> all None)."""
+    out = {"cmp": []}
+    for sec in CS.SECTIONS:
+        ids = catalog.load_nuclei(S.modality(sec))[1]
+        m = st.session_state.get(_cell_key(sec), CS.NONE)
+        out[sec] = CS.load(S.sample_id, sec, m, ids) if CS.availability(S.sample_id, sec, m)[0] else None
+        for x in st.session_state.get(f"{KEY}-cellcmp-{sec}", []) or []:
+            g = CS.load(S.sample_id, sec, x, ids)
+            if g is not None:
+                out["cmp"].append((sec, g))
+    return out
+
+
+def _cell_label(seg, j):
+    return str(seg.ids[j]).split(":")[-1]
+
+
 def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
     Ma, ta = np.asarray(auto.meta["global"]["M"]), np.asarray(auto.meta["global"]["t"])
     c_img, c_he, c_if = st.columns([1.2, 1, 1])
@@ -427,6 +477,19 @@ def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
     pk = if_c.pack(r_if) if if_c is not None else {"idx": [], "poly": []}
     groups.append(crv.contour_group("c_if", "IF核の輪郭", pk, "#b0bec5", ids=[CR._scalar(if_ids[f]) for f in r_if], at=if_pts[r_if],
                                     label_color="#80deea"))
+    segs = cell_segs(S)
+    pad_roi = [roi[0] - CR.ROI_MARGIN_UM, roi[1] - CR.ROI_MARGIN_UM, roi[2] + CR.ROI_MARGIN_UM, roi[3] + CR.ROI_MARGIN_UM]
+    layers = [(sec, segs[sec], CELL_COLORS[sec], [8, 4], 1.3) for sec in CS.SECTIONS if segs[sec] is not None]
+    layers += [(sec, g, CELL_CMP_COLORS[i % len(CELL_CMP_COLORS)], [3, 3], 1.0) for i, (sec, g) in enumerate(segs["cmp"])]
+    for sec, g, col, dash, wm in layers:
+        M_, t_ = (Ma, ta) if sec == "HE" else (None, None)
+        js = g.query(pad_roi, M_, t_)
+        pk = g.pack(js, M_, t_)
+        at = np.array([g.centroid(j) for j in js]).reshape(-1, 2)
+        if M_ is not None and len(at):
+            at = at @ Ma.T + ta
+        groups.append(crv.contour_group(f"cell_{sec}_{g.method}", f"{sec} 細胞: {CS.label(g.method)}", pk, col,
+                                        ids=[_cell_label(g, j) for j in js], at=at, kind="cell", dash=dash, wmul=wm))
 
     def _poly(c, i, M=None, t=None):
         if c is None or i is None:
@@ -442,8 +505,16 @@ def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
     if sel_if is not None:
         selected["if"] = if_pts[sel_if].round(2).tolist()
         selected["if_poly"] = _poly(if_c, sel_if)
+    if segs["HE"] is not None and sel_he is not None:          # cell(s) of the selected nucleus (never forced to one)
+        selected["he_cell_polys"] = segs["HE"].pack(segs["HE"].cells_for(sel_he), Ma, ta)["poly"]
+    if segs["IF"] is not None:
+        if sel_if is not None:
+            selected["if_cell_polys"] = segs["IF"].pack(segs["IF"].cells_for(sel_if))["poly"]
+        if sel_he is not None:
+            cf = auto.candidates[auto.candidates["he_index"] == sel_he]["if_index"].to_numpy(int)
+            selected["cand_cell_polys"] = segs["IF"].pack(sorted({j for f in cf for j in segs["IF"].cells_for(f)}))["poly"]
     pad = 40.0
-    sc.update({"points": pts, "polys": polys, "vectors": None, "selected": selected, "contours": groups,
+    sc.update({"points": pts, "polys": polys, "vectors": None, "selected": selected, "contours": groups, "cell_min_k": 0.6,
                "bounds": [roi[0] - pad, roi[1] - pad, roi[2] + pad, roi[3] + pad], "frame_name": f"{S.sample_id}:IF (fixed frame)",
                "frame_note": "IF（Fixed）frame の µm。H&E核はGlobal変換後の位置。黄色の輪 = 選択中のH&E核、白い輪 = その対応候補、水色の輪 = 選択中のIF核。"})
     return crv.interactive(sc, 640, key=f"{KEY}-viewer-{auto.auto_id}", view_key=f"crv-{auto.auto_id}")
@@ -493,6 +564,7 @@ def _nucleus_panel(S, auto, rv, he_pts, he_ids, if_ids, mapped, if_pts, user, av
         cands["対応先(現在)"] = cands["if_index"] == cur["if_index"]
         st.dataframe(cands[["rank", "if_id", "distance_um", "mass_share", "graph_support", "position_graph_cost", "対応先(現在)"]], hide_index=True)
         active = _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids, if_ids, avail, he_c, if_c)
+        cell = _cell_review_inputs(S, sel_he, active if active is not None else cur["if_index"], he_ids, if_ids)
         reason = st.text_input("コメント（履歴に保存。非観測では必須）", key=f"{KEY}-reason")
         tags = st.multiselect("補助タグ", list(CR.REVIEW_TAGS), format_func=CR.REVIEW_TAGS.get, key=f"{KEY}-tags-{sel_he}")
         adv = st.checkbox("記録したら次の未レビュー核へ進む", key=f"{KEY}-advance")
@@ -503,7 +575,8 @@ def _nucleus_panel(S, auto, rv, he_pts, he_ids, if_ids, mapped, if_pts, user, av
 
         def do(op, f=None):
             try:
-                rv.apply(op, sel_he, f, user=user, reason=reason, tags=tags, scope=scope if op in CR.VERDICT_OPS else None)
+                rv.apply(op, sel_he, f, user=user, reason=reason, tags=tags, scope=scope if op in CR.VERDICT_OPS else None,
+                         cell=cell if op not in ("exclude", "unset", "reset") else None)
             except CR.ReviewError as exc:
                 st.error(str(exc))
                 return
@@ -549,6 +622,45 @@ def _nucleus_panel(S, auto, rv, he_pts, he_ids, if_ids, mapped, if_pts, user, av
                     do("reassign" if cur["if_index"] is not None else "add", int(sel_if))
             else:
                 o[3].caption("ビューアーで『対応先のIF核を選択』にしてIF核をクリックすると、任意のIF核を対応先にできます。")
+
+
+def _cell_rows(seg, nucleus_index, ids):
+    out = []
+    for j in seg.cells_for(nucleus_index):
+        p = seg.props[j]
+        out.append({"細胞ID": seg.ids[j], "面積 µm²": p.get("area_um2"), "核/細胞の面積比": (p.get("nucleus_area_um2") or 0) / p["area_um2"] if p.get("area_um2") else None,
+                    "細胞内の核": len(seg.nuclei_of_cell[j]), "関係": p.get("cell_relation"), "品質フラグ": ", ".join(p.get("quality_flags") or [])})
+    return out
+
+
+def _cell_review_inputs(S, sel_he, f, he_ids, if_ids):
+    """Cell outlines of the selected H&E nucleus and the compared IF nucleus + the cell-level judgement (None if no outlines shown)."""
+    segs = cell_segs(S)
+    if segs["HE"] is None and segs["IF"] is None:
+        return None
+    st.markdown("**細胞全体の輪郭**（核の対応とは別に記録。輪郭は自動セグメンテーションで、正しい細胞境界とは限りません）")
+    rec = {}
+    for sec, seg, n, ids in (("source", segs["HE"], sel_he, he_ids), ("target", segs["IF"], f, if_ids)):
+        name = "H&E" if sec == "source" else "IF"
+        if seg is None:
+            st.caption(f"{name}: 細胞輪郭を表示していません")
+            continue
+        if n is None:
+            st.caption(f"{name}: 比較中の核がありません")
+            rec[sec] = {**CS.identifier(seg), "cell_ids": []}
+            continue
+        rows = _cell_rows(seg, n, ids)
+        rec[sec] = {**CS.identifier(seg), "cell_ids": [r["細胞ID"] for r in rows]}
+        if not rows:
+            st.caption(f"{name} 核 {CR._scalar(ids[n])}: {CS.label(seg.method)} に対応する細胞がありません（核の外・未検出・範囲外のいずれか）")
+        else:
+            st.caption(f"{name} 核 {CR._scalar(ids[n])}: {CS.label(seg.method)} の細胞 {len(rows)} 個" + ("（複数の細胞と重なる）" if len(rows) > 1 else ""))
+            st.dataframe(pd.DataFrame(rows), hide_index=True)
+    c1, c2, c3 = st.columns([1, 2, 2])
+    rec["reliability"] = c1.selectbox("輪郭の信頼度", list(CS.RELIABILITY), format_func=CS.RELIABILITY.get, key=f"{KEY}-cellrel-{sel_he}")
+    rec["flags"] = c2.multiselect("細胞の所見", list(CS.CELL_FLAGS), format_func=CS.CELL_FLAGS.get, key=f"{KEY}-cellflags-{sel_he}")
+    rec["comment"] = c3.text_input("細胞についてのコメント", key=f"{KEY}-cellcomment-{sel_he}")
+    return rec
 
 
 def _next_unreviewed(auto, rv, after):
@@ -634,6 +746,14 @@ def _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids
         lb = (f"#{rank[f]} " if f in rank else "") + f"IF {CR._scalar(if_ids[f])}"
         items_r.append(cmpv.item(style, if_pts[f], if_c.polygon(f) if if_c is not None else None, lb))
     items_r.append(cmpv.item("sel", cr, None, "H&E核の予測位置（Global）"))
+    segs = cell_segs(S)
+    for g, its, box, hot in ((segs["HE"], items_l, bl, set(segs["HE"].cells_for(sel_he)) if segs["HE"] is not None else set()),
+                             (segs["IF"], items_r, br, {j for f in ([active] if active is not None else []) + ([sel_if] if sel_if is not None else [])
+                                                        for j in segs["IF"].cells_for(f)} if segs["IF"] is not None else set())):
+        if g is None:
+            continue
+        for j in g.query(box):
+            its.insert(0, cmpv.item("cell_sel" if j in hot else "cell", g.centroid(j), g.polygon(j), _cell_label(g, j), kind="cell"))
     img_l = _crop(S, "HE", cl, w, he_mode) if avail["HE"]["image"] else None
     img_r = _crop(S, "IF", cr, w, if_mode) if avail["IF"]["image"] else None
     note_l = "" if img_l else "H&E画像なし（輪郭・中心点のみ）"
