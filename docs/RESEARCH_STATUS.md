@@ -1,6 +1,6 @@
 # 研究の進捗と引き継ぎ（エージェント向け）
 
-- 最終更新：2026-11-18（whole-cell-segmentation-20261118 の作業が終わった時点の状態）
+- 最終更新：2026-11-25（cell-review-ui-operation-20261125 の作業が終わった時点の状態）
 - 対象：このリポジトリで作業を引き継ぐエージェント（Claude Code などの AI エージェント）
 - 位置づけ：研究の現状、決まったこと、未解決の問題、作業のルールをまとめた入口です。詳しい内容は、各研究ディレクトリの `REPORT.md` にあります。
 - 更新のしかた：研究のタスクが終わるたびに、この文書の §2〜§6 を更新してください。過去の記述は消さずに、§7 の履歴に追記してください。
@@ -11,7 +11,13 @@
 
 1. この文書
 2. `README.md` の「Registration Explorer (Research) と研究Workflow C」
-3. 最新の作業：`analysis/whole-cell-segmentation-20261118/REPORT.md`（細胞全体のセグメンテーション：IF は Cellpose-SAM＋膜代用チャンネルで部分的に成功、H&E は失敗、Mesmer は未実行。Cell Review に細胞輪郭を研究表示）。その前は `analysis/cell-review-annotation-20261118/REPORT.md`（核輪郭の表示、H&E と IF の左右比較、人のレビュー状態：対応確認／未特定／非観測／判断不能）。その前は `analysis/cell-review-explorer-20261117/REPORT.md`（Explorer での細胞対応のレビュー → 点群の変形 → H&E 画像の変形）。その前の研究は `analysis/region-cell-matching-20261113/REPORT.md`（核対応による候補の再評価と局所変形。結論は §3）。ロードマップは `analysis/adaptive-registration-validation-20261111/REPORT.md` と `v1_roadmap_recommendations.md`
+3. 最新の作業：`analysis/cell-review-ui-operation-20261125/REPORT.md`（Cell Review の操作の改善。次のとおり。
+   - モードを切り替えずに、左クリックで核を選ぶと拡大する。ドラッグで移動する。
+   - 判定パネルは横の列に置き、スクロールしても表示されたまま。
+   - キーボード：1〜4 判定、Enter 次へ、Ctrl+Z／Ctrl+Y、Esc。
+   - 実際のブラウザ（ヘッドレス Chromium）で確認した。
+
+   その前は `analysis/whole-cell-segmentation-20261118/REPORT.md`（細胞全体のセグメンテーション：IF は Cellpose-SAM＋膜代用チャンネルで部分的に成功、H&E は失敗、Mesmer は未実行。Cell Review に細胞輪郭を研究表示）。その前は `analysis/cell-review-annotation-20261118/REPORT.md`（核輪郭の表示、H&E と IF の左右比較、人のレビュー状態：対応確認／未特定／非観測／判断不能）。その前は `analysis/cell-review-explorer-20261117/REPORT.md`（Explorer での細胞対応のレビュー → 点群の変形 → H&E 画像の変形）。その前の研究は `analysis/region-cell-matching-20261113/REPORT.md`（核対応による候補の再評価と局所変形。結論は §3）。ロードマップは `analysis/adaptive-registration-validation-20261111/REPORT.md` と `v1_roadmap_recommendations.md`
 4. サンプルの来歴：`analysis/e0x-difficulty-and-web-integration-20261020/sample_provenance.md`
 5. エンジンの本体：`src/registration_core/workflow.py`（`CORE_VERSION`、`WorkflowConfig`、`infer_section_relation`、C3 の規則）
 
@@ -25,7 +31,7 @@
 - 最も大事な要件は、**誤った位置合わせを採択しないこと（誤採択 0）**。見逃し（採択できない）は、手動の補助で補う方針。
 - 目標：研究用 v1.0 を 2026-12-31 に完成させる（`v1_roadmap_recommendations.md`）。
 
-## 2. 現在の状態（2026-11-18）
+## 2. 現在の状態（2026-11-25）
 
 | 項目 | 状態 |
 |---|---|
@@ -33,9 +39,9 @@
 | エンジン | `registration_core 1.2 (2026-11-10)` |
 | 実行中のジョブ | なし |
 | 未完了の作業 | なし。次の作業はユーザーの承認待ち（§5） |
-| テスト | `pytest tests`：270 成功、1 スキップ。条件は §6 を参照。研究テスト：`analysis/region-cell-matching-20261113/tests_rcm`（13 件）、`analysis/cell-review-explorer-20261117/tests_crx`（25 件）、`analysis/cell-review-annotation-20261118/tests_cra`（16 件）、`analysis/whole-cell-segmentation-20261118/tests_wcs`（12 件。slow を含む。`pytest.sbatch all`。GPU の一致テストがあるので `--gres=gpu:1` が必要） |
+| テスト | `pytest tests`：270 成功、1 スキップ。条件は §6 を参照。研究テスト：`analysis/region-cell-matching-20261113/tests_rcm`（13 件）、`analysis/cell-review-explorer-20261117/tests_crx`（25 件）、`analysis/cell-review-annotation-20261118/tests_cra`（16 件）、`analysis/whole-cell-segmentation-20261118/tests_wcs`（12 件）、`analysis/cell-review-ui-operation-20261125/tests_cro`（9 件。slow を含む。`pytest.sbatch all`。GPU の一致テストがあるので `--gres=gpu:1` が必要）。実際のブラウザでの確認は `analysis/cell-review-ui-operation-20261125/browser/e2e.sbatch`（Slurm。Playwright は `~/envs/uitest`。ログインノードでは Chromium が遅く使えない） |
 | 研究用コード | `src/registration_research/`（C1 の候補アダプタ、凍結済み Graph/UOT/B2 の呼び出し、再順位付け、局所変形の比較、`cell_review.py`＝レビュー・人のレビュー状態・評価用の表・変形・画像の逆写像、`nuclear_contours.py`＝既存のGeoJSONの核輪郭をIDで中心点に結ぶ、`cell_segmentation.py`＝細胞全体の輪郭の結果を読むだけ（核とは別データ、核IDで結ぶ）。結果の置き場は `CELLREG_CELLSEG_ROOT`、既定は `analysis/whole-cell-segmentation-20261118/results`）。本番からは使われない |
-| Explorer の研究タブ | 「核対応（研究）」：既定で無効（`CELLREG_REGION_CELL_MATCHING=1` で有効）。保存済みの結果を表示するだけ。「細胞対応レビュー（研究）」：既定で無効（`CELLREG_CELL_REVIEW=1` で有効）。計算し、`runs/cell_review/` にファイルとして保存する（研究ストアには書き込まない）。開発サーバー 8511 は 11-17 からこのフラグ付きで動かしている。細胞全体の輪郭は、このタブの中でさらに既定オフ（方式の選択が「表示しない」） |
+| Explorer の研究タブ | 「核対応（研究）」：既定で無効（`CELLREG_REGION_CELL_MATCHING=1` で有効）。保存済みの結果を表示するだけ。「細胞対応レビュー（研究）」：既定で無効（`CELLREG_CELL_REVIEW=1` で有効）。計算し、`runs/cell_review/` にファイルとして保存する（研究ストアには書き込まない）。開発サーバー 8511 は 11-17 からこのフラグ付きで動かしている。細胞全体の輪郭は、このタブの中でさらに既定オフ（方式の選択が「表示しない」）。11-25 以降の操作：左クリックで選択して拡大、ドラッグで移動、右の判定パネル（固定表示）、キー 1〜4／Enter／Ctrl+Z／Ctrl+Y／Esc |
 
 ### エンジン（`src/registration_core`）の処理の流れ
 1. **C1 対応領域の探索**：画像の探索と、核点群の探索の両方を行う。
@@ -105,6 +111,12 @@
   - 6_2 / 8_6 の変換が 11-10 と同一であること。
   - 鏡像の負例が本番の規則で NOT_ACCEPTED になること。
 - その後の作業：A3（Data Profiler を artifact に入れる）→ A4（戦略の提案）、A5（判定理由の表示）→ A6（失敗時の手動補助）、A7（再現できる実行履歴）、A9（IF チャンネルの設定化）。
+- 11-25 の作業からの候補（cell-review-ui-operation-20261125 の REPORT §5）：
+  - ユーザーが開発サーバー 8511 で操作感を確認する。
+    - 連続レビューの速さ
+    - 60 µm への拡大が適切か
+    - 固定表示の判定パネルの見え方
+  - 実際のブラウザでの未確認の項目：Firefox・Safari・Windows のブラウザ、Explorer の全体のページ、左右比較の中で押したキーの転送。
 - 11-18 細胞全体のセグメンテーションからの候補（whole-cell-segmentation-20261118 の REPORT §6〜7）：
   - Mesmer：`DEEPCELL_ACCESS_TOKEN` の取得（利用規約への同意が必要なのでユーザーの判断）。取得後は `run_mesmer.py all` → `evaluate.py` で比較に加わる。
   - `manual_eval/template.csv`（380 細胞）に人が記入し、`score.py` で方式ごとの正否を求める（現在、精度の数値はない）。
@@ -115,7 +127,7 @@
   - IF 核を起点とした判定（H&E に核がない）。大きな ROI での輪郭のタイルごとの読み込み。
   - 6_2 の H&E の StarDist の検出漏れ・淡い領域の誤検出（図で確認）。
 - 11-17 の作業からの候補（REPORT §8）：
-  - 実際のブラウザでのクリック操作の確認（ユーザーに依頼済み。Playwright の導入はセッションの権限で拒否された）。
+  - 実際のブラウザでのクリック操作の確認：11-25 に、ヘッドレス Chromium で自動確認した（cell-review-ui-operation-20261125）。
   - 人による実データのレビューと、独立のランドマークでの評価。
   - 隣接切片で使える、核以外のアンカー。
   - 自動推定を Slurm で非同期に実行する。
@@ -174,3 +186,4 @@
 | 11-17 | `cell-review-explorer-20261117` | Explorer の研究タブ「細胞対応レビュー（研究）」（既定で無効）：核対応の上位 5 候補、手動レビュー（支持・除外・変更・追加・未確定・取り消し・やり直し、版ごとの保存）、Affine／自動推定＋RBF／手動修正後＋RBF／UOT の変位場、H&E 画像の逆写像（収束を確認）、出力。既存のテストはすべて同じ結果、新しいテストは 24 件。11-18：レビューの画像表示モード（RGB／核強調）を Viewer の `regx-hem`/`regx-ifm` と共有し、既定を RGB にした（テストは 25 件） |
 | 11-18 | `cell-review-annotation-20261118` | Cell Review：既存のGeoJSONの核輪郭（IDで結合・整合性を検査）、H&E と IF の左右比較（未変形）、人のレビュー状態（対応確認／未特定／非観測／判断不能を、アルゴリズムの状態とは別に保存）、補助タグ、評価用の表と集計。推定・変形・Workflow C/D は変更なし。tests_cra 15+1 |
 | 11-18 | `whole-cell-segmentation-20261118` | 細胞全体のセグメンテーション（ROI 比較：S0 既存の核／S1 Cellpose-SAM／S2 Mesmer（重みのトークンがなく未実行）／S3 核シードの Watershed と Voronoi（基準線））。IF は cpsam＋G+R の膜代用で心筋細胞の外形を取れた（8_6 概ね妥当、6_2 部分的、間質の細胞は取れない）。H&E は全方式失敗（核しか取れない）。IF 切片全体の結果を Cell Review に研究表示（既定オフ、破線、独立の切替、方式の選択と使えない理由、判定に `cell` 記録＝schema /3）。核輪郭・推定・変形・Workflow C/D は変更なし。tests_wcs 11+1 |
+| 11-25 | `cell-review-ui-operation-20261125` | Cell Review の操作の改善（UI のみ）。次のとおり。<br>- モードを切り替えずに、左クリックで H&E 核を選択して拡大（初回は 60 µm、その後はユーザーの倍率を保つ）、ドラッグで移動。<br>- 候補の輪のクリックで比較する候補を変更、Shift+クリックで任意の IF 核。<br>- 判定パネルは横の列に固定表示。キー 1〜4／Enter／Ctrl+Z／Ctrl+Y／Esc。テキスト入力中と別のタブでは無効。表示中の核にだけ記録し、`Review.apply` を通す。<br>- 選択だけが変わったときは、ビューアを再起動せずに描き直す（`view_key` を追加）。左右比較はズームとパンを保持し、右の枠は比較中の候補を中心にする。<br>- 確認：変更してはいけない 65 ファイルは HEAD と同一、既存のテストはすべて同じ結果。実際のブラウザ（Chromium、dpr 1・2）で 36/36、tests_cro は 9 件 |

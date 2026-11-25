@@ -6,6 +6,12 @@ is never warped).  The global affine (H&E -> IF) is used only for the optional p
 Static component (components.html): zoom (wheel), pan (drag), local re-centre, contour / centre / ID / image toggles,
 contour opacity.  Decisions are made with Streamlit buttons next to it, so no value is sent back.
 
+2026-11-25: each pane is centred on its ``anchor`` (left: the selected H&E nucleus; right: the compared candidate, or the
+Global prediction when there is none).  Zoom (relative to the window), pan and the toggles are kept in sessionStorage per
+``view_key``: a re-render for the same nucleus keeps the view; another nucleus is centred again at the same zoom; another
+candidate re-centres the right pane only.  Changing the window (30 / 60 / 120 µm) or 「選択核を中心に戻す」 resets the zoom.
+Shortcut keys pressed inside the panes are forwarded to the page (the review viewer listens there).
+
 Item styles (contours and points):
   sel        selected H&E nucleus                     yellow, thick
   active     candidate being compared                 magenta, thick
@@ -45,18 +51,22 @@ button{background:#263238;color:var(--fg);border:1px solid #37474f;border-radius
 <div id="bar"></div><div id="panes"></div><div id="leg"></div>
 <script>
 const D = __DATA__;
-const opt = {img: true, contours: true, centres: true, ids: true, cells: true, cellids: false, sync: D.sync_default, alpha: 0.55};
+const VK = 'crv-cmp-' + (D.view_key || 'default');
+const load = (k) => { try { return JSON.parse(sessionStorage.getItem(VK + k) || 'null'); } catch (e) { return null; } };
+const save = (k, v) => { try { sessionStorage.setItem(VK + k, JSON.stringify(v)); } catch (e) {} };
+const opt = Object.assign({img: true, contours: true, centres: true, ids: true, cells: true, cellids: false, sync: D.sync_default, alpha: 0.55},
+  load('opt') || {});
 const bar = document.getElementById('bar');
 function chk(k, label){ const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = opt[k];
-  c.onchange = () => { opt[k] = c.checked; if (k === 'sync' && opt.sync) syncFrom(0); drawAll(); }; l.appendChild(c); l.appendChild(document.createTextNode(' ' + label)); bar.appendChild(l); }
+  c.onchange = () => { opt[k] = c.checked; save('opt', opt); if (k === 'sync' && opt.sync) { syncFrom(0); saveView(); } drawAll(); }; l.appendChild(c); l.appendChild(document.createTextNode(' ' + label)); bar.appendChild(l); }
 chk('img', '元画像'); chk('contours', '核輪郭'); chk('centres', '核中心点'); chk('ids', '核ID');
 if (D.panes.some(S => S.items.some(it => it.k === 'cell'))) { chk('cells', '細胞輪郭（破線）'); chk('cellids', '細胞ID'); } if (D.sync) chk('sync', '位置を同期（Global Affine）');
 { const l = document.createElement('label'); l.textContent = '周辺の輪郭の濃さ '; const r = document.createElement('input'); r.type = 'range'; r.min = 0.05; r.max = 1; r.step = 0.05; r.value = opt.alpha;
-  r.oninput = () => { opt.alpha = +r.value; drawAll(); }; l.appendChild(r); bar.appendChild(l); }
-{ const b = document.createElement('button'); b.textContent = '選択核を中心に戻す'; b.onclick = () => { P.forEach(p => p.fit()); drawAll(); }; bar.appendChild(b); }
+  r.oninput = () => { opt.alpha = +r.value; save('opt', opt); drawAll(); }; l.appendChild(r); bar.appendChild(l); }
+{ const b = document.createElement('button'); b.textContent = '選択核を中心に戻す'; b.onclick = () => { P.forEach(p => p.fit()); if (opt.sync) syncFrom(0); saveView(); drawAll(); }; bar.appendChild(b); }
 const leg = document.getElementById('leg');
 leg.innerHTML = Object.entries(D.legend).map(([k, v]) => '<span class="sw" style="background:' + D.styles[k][0] + '"></span>' + v).join('') +
-  '<br>ホイール: ズーム / ドラッグ: パン。左右とも未変形の元画像（各切片の座標）。';
+  '<br>ホイール: ズーム / ドラッグ: パン（左右とも、この表示を保ったまま候補・核を切り替えられます）。左右とも未変形の元画像（各切片の座標）。';
 const P = [];
 function Pane(i, S){
   const wrap = document.createElement('div'); wrap.className = 'pane';
@@ -64,9 +74,10 @@ function Pane(i, S){
   const cv = document.createElement('canvas'); wrap.appendChild(cv); document.getElementById('panes').appendChild(wrap);
   const ctx = cv.getContext('2d'); const me = {S: S, cv: cv, view: null};
   let im = null; if (S.image) { im = new Image(); im.onload = () => draw(); im.src = S.image.src; }
-  me.fit = () => { const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; cv.width = Math.max(2, r.width * d); cv.height = Math.max(2, r.height * d);
-    const b = S.bounds, k = Math.min(cv.width / (b[2] - b[0]), cv.height / (b[3] - b[1]));
-    me.view = {k: k, ox: cv.width / 2 - k * (b[0] + b[2]) / 2, oy: cv.height / 2 - k * (b[1] + b[3]) / 2}; };
+  me.size = () => { const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; cv.width = Math.max(2, r.width * d); cv.height = Math.max(2, r.height * d); };
+  me.k0 = () => { const b = S.bounds; return Math.min(cv.width / (b[2] - b[0]), cv.height / (b[3] - b[1])); };   // device px per µm of the window
+  me.anchor = () => S.anchor || [(S.bounds[0] + S.bounds[2]) / 2, (S.bounds[1] + S.bounds[3]) / 2];
+  me.fit = () => { me.size(); me.setCentre(me.anchor(), me.k0()); };
   me.centre = () => { const v = me.view; return [(cv.width / 2 - v.ox) / v.k, (cv.height / 2 - v.oy) / v.k]; };
   me.setCentre = (c, k) => { me.view = {k: k, ox: cv.width / 2 - k * c[0], oy: cv.height / 2 - k * c[1]}; };
   const path = (Q) => { const v = me.view; ctx.beginPath(); for (let j = 0; j < Q.length; j += 2) { const x = Q[j] * v.k + v.ox, y = Q[j+1] * v.k + v.oy; j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); };
@@ -98,10 +109,10 @@ function Pane(i, S){
   me.draw = draw;
   let drag = null;
   cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; const sx = (e.clientX - r.left) * d, sy = (e.clientY - r.top) * d;
-    const f = Math.exp(-e.deltaY * 0.0015), v = me.view; v.ox = sx - (sx - v.ox) * f; v.oy = sy - (sy - v.oy) * f; v.k *= f; syncFrom(i); drawAll(); }, {passive: false});
+    const f = Math.exp(-e.deltaY * 0.0015), v = me.view; v.ox = sx - (sx - v.ox) * f; v.oy = sy - (sy - v.oy) * f; v.k *= f; syncFrom(i); drawAll(); saveView(); }, {passive: false});
   cv.addEventListener('pointerdown', e => { drag = {x: e.clientX, y: e.clientY, ox: me.view.ox, oy: me.view.oy}; cv.setPointerCapture(e.pointerId); });
   cv.addEventListener('pointermove', e => { if (!drag) return; const d = window.devicePixelRatio || 1; me.view.ox = drag.ox + (e.clientX - drag.x) * d; me.view.oy = drag.oy + (e.clientY - drag.y) * d; syncFrom(i); drawAll(); });
-  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('pointerup', () => { if (drag) saveView(); drag = null; });
   return me;
 }
 function syncFrom(i){
@@ -110,10 +121,27 @@ function syncFrom(i){
   else { const Ai = D.sync.Ainv, ti = D.sync.tinv; b.setCentre([Ai[0][0] * c[0] + Ai[0][1] * c[1] + ti[0], Ai[1][0] * c[0] + Ai[1][1] * c[1] + ti[1]], a.view.k * s); }
 }
 function drawAll(){ P.forEach(p => p.draw()); }
+// view state: zoom relative to the window (rel), centre offset from the anchor (off, µm); kept per nucleus / candidate
+function saveView(){ save('view', {he: D.he, active: D.active, window: D.window, rel: P.map(p => p.view.k / p.k0()),
+  off: P.map(p => { const c = p.centre(), a = p.anchor(); return [c[0] - a[0], c[1] - a[1]]; })}); }
+function restore(){
+  const s = load('view'); P.forEach(p => p.fit());
+  if (!s || s.window !== D.window) return 'fit';
+  P.forEach((p, i) => { const keep = s.he === D.he && (i === 0 || s.active === D.active);   // same nucleus (and candidate on the right): keep the pan
+    const a = p.anchor(), o = keep ? s.off[i] : [0, 0]; p.setCentre([a[0] + o[0], a[1] + o[1]], p.k0() * (s.rel[i] || 1)); });
+  return s.he === D.he ? (s.active === D.active ? 'kept' : 'kept-left') : 'zoom-kept';
+}
 D.panes.forEach((S, i) => P.push(Pane(i, S)));
-P.forEach(p => p.fit()); if (opt.sync) syncFrom(0); drawAll();
-if (window.ResizeObserver) new ResizeObserver(() => { P.forEach(p => { const c = p.view ? p.centre() : null, k = p.view ? p.view.k : null; p.fit(); }); if (opt.sync) syncFrom(0); drawAll(); }).observe(document.body);
-window.__cmp = {D: D, P: P, opt: opt};
+const restored = restore(); if (opt.sync && restored !== 'kept') syncFrom(0); drawAll();
+if (window.ResizeObserver) new ResizeObserver(() => { P.forEach(p => { if (!p.view) { p.fit(); return; } const c = p.centre(), rel = p.view.k / p.k0(); p.size(); p.setCentre(c, p.k0() * rel); });
+  drawAll(); }).observe(document.body);
+// shortcut keys pressed in this frame -> the page (the review viewer listens there); typing in inputs is left alone
+const FWD = ['1', '2', '3', '4', 'Enter', 'Escape'];
+window.addEventListener('keydown', e => { const t = e.target; if (t && (/^(TEXTAREA|SELECT)$/.test(t.tagName || '') || (t.tagName === 'INPUT' && !/^(checkbox|radio|range|button)$/i.test(t.type || 'text')))) return;
+  const k = (e.key || '').toLowerCase(); if (!(FWD.includes(e.key) || (e.ctrlKey && (k === 'z' || k === 'y')))) return;
+  e.preventDefault();
+  try { window.parent.document.dispatchEvent(new KeyboardEvent('keydown', {key: e.key, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, bubbles: true})); } catch (err) {} });
+window.__cmp = {D: D, P: P, opt: opt, restored: restored};
 </script></body></html>"""
 
 LEGEND = {"sel": "選択中のH&E核", "active": "比較中の候補", "cand": "その他の候補（#順位）", "current": "現在の対応先", "target": "クリックしたIF核",
@@ -145,8 +173,12 @@ def item(style, centre=None, poly=None, label=None, kind="nucleus") -> dict:
     return d
 
 
-def pane(title, bounds, items, image=None, note="", scale_um=10) -> dict:
-    return {"title": title, "bounds": [float(v) for v in bounds], "items": items, "image": image, "note": note, "scale_um": scale_um}
+def pane(title, bounds, items, image=None, note="", scale_um=10, anchor=None) -> dict:
+    """anchor: world point the pane is centred on (default: the centre of bounds); bounds give the window size."""
+    d = {"title": title, "bounds": [float(v) for v in bounds], "items": items, "image": image, "note": note, "scale_um": scale_um}
+    if anchor is not None:
+        d["anchor"] = [float(v) for v in np.asarray(anchor, float).ravel()[:2]]
+    return d
 
 
 def sync_spec(M, t) -> dict:
@@ -156,8 +188,12 @@ def sync_spec(M, t) -> dict:
     return {"A": M.tolist(), "t": t.tolist(), "Ainv": Mi.tolist(), "tinv": (-Mi @ t).tolist(), "scale": float(np.sqrt(abs(np.linalg.det(M))))}
 
 
-def html(left: dict, right: dict, sync: dict | None = None, height: int = 420, sync_default: bool = False) -> str:
+def html(left: dict, right: dict, sync: dict | None = None, height: int = 420, sync_default: bool = False, view_key: str | None = None,
+         he=None, active=None, window=None) -> str:
+    """view_key / he / active / window: identify the view state kept across re-renders (see the module docstring)."""
     has_cells = any(it.get("k") == "cell" for p in (left, right) for it in p["items"])
     data = {"panes": [left, right], "sync": sync, "sync_default": bool(sync_default and sync), "styles": STYLES,
-            "legend": {**LEGEND, **(CELL_LEGEND if has_cells else {})}}
+            "legend": {**LEGEND, **(CELL_LEGEND if has_cells else {})}, "view_key": view_key,
+            "he": None if he is None else int(he), "active": None if active is None else int(active),
+            "window": None if window is None else float(window)}
     return _HTML.replace("__DATA__", json.dumps(data, allow_nan=False)).replace("__H__", str(int(height)))
