@@ -271,6 +271,8 @@ def _review_section(S, auto, he_pts, he_ids, if_pts, if_ids, mapped, avail):
             rv = st.session_state[rk] = CR.Review.start(auto)
         if not rv.context.get("segmentation"):
             rv.context.update(segmentation_context(S))     # identifiers of the segmentation used (saved with the review)
+        vk = f"{KEY}-viewer-{auto.auto_id}"
+        _handle_event(st.session_state.get(vk), auto, rv, he_ids, user)   # last click / key of the viewer, before anything is drawn
         _segmentation_check(S)
         _progress(auto, rv)
         st.caption(f"レビュー {rv.review_id}（保存版 v{rv.version}）: 有効な変更 {rv.cursor} 件 / 履歴 {len(rv.history)} 件、対応ペア {len(rv.pairs())} 組、"
@@ -279,26 +281,16 @@ def _review_section(S, auto, he_pts, he_ids, if_pts, if_ids, mapped, avail):
         sel_he = st.session_state.get(f"{KEY}-selhe-{auto.auto_id}")
         sel_if = st.session_state.get(f"{KEY}-selif-{auto.auto_id}")
         cell_selector(S)
-        ev = _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if)
-        if ev and isinstance(ev, dict) and ev.get("kind") == "nucleus":
-            seen = st.session_state.setdefault(f"{KEY}-nonce", set())
-            if ev.get("nonce") not in seen:
-                seen.add(ev.get("nonce"))
-                if ev["role"] == "he":
-                    st.session_state[f"{KEY}-selhe-{auto.auto_id}"] = int(ev["index"])
-                    st.session_state.pop(f"{KEY}-selif-{auto.auto_id}", None)
-                else:
-                    st.session_state[f"{KEY}-selif-{auto.auto_id}"] = int(ev["index"])
-                st.rerun()
-        _nucleus_panel(S, auto, rv, he_pts, he_ids, if_ids, mapped, if_pts, user, avail)
-        u1, u2, u3, u4 = st.columns(4)
-        if u1.button("↶ 取り消す", disabled=rv.cursor == 0, key=f"{KEY}-undo"):
-            rv.undo(user); st.rerun()
-        if u2.button("↷ やり直す", disabled=rv.cursor >= len(rv.ops), key=f"{KEY}-redo"):
-            rv.redo(user); st.rerun()
-        if u3.button("レビューを保存（新しい版）", key=f"{KEY}-save"):
-            p = rv.save(S.sample_id)
-            st.success(f"保存しました: {p}（以前の版は残ります）")
+        st.markdown(QUICK_CSS, unsafe_allow_html=True)
+        left, right = st.columns([3, 1.25], gap="small")
+        quick = right.container(key=f"{KEY}-quick")         # judgement panel: next to the images, kept in view while scrolling
+        cst = _cmp_state(auto, rv, sel_he, sel_if)
+        with left:
+            ev = _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if, cst)
+        if _handle_event(ev, auto, rv, he_ids, user):         # fallback: the event was not visible before the viewer was drawn
+            st.rerun()
+        _nucleus_panel(S, auto, rv, he_pts, he_ids, if_ids, mapped, if_pts, user, avail, left, quick, cst)
+        u4, _ = st.columns([1, 3])
         u4.download_button("レビューJSON", json.dumps(rv.to_json(), ensure_ascii=False, indent=1, default=CR._json_default),
                            file_name=f"{S.sample_id}_{rv.review_id}.json", mime="application/json", key=f"{KEY}-revdl")
         hc, ic = section_contours(S)
@@ -416,7 +408,7 @@ def _cell_label(seg, j):
     return str(seg.ids[j]).split(":")[-1]
 
 
-def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
+def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if, cst=None):
     Ma, ta = np.asarray(auto.meta["global"]["M"]), np.asarray(auto.meta["global"]["t"])
     c_img, c_he, c_if = st.columns([1.2, 1, 1])
     show_img = c_img.toggle("画像を重ねる（概観）", value=any(avail[k]["image"] for k in ("HE", "IF")), key=f"{KEY}-img")
@@ -497,12 +489,23 @@ def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
         pk = c.pack([int(i)], M, t)
         return pk["poly"][0] if pk["poly"] else None
     if sel_he is not None:
+        selected["he_index"] = int(sel_he)
         selected["he"] = mapped[sel_he].round(2).tolist()
         selected["he_poly"] = _poly(he_c, sel_he, Ma, ta)
         cands = auto.candidates[auto.candidates["he_index"] == sel_he]
         selected["candidates"] = cands[["if_x", "if_y"]].to_numpy(float).round(2).tolist()
+        selected["cand_index"] = [int(f) for f in cands["if_index"]]
+        selected["cand_rank"] = [int(r) for r in cands["rank"]]
         selected["cand_polys"] = [q for q in (_poly(if_c, f) for f in cands["if_index"].to_numpy(int)) if q]
+        cur_f = (cst or {}).get("cur", {}).get("if_index")
+        selected["partner"] = None if cur_f is None else int(cur_f)
+        act = (cst or {}).get("active")
+        if act is not None:
+            selected["active"] = int(act)
+            selected["active_xy"] = if_pts[act].round(2).tolist()
+            selected["active_poly"] = _poly(if_c, act)
     if sel_if is not None:
+        selected["if_index"] = int(sel_if)
         selected["if"] = if_pts[sel_if].round(2).tolist()
         selected["if_poly"] = _poly(if_c, sel_if)
     if segs["HE"] is not None and sel_he is not None:          # cell(s) of the selected nucleus (never forced to one)
@@ -514,114 +517,356 @@ def _picker(S, auto, rv, cats, mapped, if_pts, avail, sel_he, sel_if):
             cf = auto.candidates[auto.candidates["he_index"] == sel_he]["if_index"].to_numpy(int)
             selected["cand_cell_polys"] = segs["IF"].pack(sorted({j for f in cf for j in segs["IF"].cells_for(f)}))["poly"]
     pad = 40.0
+    tab = _cand_table(auto)
+    pr = rv.pairs()
+    sc.update({"cand_table": tab, "partner": {str(h): int(pr[h]) for h in in_roi if int(h) in pr},
+               "he_ids": {str(int(h)): str(CR._scalar(he_ids[h])) for h in in_roi}, "focus_windows": [int(w) for w in CMP_WINDOWS]})
     sc.update({"points": pts, "polys": polys, "vectors": None, "selected": selected, "contours": groups, "cell_min_k": 0.6,
                "bounds": [roi[0] - pad, roi[1] - pad, roi[2] + pad, roi[3] + pad], "frame_name": f"{S.sample_id}:IF (fixed frame)",
-               "frame_note": "IF（Fixed）frame の µm。H&E核はGlobal変換後の位置。黄色の輪 = 選択中のH&E核、白い輪 = その対応候補、水色の輪 = 選択中のIF核。"})
-    return crv.interactive(sc, 640, key=f"{KEY}-viewer-{auto.auto_id}", view_key=f"crv-{auto.auto_id}")
+               "frame_note": "IF（Fixed）frame の µm。H&E核はGlobal変換後の位置。黄色の輪 = 選択中のH&E核、白い輪 = その対応候補（#順位）、"
+                             "マゼンタの輪 = 比較中の候補、緑の輪 = 現在の対応先、水色の輪 = Shift+クリックしたIF核。"})
+    return crv.interactive(sc, 620, key=f"{KEY}-viewer-{auto.auto_id}", view_key=f"crv-{auto.auto_id}")
 
 
-def _nucleus_panel(S, auto, rv, he_pts, he_ids, if_ids, mapped, if_pts, user, avail):
-    sel_he = st.session_state.get(f"{KEY}-selhe-{auto.auto_id}")
-    sel_if = st.session_state.get(f"{KEY}-selif-{auto.auto_id}")
-    c1, c2 = st.columns([1, 1])
-    typed = c1.text_input("H&E核IDで選択", key=f"{KEY}-typehe", placeholder="例: 1234")
-    if typed:
-        hit = np.flatnonzero(np.asarray([str(CR._scalar(v)) for v in he_ids]) == typed.strip())
-        if len(hit) and int(hit[0]) in set(auto.he_idx.tolist()):
-            sel_he = int(hit[0]); st.session_state[f"{KEY}-selhe-{auto.auto_id}"] = sel_he
+def _cand_table(auto) -> dict:
+    """{he_index: [[if_index, if_x, if_y, rank], ...]} (the top-k candidates) for instant feedback in the viewer."""
+    cache = st.session_state.setdefault(f"{KEY}-candtab", {})
+    if auto.auto_id not in cache:
+        c = auto.candidates.sort_values(["he_index", "rank"])
+        out = {}
+        for h, f, x, y, r in zip(c["he_index"].to_numpy(int), c["if_index"].to_numpy(int), c["if_x"].to_numpy(float),
+                                 c["if_y"].to_numpy(float), c["rank"].to_numpy(int)):
+            out.setdefault(str(int(h)), []).append([int(f), round(float(x), 2), round(float(y), 2), int(r)])
+        cache.clear()
+        cache[auto.auto_id] = out
+    return cache[auto.auto_id]
+
+
+# ----------------------------------------------------------------------------- selection, events and the judgement panel (2026-11-25)
+QUICK_CSS = """<style>
+div[data-testid="stLayoutWrapper"]:has(> div.st-key-regx-crv-quick){position:sticky;top:3.75rem;z-index:5;align-self:flex-start}
+div.st-key-regx-crv-quick{max-height:calc(100vh - 4.5rem);overflow-y:auto;overflow-x:hidden;
+  padding:0.4rem 0.5rem;border:1px solid rgba(128,128,128,.35);border-radius:0.5rem;background:var(--background-color, inherit)}
+div[data-testid="stColumn"]:has(div.st-key-regx-crv-quick){align-self:stretch}
+div.st-key-regx-crv-quick button p{font-size:0.85rem}
+</style>"""
+VERDICT_KEYS = ("confirm", "not_identified", "absent", "uncertain")
+VERDICT_LABELS = {"confirm": "対応確認", "not_identified": "未特定", "absent": "非観測", "uncertain": "判断不能"}
+
+
+def _flash(text, level="info"):
+    st.session_state[f"{KEY}-flash"] = (level, text)
+
+
+def _select_he(auto, h):
+    """Select an H&E nucleus (None = deselect).  A different nucleus starts with a clear comment and its default candidate."""
+    aid = auto.auto_id
+    prev = st.session_state.get(f"{KEY}-selhe-{aid}")
+    if h is None:
+        st.session_state.pop(f"{KEY}-selhe-{aid}", None)
+    else:
+        st.session_state[f"{KEY}-selhe-{aid}"] = int(h)
+        if prev != h:                                        # re-clicking the same nucleus keeps the compared candidate
+            st.session_state.pop(f"{KEY}-cmpcand-{int(h)}-a", None)
+    st.session_state.pop(f"{KEY}-selif-{aid}", None)
+    if prev != h:
+        st.session_state[f"{KEY}-clearreason"] = True
+
+
+def _undo_redo(auto, rv, which, user, he_ids):
+    try:
+        (rv.undo if which == "undo" else rv.redo)(user)
+    except CR.ReviewError as exc:
+        _flash(str(exc), "warning")
+        return
+    seq = rv.history[-1]["target_seq"]
+    op = next(o for o in rv.ops if o["seq"] == seq)
+    if int(op["he_index"]) in set(auto.he_idx.tolist()):
+        _select_he(auto, int(op["he_index"]))              # show the nucleus whose verdict was undone / redone
+    _flash(f"{'取り消しました' if which == 'undo' else 'やり直しました'}: H&E核 {CR._scalar(he_ids[op['he_index']])} の"
+           f"『{CR.OP_LABELS.get(op['op'], op['op'])}』", "info")
+
+
+def _handle_event(ev, auto, rv, he_ids, user) -> bool:
+    """Apply one viewer event (click / key) to the session state; each event (nonce) is used once.  Verdict keys are only
+    queued here (they are recorded by the judgement panel through the same path as its buttons, i.e. Review.apply)."""
+    if not isinstance(ev, dict) or not ev.get("nonce"):
+        return False
+    seen = st.session_state.setdefault(f"{KEY}-nonce", set())
+    if ev["nonce"] in seen:
+        return False
+    seen.add(ev["nonce"])
+    aid = auto.auto_id
+    sel = st.session_state.get(f"{KEY}-selhe-{aid}")
+    in_roi = set(auto.he_idx.tolist())
+    kind, role = ev.get("kind"), ev.get("role")
+    if kind == "nucleus" and role == "he":
+        h = int(ev["index"])
+        if h in in_roi:
+            _select_he(auto, h)
         else:
-            c1.error("このIDのH&E核はROI内にありません（不正なIDまたはROI外）")
-    typed_if = c2.text_input("対応先のIF核IDを指定", key=f"{KEY}-typeif", placeholder="例: 5678")
-    if typed_if:
-        hit = np.flatnonzero(np.asarray([str(CR._scalar(v)) for v in if_ids]) == typed_if.strip())
-        if len(hit):
-            sel_if = int(hit[0]); st.session_state[f"{KEY}-selif-{auto.auto_id}"] = sel_if
-        else:
-            c2.error("このIDのIF核はありません（不正なID）")
+            _flash("このH&E核は自動推定のROIの外です", "warning")
+    elif kind == "nucleus" and role == "if":
+        st.session_state[f"{KEY}-selif-{aid}"] = int(ev["index"])
+        if sel is not None:
+            st.session_state[f"{KEY}-cmpcand-{sel}-a"] = int(ev["index"])
+    elif kind == "candidate":
+        if sel is not None and ev.get("he") is not None and int(ev["he"]) == int(sel):
+            st.session_state[f"{KEY}-cmpcand-{sel}-a"] = int(ev["index"])
+    elif kind == "deselect":
+        _select_he(auto, None)
+    elif kind == "key":
+        act = ev.get("action")
+        if act == "next":
+            nxt = _next_unreviewed(auto, rv, sel)
+            if nxt is None:
+                _flash("未レビューの核はありません", "info")
+            else:
+                _select_he(auto, nxt)
+        elif act in ("undo", "redo"):
+            _undo_redo(auto, rv, act, user, he_ids)
+        elif act in VERDICT_KEYS:
+            h = ev.get("he")
+            if h is None or sel is None or int(h) != int(sel):
+                # the key was pressed for a nucleus whose selection had not reached Python yet: select it, record nothing
+                if h is not None and int(h) in in_roi:
+                    _select_he(auto, int(h))
+                _flash("選択が切り替わる途中だったため、判定は記録していません。表示を確認して、もう一度キーを押してください。", "warning")
+                return True
+            if ev.get("active") is not None:
+                st.session_state[f"{KEY}-cmpcand-{sel}-a"] = int(ev["active"])
+            st.session_state[f"{KEY}-pend-{aid}"] = {"action": act, "he": int(h)}
+    else:
+        return False
+    return True
+
+
+def _cmp_state(auto, rv, sel_he, sel_if):
+    """Candidates of the selected nucleus and the one being compared (radio state, default = current partner)."""
     if sel_he is None:
-        st.caption("ビューアーで『H&E核を選択』にしてH&E核をクリックすると、左右比較・対応候補・判定ボタンが表示されます。")
+        return None
+    cur = rv.state().get(sel_he, {"if_index": None, "decision": "none"})
+    cands = auto.candidates[auto.candidates["he_index"] == sel_he].copy()
+    opts = [int(f) for f in cands["if_index"].to_numpy(int)]
+    opts += [int(f) for f in dict.fromkeys(f for f in (cur["if_index"], sel_if) if f is not None and int(f) not in opts)]
+    rank = {int(f): int(rk) for f, rk in zip(cands["if_index"], cands["rank"])}
+    rk = f"{KEY}-cmpcand-{sel_he}-a"
+    if opts:
+        if st.session_state.get(rk) not in opts:
+            st.session_state[rk] = cur["if_index"] if cur["if_index"] in opts else (sel_if if sel_if in opts else opts[0])
+        active = int(st.session_state[rk])
+    else:
+        st.session_state.pop(rk, None)
+        active = None
+    return {"cur": cur, "cands": cands, "opts": opts, "rank": rank, "rk": rk, "active": active}
+
+
+def _type_select(auto, he_ids, if_ids):
+    """on_change of the ID boxes (applied once, so a later click is not overridden)."""
+    aid = auto.auto_id
+    typed = (st.session_state.get(f"{KEY}-typehe") or "").strip()
+    if typed:
+        hit = np.flatnonzero(np.asarray([str(CR._scalar(v)) for v in he_ids]) == typed)
+        if len(hit) and int(hit[0]) in set(auto.he_idx.tolist()):
+            _select_he(auto, int(hit[0]))
+        else:
+            _flash("このIDのH&E核はROI内にありません（不正なIDまたはROI外）", "error")
+    typed_if = (st.session_state.get(f"{KEY}-typeif") or "").strip()
+    sel = st.session_state.get(f"{KEY}-selhe-{aid}")
+    if typed_if:
+        hit = np.flatnonzero(np.asarray([str(CR._scalar(v)) for v in if_ids]) == typed_if)
+        if len(hit):
+            st.session_state[f"{KEY}-selif-{aid}"] = int(hit[0])
+            if sel is not None:
+                st.session_state[f"{KEY}-cmpcand-{sel}-a"] = int(hit[0])
+        else:
+            _flash("このIDのIF核はありません（不正なID）", "error")
+
+
+def _focus_comment():
+    """Move the keyboard focus to the comment box (absent needs a comment); nothing is saved."""
+    components.html("<script>(function(){ const d = window.parent.document; const el = Array.from(d.querySelectorAll('input'))"
+                    ".find(e => (e.getAttribute('aria-label') || '').startsWith('コメント（')); if (el) { el.focus(); el.scrollIntoView({block: 'nearest'}); } })();"
+                    f"/* {np.random.randint(1 << 30)} */</script>", height=0)
+
+
+def _nucleus_panel(S, auto, rv, he_pts, he_ids, if_ids, mapped, if_pts, user, avail, left=None, quick=None, cst=None):
+    left = left if left is not None else st.container()
+    quick = quick if quick is not None else st.container()
+    aid = auto.auto_id
+    sel_he = st.session_state.get(f"{KEY}-selhe-{aid}")
+    sel_if = st.session_state.get(f"{KEY}-selif-{aid}")
+    if cst is None:
+        cst = _cmp_state(auto, rv, sel_he, sel_if)
+    if st.session_state.pop(f"{KEY}-clearreason", False):
+        st.session_state[f"{KEY}-reason"] = ""
+    with quick:
+        st.markdown("**判定パネル**")
+        fl = st.session_state.pop(f"{KEY}-flash", None)
+        if fl:
+            getattr(st, fl[0] if fl[0] in ("info", "warning", "error", "success") else "info")(fl[1])
+        c1, c2 = st.columns(2)
+        c1.text_input("H&E核IDで選択", key=f"{KEY}-typehe", placeholder="例: 1234", on_change=_type_select, args=(auto, he_ids, if_ids))
+        c2.text_input("対応先のIF核ID", key=f"{KEY}-typeif", placeholder="例: 5678", on_change=_type_select, args=(auto, he_ids, if_ids))
+    if sel_he is None:
+        with quick:
+            st.caption("画像の H&E核を**左クリック**すると、その核を拡大し、左右比較と判定をここに表示します。モードの切り替えは不要です。"
+                       "ドラッグで移動、ホイールでズーム。Enter で次の未レビュー核へ進みます。")
+            _nav_buttons(S, auto, rv, user, he_ids, None)
         return
     row = auto.table[auto.table["he_index"] == sel_he]
     if row.empty:
-        st.warning("選択したH&E核はこの自動推定のROIにありません。")
+        quick.warning("選択したH&E核はこの自動推定のROIにありません。")
         return
     r = row.iloc[0]
-    cur = rv.state().get(sel_he, {"if_index": None, "decision": "none"})
+    cur, cands, opts, rank, rk = cst["cur"], cst["cands"], cst["opts"], cst["rank"], cst["rk"]
     ver = rv.verdicts().get(sel_he)
     he_c, if_c = section_contours(S)
-    with st.container(border=True):
-        st.markdown(f"**H&E核 {CR._scalar(he_ids[sel_he])}**（index {sel_he}）— アルゴリズム: **{r['status']}**"
-                    f"（B2 matched {_fmt(r['b2_match_prob'])}、unmatched {_fmt(r['b2_unmatched_prob'])}）｜ 人のレビュー: "
-                    f"**{CR.REVIEW_STATUSES[ver['review_status']] if ver else CR.REVIEW_STATUSES['unreviewed']}**"
-                    + (f"、現在の対応先 IF {CR._scalar(if_ids[cur['if_index']])}" if cur["if_index"] is not None else ""))
-        if ver:
-            st.caption(f"最終の判定: {ver['user']} {ver['at']}" + (f"、コメント「{ver['reason']}」" if ver["reason"] else "")
-                       + (f"、タグ: {', '.join(CR.REVIEW_TAGS[x] for x in ver['tags'])}" if ver["tags"] else ""))
-        st.caption(f"H&E座標 ({r['he_x']:.1f}, {r['he_y']:.1f}) µm → 変換後 ({r['mapped_x']:.1f}, {r['mapped_y']:.1f}) µm（IF frame）。"
-                   f" 周辺30 µm内: H&E {r['n_he_within_30um']} 個、IF {r['n_if_within_30um']} 個。根拠: {r['adoption_reason']}"
-                   f"。輪郭: H&E {he_c.status[sel_he] if he_c is not None else 'なし'}")
-        cands = auto.candidates[auto.candidates["he_index"] == sel_he].copy()
-        cands["対応先(現在)"] = cands["if_index"] == cur["if_index"]
-        st.dataframe(cands[["rank", "if_id", "distance_um", "mass_share", "graph_support", "position_graph_cost", "対応先(現在)"]], hide_index=True)
-        active = _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids, if_ids, avail, he_c, if_c)
-        cell = _cell_review_inputs(S, sel_he, active if active is not None else cur["if_index"], he_ids, if_ids)
-        reason = st.text_input("コメント（履歴に保存。非観測では必須）", key=f"{KEY}-reason")
-        tags = st.multiselect("補助タグ", list(CR.REVIEW_TAGS), format_func=CR.REVIEW_TAGS.get, key=f"{KEY}-tags-{sel_he}")
-        adv = st.checkbox("記録したら次の未レビュー核へ進む", key=f"{KEY}-advance")
-        fe = S.modality("IF").extent()
-        scope = {"window_um": st.session_state.get(f"{KEY}-cmpw", CMP_WINDOWS[1]), "if_image_used": bool(avail["IF"]["image"]),
-                 "inside_if_extent": (bool(0 <= mapped[sel_he, 0] <= fe[0] and 0 <= mapped[sel_he, 1] <= fe[1]) if fe else None),
-                 "if_contours_available": if_c is not None, "algorithm_status": str(r["status"])}
 
-        def do(op, f=None):
-            try:
-                rv.apply(op, sel_he, f, user=user, reason=reason, tags=tags, scope=scope if op in CR.VERDICT_OPS else None,
-                         cell=cell if op not in ("exclude", "unset", "reset") else None)
-            except CR.ReviewError as exc:
-                st.error(str(exc))
-                return
-            if adv:
-                nxt = _next_unreviewed(auto, rv, sel_he)
-                if nxt is not None:
-                    st.session_state[f"{KEY}-selhe-{auto.auto_id}"] = nxt
-                    st.session_state.pop(f"{KEY}-selif-{auto.auto_id}", None)
-            st.rerun()
-        st.markdown("**判定**（アルゴリズムの結果は変更されず、別に記録します）")
-        b = st.columns(6)
+    def lab(f):
+        d = float(np.linalg.norm(if_pts[f] - mapped[sel_he]))
+        tag = (" ・現在の対応先" if f == cur["if_index"] else "") + (" ・指定したIF核" if f == sel_if else "")
+        if f in rank:
+            rr = cands[cands["if_index"] == f].iloc[0]
+            return f"#{rank[f]} IF {CR._scalar(if_ids[f])}  {d:.1f} µm  mass {rr['mass_share']:.2f}{tag}"
+        return f"候補外 IF {CR._scalar(if_ids[f])}  {d:.1f} µm{tag}"
+    with quick:
+        st.markdown(f"**H&E核 {CR._scalar(he_ids[sel_he])}**（index {sel_he}）  \n"
+                    f"自動推定: **{r['status']}**（B2 matched {_fmt(r['b2_match_prob'], 2)}）  \n"
+                    f"人のレビュー: **{CR.REVIEW_STATUSES[ver['review_status']] if ver else CR.REVIEW_STATUSES['unreviewed']}**  \n"
+                    f"現在の対応先: **{('IF ' + str(CR._scalar(if_ids[cur['if_index']]))) if cur['if_index'] is not None else 'なし'}**")
+        if opts:
+            active = st.radio("比較する候補（自動推定の上位5件）", opts, format_func=lab, key=rk)
+            active = None if active is None else int(active)
+        else:
+            active = None
+            st.caption("候補がありません（ROIの周辺にIF核がない）。Shift+クリックで任意のIF核を指定できます。")
+        st.markdown(f"比較中の IF候補: **{('IF ' + str(CR._scalar(if_ids[active]))) if active is not None else 'なし'}**")
+    with left:
+        _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids, if_ids, avail, he_c, if_c, active, opts, rank)
+        with st.expander("選択核の詳細・細胞輪郭・補助タグ・その他の操作", expanded=False):
+            if ver:
+                st.caption(f"最終の判定: {ver['user']} {ver['at']}" + (f"、コメント「{ver['reason']}」" if ver["reason"] else "")
+                           + (f"、タグ: {', '.join(CR.REVIEW_TAGS[x] for x in ver['tags'])}" if ver["tags"] else ""))
+            st.caption(f"H&E座標 ({r['he_x']:.1f}, {r['he_y']:.1f}) µm → 変換後 ({r['mapped_x']:.1f}, {r['mapped_y']:.1f}) µm（IF frame）。"
+                       f" B2 unmatched {_fmt(r['b2_unmatched_prob'])}。周辺30 µm内: H&E {r['n_he_within_30um']} 個、IF {r['n_if_within_30um']} 個。"
+                       f"根拠: {r['adoption_reason']}。輪郭: H&E {he_c.status[sel_he] if he_c is not None else 'なし'}")
+            ct = cands.copy()
+            ct["対応先(現在)"] = ct["if_index"] == cur["if_index"]
+            st.dataframe(ct[["rank", "if_id", "distance_um", "mass_share", "graph_support", "position_graph_cost", "対応先(現在)"]], hide_index=True)
+            cell = _cell_review_inputs(S, sel_he, active if active is not None else cur["if_index"], he_ids, if_ids)
+            tags = st.multiselect("補助タグ", list(CR.REVIEW_TAGS), format_func=CR.REVIEW_TAGS.get, key=f"{KEY}-tags-{sel_he}")
+            other = st.container()
+    fe = S.modality("IF").extent()
+    scope = {"window_um": st.session_state.get(f"{KEY}-cmpw", CMP_WINDOWS[1]), "if_image_used": bool(avail["IF"]["image"]),
+             "inside_if_extent": (bool(0 <= mapped[sel_he, 0] <= fe[0] and 0 <= mapped[sel_he, 1] <= fe[1]) if fe else None),
+             "if_contours_available": if_c is not None, "algorithm_status": str(r["status"])}
+    with quick:
+        reason = st.text_input("コメント（履歴に保存。非観測では必須）", key=f"{KEY}-reason")
+        adv = st.checkbox("判定を記録したら次の未レビュー核へ進む", key=f"{KEY}-advance")
+
+    def do(op, f=None):
+        try:
+            rv.apply(op, sel_he, f, user=user, reason=reason, tags=tags, scope=scope if op in CR.VERDICT_OPS else None,
+                     cell=cell if op not in ("exclude", "unset", "reset") else None)
+        except CR.ReviewError as exc:
+            quick.error(str(exc))
+            if op == "absent":
+                with quick:
+                    _focus_comment()
+            return
+        msg = f"記録しました: H&E核 {CR._scalar(he_ids[sel_he])} →『{CR.OP_LABELS.get(op, op)}』" + (f"（IF {CR._scalar(if_ids[f])}）" if f is not None else "")
+        if adv and (op in CR.VERDICT_OPS or op in ("support", "reassign", "add")):   # a verdict was recorded
+            nxt = _next_unreviewed(auto, rv, sel_he)
+            if nxt is not None:
+                _select_he(auto, nxt)
+                msg += f"。次の未レビュー核 {CR._scalar(he_ids[nxt])} へ進みました"
+        _flash(msg, "success")
+        st.rerun()
+
+    def confirm():
+        if active is None:
+            quick.warning("比較する候補がないため、対応確認は記録できません。")
+            return
+        if active == cur["if_index"]:
+            do("support")
+        else:
+            do("reassign" if cur["if_index"] is not None else "add", int(active))
+    with quick:
         lab_ok = "この対応を確認" if (active is not None and active == cur["if_index"]) else "この候補で対応確認"
-        if b[0].button(f"✔ {lab_ok}", disabled=active is None, key=f"{KEY}-cmpok", type="primary"):
-            if active == cur["if_index"]:
-                do("support")
-            else:
-                do("reassign" if cur["if_index"] is not None else "add", int(active))
-        if b[1].button("未特定", key=f"{KEY}-nid", help="対応する核はあり得るが、候補や観察からは特定できない"):
+        b = st.columns(2)
+        if b[0].button("✔ 対応確認 [1]", disabled=active is None, key=f"{KEY}-cmpok", type="primary", width="stretch",
+                       help=f"{lab_ok}（比較中の候補を対応先として確認）"):
+            confirm()
+        if b[1].button("未特定 [2]", key=f"{KEY}-nid", width="stretch", help="対応する核はあり得るが、候補や観察からは特定できない"):
             do("not_identified")
-        if b[2].button("非観測（IF）", key=f"{KEY}-abs", help="IF切片の観察範囲に対応する核が見えないと判断した（生物学的な非存在の証明ではない）。コメント必須"):
+        b = st.columns(2)
+        if b[0].button("非観測 [3]", key=f"{KEY}-abs", width="stretch",
+                       help="IF切片の観察範囲に対応する核が見えないと判断した（生物学的な非存在の証明ではない）。コメント必須"):
             do("absent")
-        if b[3].button("判断不能", key=f"{KEY}-unc", help="画像品質・セグメンテーション不良・候補の競合などで判断できない"):
+        if b[1].button("判断不能 [4]", key=f"{KEY}-unc", width="stretch", help="画像品質・セグメンテーション不良・候補の競合などで判断できない"):
             do("uncertain")
-        if b[4].button("対応を解除", disabled=cur["if_index"] is None, key=f"{KEY}-exc", help="対応先を外す（判定は記録しない）"):
+        b = st.columns(2)
+        if b[0].button("対応を解除", disabled=cur["if_index"] is None, key=f"{KEY}-exc", width="stretch", help="対応先を外す（判定は記録しない）"):
             do("exclude")
-        if b[5].button("未レビューに戻す", disabled=(ver is None and cur["decision"] in ("auto", "none")), key=f"{KEY}-reset"):
+        if b[1].button("未レビューに戻す", disabled=(ver is None and cur["decision"] in ("auto", "none")), key=f"{KEY}-reset", width="stretch"):
             do("reset")
-        st.caption("非観測は『候補がない』『確信度が低い』だけを理由にしないでください。判定は何度でも記録し直せます（履歴に残ります）。")
-        with st.expander("その他の操作（現在の対応の支持・候補の一覧から変更・任意のIF核）"):
-            o = st.columns(4)
-            if o[0].button("現在の対応を支持する", disabled=cur["if_index"] is None, key=f"{KEY}-sup"):
-                do("support")
-            if o[1].button("対応を外す（未確定）", key=f"{KEY}-uns"):
-                do("unset")
-            pick = o[2].selectbox("候補に変更", [None] + cands["if_index"].tolist(),
-                                  format_func=lambda f: "候補を選ぶ" if f is None else f"#{int(cands.loc[cands.if_index == f, 'rank'].iloc[0])} IF {CR._scalar(if_ids[f])}",
-                                  key=f"{KEY}-candpick-{sel_he}")
-            if pick is not None and o[2].button("この候補にする", key=f"{KEY}-candset"):
-                do("reassign" if cur["if_index"] is not None else "add", int(pick))
-            if sel_if is not None:
-                d = float(np.linalg.norm(if_pts[sel_if] - mapped[sel_he]))
-                if o[3].button(f"IF {CR._scalar(if_ids[sel_if])} を対応先にする（{d:.1f} µm）", key=f"{KEY}-ifset"):
-                    do("reassign" if cur["if_index"] is not None else "add", int(sel_if))
-            else:
-                o[3].caption("ビューアーで『対応先のIF核を選択』にしてIF核をクリックすると、任意のIF核を対応先にできます。")
+        _nav_buttons(S, auto, rv, user, he_ids, sel_he)
+        st.caption("核をクリックしただけでは記録しません。非観測は『候補がない』『確信度が低い』だけを理由にしないでください。")
+    # a verdict key (1-4) from the viewer, for this nucleus: same path as the buttons
+    pend = st.session_state.pop(f"{KEY}-pend-{aid}", None)
+    if pend and int(pend["he"]) == int(sel_he):
+        a = pend["action"]
+        if a == "confirm":
+            confirm()
+        elif a == "absent" and not (reason or "").strip():
+            quick.warning("非観測にはコメントが必要です。コメント欄に根拠を入力してから、もう一度 3 を押すかボタンを押してください（保存していません）。")
+            with quick:
+                _focus_comment()
+        else:
+            do(a)
+    with other:
+        o = st.columns(4)
+        if o[0].button("現在の対応を支持する", disabled=cur["if_index"] is None, key=f"{KEY}-sup"):
+            do("support")
+        if o[1].button("対応を外す（未確定）", key=f"{KEY}-uns"):
+            do("unset")
+        pick = o[2].selectbox("候補に変更", [None] + cands["if_index"].tolist(),
+                              format_func=lambda f: "候補を選ぶ" if f is None else f"#{int(cands.loc[cands.if_index == f, 'rank'].iloc[0])} IF {CR._scalar(if_ids[f])}",
+                              key=f"{KEY}-candpick-{sel_he}")
+        if pick is not None and o[2].button("この候補にする", key=f"{KEY}-candset"):
+            do("reassign" if cur["if_index"] is not None else "add", int(pick))
+        if sel_if is not None:
+            d = float(np.linalg.norm(if_pts[sel_if] - mapped[sel_he]))
+            if o[3].button(f"IF {CR._scalar(if_ids[sel_if])} を対応先にする（{d:.1f} µm）", key=f"{KEY}-ifset"):
+                do("reassign" if cur["if_index"] is not None else "add", int(sel_if))
+        else:
+            o[3].caption("画像で Shift+クリックしたIF核を、対応先にできます。")
+
+
+def _nav_buttons(S, auto, rv, user, he_ids, sel_he):
+    """Next / deselect / undo / redo / save (inside the judgement panel)."""
+    b = st.columns(2)
+    if b[0].button("次の未レビュー [Enter]", key=f"{KEY}-next", width="stretch"):
+        nxt = _next_unreviewed(auto, rv, sel_he)
+        if nxt is None:
+            _flash("未レビューの核はありません", "info")
+        else:
+            _select_he(auto, nxt)
+        st.rerun()
+    if b[1].button("選択解除 [Esc]", disabled=sel_he is None, key=f"{KEY}-desel", width="stretch"):
+        _select_he(auto, None)
+        st.rerun()
+    b = st.columns(2)
+    if b[0].button("↶ 取り消す [Ctrl+Z]", disabled=rv.cursor == 0, key=f"{KEY}-undo", width="stretch"):
+        _undo_redo(auto, rv, "undo", user, he_ids)
+        st.rerun()
+    if b[1].button("↷ やり直す [Ctrl+Y]", disabled=rv.cursor >= len(rv.ops), key=f"{KEY}-redo", width="stretch"):
+        _undo_redo(auto, rv, "redo", user, he_ids)
+        st.rerun()
+    if st.button("レビューを保存（新しい版）", key=f"{KEY}-save", width="stretch"):
+        p = rv.save(S.sample_id)
+        st.success(f"保存しました: {p}（以前の版は残ります）")
 
 
 def _cell_rows(seg, nucleus_index, ids):
@@ -695,34 +940,17 @@ def _crop(S, key, centre, window, mode):
     return cache[ck]
 
 
-def _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids, if_ids, avail, he_c, if_c):
-    """Left: H&E (own frame) / right: IF (own frame), undeformed; returns the IF index being compared (or None)."""
-    st.markdown("**左右比較**（左: H&E、右: IF。どちらも未変形の元画像と、その切片の座標）")
-    opts = list(cands["if_index"].to_numpy(int))
-    extra = [f for f in (cur["if_index"], sel_if) if f is not None and f not in opts]
-    opts = opts + [int(f) for f in dict.fromkeys(extra)]
-    rank = {int(f): int(rk) for f, rk in zip(cands["if_index"], cands["rank"])}
-
-    def lab(f):
-        d = float(np.linalg.norm(if_pts[f] - mapped[sel_he]))
-        tag = (" ・現在の対応先" if f == cur["if_index"] else "") + (" ・クリックしたIF核" if f == sel_if else "")
-        if f in rank:
-            rr = cands[cands["if_index"] == f].iloc[0]
-            return f"#{rank[f]} IF {CR._scalar(if_ids[f])}  {d:.1f} µm  mass {rr['mass_share']:.2f}  graph {_fmt(rr['graph_support'], 2)}{tag}"
-        return f"候補外 IF {CR._scalar(if_ids[f])}  {d:.1f} µm{tag}"
-    c1, c2, c3 = st.columns([3, 1, 1])
-    active = None
-    if opts:
-        default = opts.index(cur["if_index"]) if cur["if_index"] in opts else (opts.index(sel_if) if sel_if in opts else 0)
-        active = c1.radio("比較する候補", opts, index=default, format_func=lab, key=f"{KEY}-cmpcand-{sel_he}-{cur['if_index']}-{sel_if}")
-    else:
-        c1.caption("候補がありません（ROIの周辺にIF核がない）。")
-    w = c2.selectbox("拡大範囲", list(CMP_WINDOWS), index=1, format_func=lambda v: f"{v:g} µm 四方", key=f"{KEY}-cmpw")
-    sync = c3.checkbox("位置を同期", value=False, key=f"{KEY}-cmpsync")
+def _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids, if_ids, avail, he_c, if_c, active, opts, rank):
+    """Left: H&E (own frame) / right: IF (own frame), undeformed.  Left is centred on the selected nucleus, right on the
+    compared candidate (or the Global prediction when there is none).  The compared candidate is chosen in the judgement panel."""
+    c1, c2 = st.columns([3, 1])
+    c1.markdown("**左右比較**（左: H&E、右: IF。どちらも未変形の元画像と、その切片の座標）")
+    w = c2.selectbox("拡大範囲", list(CMP_WINDOWS), index=1, format_func=lambda v: f"{v:g} µm 四方", key=f"{KEY}-cmpw", label_visibility="collapsed")
     he_mode = st.session_state.get(f"{KEY}-hem", "rgb")
     if_mode = st.session_state.get(f"{KEY}-ifm", "rgb")
     Ma, ta = np.asarray(auto.meta["global"]["M"]), np.asarray(auto.meta["global"]["t"])
-    cl, cr = he_pts[sel_he], mapped[sel_he]
+    cl, cp = he_pts[sel_he], mapped[sel_he]
+    cr = if_pts[active] if active is not None else cp
     half = w / 2.0
     bl = [cl[0] - half, cl[1] - half, cl[0] + half, cl[1] + half]
     br = [cr[0] - half, cr[1] - half, cr[0] + half, cr[1] + half]
@@ -745,7 +973,7 @@ def _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids
         style = "active" if f == active else ("current" if f == cur["if_index"] else ("target" if f == sel_if else "cand"))
         lb = (f"#{rank[f]} " if f in rank else "") + f"IF {CR._scalar(if_ids[f])}"
         items_r.append(cmpv.item(style, if_pts[f], if_c.polygon(f) if if_c is not None else None, lb))
-    items_r.append(cmpv.item("sel", cr, None, "H&E核の予測位置（Global）"))
+    items_r.append(cmpv.item("sel", cp, None, "H&E核の予測位置（Global）"))
     segs = cell_segs(S)
     for g, its, box, hot in ((segs["HE"], items_l, bl, set(segs["HE"].cells_for(sel_he)) if segs["HE"] is not None else set()),
                              (segs["IF"], items_r, br, {j for f in ([active] if active is not None else []) + ([sel_if] if sel_if is not None else [])
@@ -758,9 +986,11 @@ def _compare(S, auto, sel_he, sel_if, cur, cands, he_pts, mapped, if_pts, he_ids
     img_r = _crop(S, "IF", cr, w, if_mode) if avail["IF"]["image"] else None
     note_l = "" if img_l else "H&E画像なし（輪郭・中心点のみ）"
     note_r = "" if img_r else "IF画像なし（輪郭・中心点のみ）"
-    left = cmpv.pane(f"H&E {S.sample_id}（未変形、H&E frame µm）", bl, items_l, img_l, note_l)
-    right = cmpv.pane(f"IF {S.sample_id}（未変形、IF frame µm）", br, items_r, img_r, note_r)
-    components.html(cmpv.html(left, right, cmpv.sync_spec(Ma, ta), height=380, sync_default=sync), height=470)
+    left = cmpv.pane(f"H&E {S.sample_id}（未変形、H&E frame µm）", bl, items_l, img_l, note_l, anchor=cl)
+    right = cmpv.pane(f"IF {S.sample_id}（未変形、IF frame µm）" + ("・比較中の候補を中心" if active is not None else "・予測位置を中心"),
+                      br, items_r, img_r, note_r, anchor=cr)
+    components.html(cmpv.html(left, right, cmpv.sync_spec(Ma, ta), height=360, view_key=f"crv-cmp-{auto.auto_id}", he=sel_he, active=active,
+                              window=w), height=450)
     st.session_state[f"{KEY}-cmp-last"] = {"he": int(sel_he), "active": None if active is None else int(active), "left": left, "right": right}
     return None if active is None else int(active)
 
